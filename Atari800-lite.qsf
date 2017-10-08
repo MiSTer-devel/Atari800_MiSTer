@@ -39,7 +39,7 @@ set_global_assignment -name GENERATE_RBF_FILE ON
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name SAVE_DISK_SPACE OFF
-set_global_assignment -name SMART_RECOMPILE ON
+set_global_assignment -name SMART_RECOMPILE OFF
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
@@ -50,6 +50,8 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS OFF
 set_global_assignment -name OPTIMIZE_POWER_DURING_FITTING OFF
 set_global_assignment -name FINAL_PLACEMENT_OPTIMIZATION ALWAYS
+set_global_assignment -name FITTER_EFFORT "AUTO FIT"
+set_global_assignment -name SEED 1
 
 #============================================================
 # ADC
@@ -391,7 +393,6 @@ set_global_assignment -name VHDL_FILE ./common/a8core/pokey_poly_17_9.vhdl
 set_global_assignment -name VHDL_FILE ./common/a8core/pokey_poly_4.vhdl
 set_global_assignment -name VHDL_FILE ./common/a8core/pokey_poly_5.vhdl
 set_global_assignment -name VHDL_FILE ./common/a8core/pot_from_signed.vhdl
-set_global_assignment -name VHDL_FILE ./common/a8core/ps2_to_atari5200.vhdl
 set_global_assignment -name VHDL_FILE ./common/a8core/ps2_to_atari800.vhdl
 set_global_assignment -name VHDL_FILE ./common/a8core/reg_file.vhdl
 set_global_assignment -name VHDL_FILE ./common/a8core/shared_enable.vhdl
