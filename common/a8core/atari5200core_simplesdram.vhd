@@ -47,9 +47,14 @@ ENTITY atari5200core_simplesdram is
 		VIDEO_R :  OUT  STD_LOGIC_VECTOR(video_bits-1 DOWNTO 0);
 			-- These ones are probably only needed for e.g. svideo
 		VIDEO_BLANK : out std_logic;
+		VIDEO_PIXCE : out std_logic;
 		VIDEO_BURST : out std_logic;
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
+		
+		HBLANK_EX : OUT STD_LOGIC;
+
+		POKEY_ENABLE : out std_logic;
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
@@ -232,9 +237,13 @@ atari5200_simple_sdram1 : entity work.atari5200core
 		VIDEO_G => VIDEO_G,
 		VIDEO_R => VIDEO_R,
 		VIDEO_BLANK => VIDEO_BLANK,
+		VIDEO_PIXCE => VIDEO_PIXCE,
 		VIDEO_BURST => VIDEO_BURST,
 		VIDEO_START_OF_FIELD => VIDEO_START_OF_FIELD,
 		VIDEO_ODD_LINE => VIDEO_ODD_LINE,
+
+		HBLANK_EX => HBLANK_EX,
+		POKEY_ENABLE => POKEY_ENABLE,
 
 		AUDIO_L => AUDIO_L,
 		AUDIO_R => AUDIO_R,

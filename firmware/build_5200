@@ -1,0 +1,3 @@
+#!/bin/sh
+
+make de1_5200 && ./create_rom.pl 4 DE1_5200.bin zpu_rom 12 > ../zpu_rom_5200.vhdl

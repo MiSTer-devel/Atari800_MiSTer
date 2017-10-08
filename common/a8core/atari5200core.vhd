@@ -36,9 +36,14 @@ ENTITY atari5200core IS
 		VIDEO_G :  OUT  STD_LOGIC_VECTOR(video_bits-1 DOWNTO 0);
 		VIDEO_R :  OUT  STD_LOGIC_VECTOR(video_bits-1 DOWNTO 0);
 		VIDEO_BLANK : out std_logic;
+		VIDEO_PIXCE : out std_logic;
 		VIDEO_BURST : out std_logic;
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
+		
+		HBLANK_EX : OUT STD_LOGIC;
+
+		POKEY_ENABLE : out std_logic;
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
@@ -288,6 +293,7 @@ PORT MAP(CLK => CLK,
 		 dma_fetch_out => ANTIC_FETCH,
 		 hcount_out => hcount_temp,
 		 vcount_out => vcount_temp,
+		 HBLANK_EX => HBLANK_EX,
 		 refresh_out => ANTIC_REFRESH_CYCLE,
 		 AN => ANTIC_AN,
 		 DATA_OUT => ANTIC_DO,
@@ -493,5 +499,7 @@ port map(
 -- outputs
 PBI_ADDR <= PBI_ADDR_INT;
 ANTIC_REFRESH <= ANTIC_REFRESH_CYCLE;
+VIDEO_PIXCE <= ANTIC_HIGHRES_COLOUR_CLOCK_OUT;
+POKEY_ENABLE <= ENABLE_179_MEMWAIT;
 
 END bdf_type;
