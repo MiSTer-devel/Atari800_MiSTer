@@ -1,6 +1,6 @@
-# Atari 800/800XL/65XE/130XE for [MiSTer Board](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
+# Atari 800/800XL/65XE/130XE and Atari 5200 for [MiSTer Board](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
-### This is the port of [Atari 800 core by Mark Watson](http://ssh.scrameta.net/)
+### This is the port of [Atari 800XL core by Mark Watson](http://ssh.scrameta.net/)
 
 ### Installation
 * **Core requires secondary SD card on I/O board v5.x. (or solder SD connector by yourself).**
