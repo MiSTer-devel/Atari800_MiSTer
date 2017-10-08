@@ -1,0 +1,153 @@
+(c) 2013-14 Mark Watson
+I am happy for anyone to use these for non-commercial use.
+If my vhdl files are used commercially or sold please contact me for explicit permission at scrameta@gmail.com.
+This applies for source and binary form and derived works.
+
+pokey.vhdl
+pokey_noise_filter.vhdl
+pokey_keyboard_scanner.vhdl
+pokey_ps2_decoder.vhdl
+pokey_mixer_mux.vhdl
+pokey_mixer.vhdl
+poly_4.vhdl
+poly_5.vhdl
+poly_17_9.vhdl
+
+gtia.vhdl
+gtia_priority.vhdl
+gtia_palette.vhdl // Palette data itself from laoo and Altirra
+gtia_player.vhdl
+
+antic.vhdl
+antic_dma_clock.vhdl
+antic_counter.vhdl
+
+pia.vhdl
+
+cpu.vhd
+shared_enable.vhdl
+irq_glue.vhdl
+
+ps2_keyboard.vhdl
+
+scandoubler.vhdl
+scandouble_ram_infer.vhdl
+
+zpu_glue.vhdl
+zpu_config_regs.vhdl
+
+// utils
+synchronizer.vhdl
+delay_line.vhdl
+wide_delay_line.vhdl
+reg_file.vhdl
+enable_divider.vhdl
+syncreset_enable_divider.vhd
+complete_address_decoder.vhdl
+countdown_timer.vhdl
+simple_counter.vhdl
+
+// semi de1 specific
+sram.vhdl
+flashrom.vhdl
+sdram_statemachine.vhdl
+address_decoder.vhdl
+
+// de1 specific
+atari800core.vhd // top level for DE1
+i2sslave.vhdl
+hexdecoder.vhd
+gpio.vhd
+ledsw.vhd
+
+// altera megafunctions
+pll.vhd 
+zpu_ram.vhd
+zpu_rom.vhd
+
+-----------------------------------------------------------------------------------
+(c) Matthias Reichl
+cart_logic.vhd + other changes for cart support, e.g. to address_decoder.vhdl
+
+-----------------------------------------------------------------------------------
+(c) Mike Stirling (from Spectrum core)
+See header for Mike's copyright note
+Parameters modified for my use case
+
+i2c_loader.vhd
+i2s_intf.vhd
+
+-----------------------------------------------------------------------------------
+(c) Peter Wendrich
+Please contact Peter if you wish to use them. I have permission for use as part of the Atari800 core.
+
+cpu_6510.vhd
+cpu_65xx_e.vhd
+cpu_65xx_a.vhd
+
+-----------------------------------------------------------------------------------
+(c) Peter Wendrich
+LGPL I think
+
+chameleon/chameleon_*
+
+-----------------------------------------------------------------------------------
+---- Copyright (c) 2008 Ãvind Harboe <oyvind.harboe zylin.com>           ----
+---- Copyright (c) 2008 Salvador E. Tropea <salvador inti.gob.ar>         ----
+---- Copyright (c) 2008 Instituto Nacional de Tecnología Industrial       ----
+ZPU implementation. See headers for more details
+I made a few fixes to make it work for my use case.
+
+zpu_core.vhd
+zpupkg.vhd
+
+-----------------------------------------------------------------------------------
+(c) Scott Larson
+See file header
+
+spi_master.vhd
+
+-----------------------------------------------------------------------------------
+(c) Frederic Requin
+Supplied by Arcade Retro Gaming, need to confirm copyright here.
+
+mcc*/sdram*
+mcc*/rbf2arg*
+
+mcc*/svideo/*
+
+----------------------------------------------------------------------------------
+(c) Robert Jenkins - core USB HID
+(c) Hakim Haddadi - ARG gamepad support
+mcc*/usb/*
+
+-----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
+firmware/* -r
+SD card/OSD
+-----------------------------------------------------------------------------------
+(c) Mark Watson
+Also some portions taken from SDrive, so (c) Bob and Raster
+(c) Matthias Reichl
+
+I am happy for these to be used freely for commercial and non-commercial use.
+
+----------------------------------------------------------------------------------
+(c) Pascal Stang + Bob and Raster
+spi.c
+spi.h
+mmc.c  
+mmc.h
+mmcconf.h 
+
+-----------------------------------------------------------------------------------
+(c) ChaN
+Petit File System
+
+integer.h  
+diskio.h  
+pff.h
+pff.c  
+
+
+
