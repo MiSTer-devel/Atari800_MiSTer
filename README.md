@@ -1,10 +1,10 @@
 # Atari 800/800XL/65XE/130XE for [MiSTer Board](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
-### This is the port of [Atari 800 core by Mark Watson's](http://ssh.scrameta.net/)
+### This is the port of [Atari 800 core by Mark Watson](http://ssh.scrameta.net/)
 
 ### Installation
 * **Core requires secondary SD card on I/O board v5.x. (or solder SD connector by yourself).**
-* Copy the *.rbf file at the root of the system SD card.
+* Copy the *.rbf file to the root of the system SD card.
 * Format the secondary SD card with FAT16 and extract [sdcard.zip](https://github.com/MiSTer-devel/Atari800_MiSTer/tree/master/releases/sdcard.zip) to root.
 
 ## Usage notes
