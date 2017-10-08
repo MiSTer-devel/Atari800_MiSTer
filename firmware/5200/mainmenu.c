@@ -292,6 +292,7 @@ while (1)
 		wait_us(100000);
 
 		// move
+		while(get_hotkey_settings());
 		joystick_wait(&joy,WAIT_QUIET);
 		joystick_wait(&joy,WAIT_EITHER);
 		if (joy.escape_) break;
@@ -390,7 +391,8 @@ void actions()
 		freeze();
 		debug_pos = 0;	
 		int do_reboot = settings();
-		joystick_wait(&joy,WAIT_QUIET); 
+		joystick_wait(&joy,WAIT_QUIET);
+		while(get_hotkey_settings());
 		debug_pos = -1;
 		restore();
 		if (do_reboot)
@@ -404,6 +406,7 @@ void actions()
 		freeze();
 		int res = select_cartridge();
 		joystick_wait(&joy,WAIT_QUIET); 
+		while(get_hotkey_settings());
 		restore();
 		if(res) reboot(1);
 	}
