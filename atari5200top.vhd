@@ -51,6 +51,7 @@ PORT
 	SD_CMD     : OUT STD_LOGIC;
 	SD_DAT0    : IN  STD_LOGIC;
 
+	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY1Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -316,6 +317,8 @@ pause_atari <= zpu_out1(0);
 reset_atari <= zpu_out1(1);
 speed_6502 <= zpu_out1(7 downto 2);
 VGA_RATIO <= zpu_out1(26);
+
+CPU_HALT <= pause_atari;
 
 zpu_rom1: entity work.zpu_rom
 port map

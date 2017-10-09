@@ -93,7 +93,9 @@ module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
 	output            ps2_mouse_clk_out,
 	output            ps2_mouse_data_out,
 	input             ps2_mouse_clk_in,
-	input             ps2_mouse_data_in
+	input             ps2_mouse_data_in,
+
+	output reg [24:0] ps2_mouse = 0
 );
 
 localparam DW = (WIDE) ? 15 : 7;
@@ -149,6 +151,8 @@ always@(posedge clk_sys) begin
 	{kbd_rd,kbd_we,mouse_rd,mouse_we} <= 0;
 	
 	if(~io_enable) begin
+		if(cmd == 4 && !PS2WE) ps2_mouse[24] <= ~ps2_mouse[24];
+		cmd <= 0;
 		byte_cnt <= 0;
 		sd_ack <= 0;
 		sd_ack_conf <= 0;
@@ -182,6 +186,13 @@ always@(posedge clk_sys) begin
 					'h04: begin
 							mouse_data <= io_din[7:0];
 							mouse_we   <= 1;
+							if(!PS2WE) begin
+								case(byte_cnt)
+									1: ps2_mouse[7:0]   <= io_din[7:0];
+									2: ps2_mouse[15:8]  <= io_din[7:0];
+									3: ps2_mouse[23:16] <= io_din[7:0];
+								endcase
+							end
 						end
 
 					// store incoming ps2 keyboard bytes 

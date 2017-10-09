@@ -145,6 +145,7 @@ wire [15:0] joya_0;
 wire [15:0] joya_1;
 wire  [1:0] buttons;
 wire [31:0] status;
+wire [24:0] ps2_mouse;
 
 wire PS2_CLK;
 wire PS2_DAT;
@@ -170,6 +171,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ps2_kbd_led_use(0),
 	.ps2_kbd_led_status(0),
 
+	.ps2_mouse(ps2_mouse),
+
 	.sd_lba(0),
 	.sd_rd(0),
 	.sd_wr(0),
@@ -185,6 +188,8 @@ assign VGA_DE = ~blank;
 assign AUDIO_S = 0;
 
 assign CLK_VIDEO = clk_sys;
+
+wire cpu_halt;
 
 atari800top atari800top
 (
@@ -221,16 +226,18 @@ atari800top atari800top
 	.SD_DAT3(SD_CS),
 	.SD_CMD(SD_MOSI),
 	.SD_DAT0(SD_MISO),
+	
+	.CPU_HALT(cpu_halt),
 
 	.PS2_CLK(PS2_CLK),
 	.PS2_DAT(PS2_DAT),
 
-	.JOY1X(joya_0[7:0]),
-	.JOY1Y(joya_0[15:8]),
+	.JOY1X(ax),
+	.JOY1Y(ay),
 	.JOY2X(joya_1[7:0]),
 	.JOY2Y(joya_1[15:8]),
 
-	.JOY1(joy_0[7:0]),
+	.JOY1(j0),
 	.JOY2(joy_1[7:0]),
 
 	.buttons(0),
@@ -261,6 +268,40 @@ always @(posedge clk_sys) begin
 	end
 
 	if((old_mosi ^ SD_MOSI) || (old_miso ^ SD_MISO)) timeout <= 0;
+end
+
+
+//////////////////   ANALOG AXIS   ///////////////////
+reg        emu = 0;
+wire [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
+wire [7:0] ay = emu ? my[7:0] : joya_0[15:8];
+wire [7:0] j0 = emu ? {joy_0[7], ps2_mouse[1:0], joy_0[4:0]} : joy_0;
+
+reg  signed [8:0] mx = 0;
+wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};
+wire signed [8:0] mdx2 = (mdx > 10) ? 9'd10 : (mdx < -10) ? -8'd10 : mdx;
+wire signed [8:0] nmx = mx + mdx2;
+
+reg  signed [8:0] my = 0;
+wire signed [8:0] mdy = {ps2_mouse[5],ps2_mouse[5],ps2_mouse[23:17]};
+wire signed [8:0] mdy2 = (mdy > 10) ? 9'd10 : (mdy < -10) ? -9'd10 : mdy;
+wire signed [8:0] nmy = my + mdy2;
+
+always @(posedge clk_sys) begin
+	reg old_stb = 0;
+	
+	old_stb <= ps2_mouse[24];
+	if(old_stb != ps2_mouse[24]) begin
+		emu <= 1;
+		mx <= (nmx < -128) ? -9'd128 : (nmx > 127) ? 9'd127 : nmx;
+		my <= (nmy < -128) ? -9'd128 : (nmy > 127) ? 9'd127 : nmy;
+	end
+
+	if(joya_0 || cpu_halt) begin
+		emu <= 0;
+		mx <= 0;
+		my <= 0;
+	end
 end
 
 endmodule
