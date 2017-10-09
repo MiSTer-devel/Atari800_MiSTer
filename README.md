@@ -35,11 +35,11 @@ Additionally, you can control the speed of turbo loading in settings menu (F12).
 * WIN+Enter/Fire in quick selector loads Drive 2.
 * WIN+Enter/Fire in normal work swaps Drive 1 <-> Drive 2.
 * WIN+F12 opens reduced MiSTer menu where you can assign joystick buttons.
+* Mouse emulates analog joystick(Atari 5200) and paddles(Atari 800).
 
 ### More info
 See more info in original [instructions](https://github.com/MiSTer-devel/Atari800_MiSTer/tree/master/instructions.txt)
 and original [manual](https://github.com/MiSTer-devel/Atari800_MiSTer/tree/master/manual.pdf).
-
 
 ## Download precompiled binaries
 Go to [releases](https://github.com/MiSTer-devel/Atari800_MiSTer/tree/master/releases) folder.
