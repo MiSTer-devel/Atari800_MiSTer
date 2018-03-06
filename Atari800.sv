@@ -103,19 +103,29 @@ assign LED_USER  = sd_act;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
-assign VIDEO_ARX = ratio ? 8'd4 : 8'd16;
-assign VIDEO_ARY = ratio ? 8'd3 : 8'd9;
+assign VIDEO_ARX = status[6] ? 8'd16 : 8'd4;
+assign VIDEO_ARY = status[6] ? 8'd9  : 8'd3;
+
+wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
 	"-;",
+	"RG,Drives and Cart;",
+	"-;",
+	"O79,CPU Speed,1x,2x,4x,8x,16x;",
+	"OAC,Drive Speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
+	"-;",
+	"ODF,RAM,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB;",
+	"-;",
+	"O5,Video mode,PAL,NTSC;",
+	"O6,Aspect ratio,4:3,16:9;",
 	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
 	"O34,Stereo mix,None,25%,50%,100%;",
-	"X;",
 	"J,Fire,Paddle1,Paddle2,ROM Select;",
-	"V,v1.01.",`BUILD_DATE
+	"V,v1.10.",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -190,8 +200,16 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ioctl_wait(0)
 );
 
-wire pal;
-wire ratio;
+reg menu = 0;
+always @(posedge clk_sys) begin
+	integer timeout = 0;
+
+	if(timeout) timeout <= timeout - 1;
+	menu <= |timeout;
+	
+	if(status[16]) timeout <= 28000000;
+end
+
 
 wire [7:0] R,G,B;
 wire HBlank,VBlank;
@@ -225,17 +243,20 @@ atari800top atari800top
 	.SDRAM_A(SDRAM_A),
 	.SDRAM_DQ(SDRAM_DQ),
 
-	.PAL(pal),
+	.PAL(~status[5]),
 	.VGA_VS(VSync),
 	.VGA_HS(HSync),
 	.VGA_B(B),
 	.VGA_G(G),
 	.VGA_R(R),
 	.VGA_PIXCE(ce_pix),
-	.VGA_RATIO(ratio),
 	.HBLANK(HBlank),
 	.VBLANK(VBlank),
 
+	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
+	.RAM_SIZE(status[15:13]),
+	.DRV_SPEED(status[12:10]),
+	.MENU(menu),
 
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),

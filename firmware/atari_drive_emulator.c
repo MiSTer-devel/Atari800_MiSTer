@@ -29,9 +29,8 @@ extern unsigned char volatile * baseaddr;
 #define DELAY_T3_PERIPH wait_us(150);
 
 #define speedslow 0x28
-#define speedfast turbo_div
-int turbo_drive;
-int turbo_div;
+#define speedfast turbo_div()
+int turbo_div();
 static int init_done = 0;
 
 #define XEX_SECTOR_SIZE 128
@@ -828,9 +827,8 @@ void describe_disk(int driveNumber, char * buffer)
 	buffer[5] = '\0';
 }
 
-void set_turbo_drive(int pos)
+int turbo_div()
 {
-	turbo_drive = pos;
 	static int turbodivs[] = 
 	{
 		speedslow,
@@ -842,12 +840,16 @@ void set_turbo_drive(int pos)
 		0x1,
 		0x0
 	};
-	turbo_div = turbodivs[turbo_drive];
+	return turbodivs[get_speeddrv()];
+}
+
+void set_turbo_drive(int pos)
+{
 }
 
 int get_turbo_drive()
 {
-	return turbo_drive;
+	return get_speeddrv();
 }
 
 char const * get_turbo_drive_str()
@@ -863,6 +865,5 @@ char const * get_turbo_drive_str()
 		"Fast(1)",
 		"Fast(0)"
 	};
-	return turbostr[turbo_drive];
+	return turbostr[get_speeddrv()];
 }
-

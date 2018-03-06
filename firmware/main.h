@@ -84,8 +84,6 @@ BIT_REG(,0x7,8,ram_select,zpu_out1)
 BIT_REG(,0x3f,17,cart_select,zpu_out1)
 // reserve 2 bits for extending cart_select
 BIT_REG(,0x01,25,freezer_enable,zpu_out1)
-BIT_REG(,0x01,26,ratio,zpu_out1)
-BIT_REG(,0x01,27,tv,zpu_out1)
 
 BIT_REG_RO(,0x1,8,hotkey_softboot,zpu_in1)
 BIT_REG_RO(,0x1,9,hotkey_coldboot,zpu_in1)
@@ -94,6 +92,8 @@ BIT_REG_RO(,0x1,11,hotkey_settings,zpu_in1)
 BIT_REG_RO(,0x1,18,mod_win,zpu_in1)
 
 BIT_REG_RO(,0x3f,12,controls,zpu_in1) // (esc)FLRDU
+
+BIT_REG_RO(,0x7,0,speeddrv,zpu_in2)
 
 void
 wait_us(int unsigned num)

@@ -18,7 +18,7 @@ PORT
 	CLK_SDRAM  : IN  STD_LOGIC;
 	RESET_N    : IN  STD_LOGIC;
 
-	PAL        : OUT STD_LOGIC;
+	PAL        : IN  STD_LOGIC;
 	VGA_VS     : OUT STD_LOGIC;
 	VGA_HS     : OUT STD_LOGIC;
 	VGA_BLANK  : OUT STD_LOGIC;
@@ -26,7 +26,6 @@ PORT
 	VGA_B      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_G      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_R      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
-	VGA_RATIO  : OUT STD_LOGIC;
 
 	HBLANK     : OUT STD_LOGIC;
 	VBLANK     : OUT STD_LOGIC;
@@ -52,6 +51,11 @@ PORT
 	SD_DAT3    : OUT STD_LOGIC;
 	SD_CMD     : OUT STD_LOGIC;
 	SD_DAT0    : IN  STD_LOGIC;
+	
+	CPU_SPEED  : IN std_logic_vector(5 downto 0);
+	RAM_SIZE   : IN std_logic_vector(2 downto 0);
+	DRV_SPEED  : IN std_logic_vector(2 downto 0);
+	MENU       : IN STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -127,10 +131,8 @@ signal old_command : std_logic;
 signal end_command : std_logic;
 
 -- system control from zpu
-signal ram_select : std_logic_vector(2 downto 0);
 signal reset_atari : std_logic;
 signal pause_atari : std_logic;
-SIGNAL speed_6502 : std_logic_vector(5 downto 0);
 signal emulated_cartridge_select: std_logic_vector(5 downto 0);
 
 -- ps2
@@ -144,8 +146,6 @@ signal freezer_activate: std_logic;
 -- paddles
 signal paddle_1 : std_logic;
 signal paddle_2 : std_logic;
-
-signal tv : std_logic;
 
 BEGIN
 
@@ -260,10 +260,10 @@ PORT MAP
 	MEMORY_READY_DMA => dma_memory_ready,
 	DMA_MEMORY_DATA => dma_memory_data, 
 
-	RAM_SELECT => ram_select,
-	PAL => tv,
+	RAM_SELECT => RAM_SIZE,
+	PAL => PAL,
 	HALT => pause_atari,
-	THROTTLE_COUNT_6502 => speed_6502,
+	THROTTLE_COUNT_6502 => CPU_SPEED,
 	emulated_cartridge_select => emulated_cartridge_select,
 	freezer_enable => freezer_enable,
 	freezer_activate => freezer_activate
@@ -357,8 +357,8 @@ PORT MAP
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(7)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			FKEYS(11)&(FKEYS(10) or joy(7))&FKEYS(9 downto 0),
-	ZPU_IN2 => X"00000000",
+			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(7))&FKEYS(9 downto 0),
+	ZPU_IN2 => X"0000000" & '0' & DRV_SPEED,
 	ZPU_IN3 => X"00000000",
 	ZPU_IN4 => X"00000000",
 
@@ -371,14 +371,9 @@ PORT MAP
 
 pause_atari <= zpu_out1(0);
 reset_atari <= zpu_out1(1);
-speed_6502 <= zpu_out1(7 downto 2);
-ram_select <= zpu_out1(10 downto 8);
 emulated_cartridge_select <= zpu_out1(22 downto 17);
 freezer_enable <= zpu_out1(25);
-VGA_RATIO <= zpu_out1(26);
-tv <= not zpu_out1(27);
 
-PAL <= tv;
 CPU_HALT <= pause_atari;
 
 zpu_rom1: entity work.zpu_rom
