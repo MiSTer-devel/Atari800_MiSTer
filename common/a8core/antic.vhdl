@@ -46,7 +46,8 @@ PORT
 	COLOUR_CLOCK_OUT : out std_logic;
 	HIGHRES_COLOUR_CLOCK_OUT : out std_logic; -- 2x to allow for half pixel modes
 	
-	HBLANK_EX : OUT STD_LOGIC;
+	HBLANK : OUT STD_LOGIC;
+	VBLANK : OUT STD_LOGIC;
 
 	-- DMA fetch
 	dma_fetch_out : out std_logic;
@@ -1886,7 +1887,8 @@ BEGIN
 	vcount_out <= vcount_reg;
 	hcount_out <= hcount_reg;
 
-	HBLANK_EX <= hblank_ex_reg;
+	HBLANK <= hblank_ex_reg;
+	VBLANK <= vblank_reg;
 
 END vhdl;
 

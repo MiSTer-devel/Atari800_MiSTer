@@ -44,7 +44,8 @@ ENTITY atari800core IS
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
 		
-		HBLANK_EX : OUT STD_LOGIC;
+		HBLANK : OUT STD_LOGIC;
+		VBLANK : OUT STD_LOGIC;
 
 		POKEY_ENABLE : out std_logic;
 
@@ -357,7 +358,8 @@ PORT MAP(CLK => CLK,
 		 dma_fetch_out => ANTIC_FETCH,
 		 hcount_out => hcount_temp,
 		 vcount_out => vcount_temp,
-		 HBLANK_EX => HBLANK_EX,
+		 HBLANK => HBLANK,
+		 VBLANK => VBLANK,
 		 refresh_out => ANTIC_REFRESH_CYCLE,
 		 AN => ANTIC_AN,
 		 DATA_OUT => ANTIC_DO,

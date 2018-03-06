@@ -2,7 +2,7 @@
 //  Atari 800 replica
 // 
 //  Port to MiSTer
-//  Copyright (C) 2017 Sorgelig
+//  Copyright (C) 2017,2018 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -29,7 +29,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [37:0] HPS_BUS,
+	inout  [44:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -51,7 +51,7 @@ module emu
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
-	// b[1]: 0 - LED status is system status ORed with b[0]
+	// b[1]: 0 - LED status is system status OR'd with b[0]
 	//       1 - LED status is controled solely by b[0]
 	// hint: supply 2'b00 to let the system control the LED.
 	output  [1:0] LED_POWER,
@@ -60,6 +60,7 @@ module emu
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
+	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 	input         TAPE_IN,
 
 	// SD-SPI
@@ -67,6 +68,7 @@ module emu
 	output        SD_MOSI,
 	input         SD_MISO,
 	output        SD_CS,
+	input         SD_CD,
 
 	//High latency DDR3 RAM interface
 	//Use for non-critical time purposes
@@ -107,9 +109,13 @@ assign VIDEO_ARY = ratio ? 8'd3 : 8'd9;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
+	"-;",
+	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"-;",
+	"O34,Stereo mix,None,25%,50%,100%;",
 	"X;",
 	"J,Fire,Paddle1,Paddle2,ROM Select;",
-	"V,v1.00.",`BUILD_DATE 
+	"V,v1.01.",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -150,6 +156,8 @@ wire [24:0] ps2_mouse;
 wire PS2_CLK;
 wire PS2_DAT;
 
+wire forced_scandoubler;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -164,6 +172,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
+	.forced_scandoubler(forced_scandoubler),
 
 	.ps2_kbd_clk_out(PS2_CLK),
 	.ps2_kbd_data_out(PS2_DAT),
@@ -183,13 +192,21 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 wire pal;
 wire ratio;
-wire blank;
-assign VGA_DE = ~blank;
-assign AUDIO_S = 0;
+
+wire [7:0] R,G,B;
+wire HBlank,VBlank;
+wire VSync, HSync;
+wire ce_pix;
 
 assign CLK_VIDEO = clk_sys;
 
 wire cpu_halt;
+
+wire [15:0] laudio, raudio;
+assign AUDIO_R = {raudio[15],raudio[15:1]};
+assign AUDIO_L = {laudio[15],laudio[15:1]};
+assign AUDIO_S = 1;
+assign AUDIO_MIX = status[4:3];
 
 atari800top atari800top
 (
@@ -209,24 +226,25 @@ atari800top atari800top
 	.SDRAM_DQ(SDRAM_DQ),
 
 	.PAL(pal),
-	.VGA_VS(VGA_VS),
-	.VGA_HS(VGA_HS),
+	.VGA_VS(VSync),
+	.VGA_HS(HSync),
 	.VGA_B(B),
 	.VGA_G(G),
 	.VGA_R(R),
-	.VGA_BLANK(blank),
-	.VGA_PIXCE(CE_PIXEL),
+	.VGA_PIXCE(ce_pix),
 	.VGA_RATIO(ratio),
-	.HBLANK_EX(hblank_ex),
+	.HBLANK(HBlank),
+	.VBLANK(VBlank),
 
-	.AUDIO_L(AUDIO_L),
-	.AUDIO_R(AUDIO_R),
+
+	.AUDIO_L(laudio),
+	.AUDIO_R(raudio),
 
 	.SD_CLK(SD_SCK),
 	.SD_DAT3(SD_CS),
 	.SD_CMD(SD_MOSI),
 	.SD_DAT0(SD_MISO),
-	
+
 	.CPU_HALT(cpu_halt),
 
 	.PS2_CLK(PS2_CLK),
@@ -238,17 +256,20 @@ atari800top atari800top
 	.JOY2Y(joya_1[15:8]),
 
 	.JOY1(j0),
-	.JOY2(joy_1[7:0]),
-
-	.buttons(0),
-
-	.LED()
+	.JOY2(joy_1[7:0])
 );
 
-wire hblank_ex;
+wire [1:0] scale = status[2:1];
+video_mixer video_mixer
+(
+	.*,
+	.ce_pix_out(CE_PIXEL),
 
-wire [7:0] R,G,B;
-assign {VGA_R,VGA_G,VGA_B} = hblank_ex ? 24'd0 : {R,G,B};
+	.scanlines({scale == 3, scale == 2}),
+	.scandoubler(scale || forced_scandoubler),
+	.hq2x(scale==1),
+	.mono(0)
+);
 
 
 //////////////////   LED   ///////////////////
@@ -275,7 +296,7 @@ end
 reg        emu = 0;
 wire [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
 wire [7:0] ay = emu ? my[7:0] : joya_0[15:8];
-wire [7:0] j0 = emu ? {joy_0[7], ps2_mouse[1:0], joy_0[4:0]} : joy_0;
+wire [7:0] j0 = emu ? {joy_0[7], ps2_mouse[1:0], joy_0[4:0]} : joy_0[7:0];
 
 reg  signed [8:0] mx = 0;
 wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};

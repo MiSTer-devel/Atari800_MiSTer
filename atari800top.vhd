@@ -28,7 +28,8 @@ PORT
 	VGA_R      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_RATIO  : OUT STD_LOGIC;
 
-	HBLANK_EX  : OUT STD_LOGIC;
+	HBLANK     : OUT STD_LOGIC;
+	VBLANK     : OUT STD_LOGIC;
 
 	AUDIO_L    : OUT STD_LOGIC_VECTOR(15 downto 0);
 	AUDIO_R    : OUT STD_LOGIC_VECTOR(15 downto 0);
@@ -59,11 +60,7 @@ PORT
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
 	JOY1       : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	JOY2       : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
-
-	buttons    : in  STD_LOGIC_VECTOR(1 downto 0);
-
-	LED        : OUT STD_LOGIC
+	JOY2       : IN  STD_LOGIC_VECTOR(7 DOWNTO 0)
 );
 
 END atari800top;
@@ -215,7 +212,8 @@ PORT MAP
 	VIDEO_G => VGA_G,
 	VIDEO_R => VGA_R,
 
-	HBLANK_EX => HBLANK_EX,
+	HBLANK => HBLANK,
+	VBLANK => VBLANK,
 	POKEY_ENABLE => zpu_pokey_enable,
 
 	AUDIO_L => AUDIO_L,
@@ -308,8 +306,6 @@ PORT MAP
 	SDRAM_ADDR => SDRAM_A,
 	reset_client_n => SDRAM_RESET_N
 );
-
-LED <= zpu_sio_rxd;
 
 joy <= joy1 or joy2;
 

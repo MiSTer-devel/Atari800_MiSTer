@@ -2,7 +2,7 @@
 //  Atari 5200 replica
 // 
 //  Port to MiSTer
-//  Copyright (C) 2017 Sorgelig
+//  Copyright (C) 2017,2018 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -29,7 +29,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [37:0] HPS_BUS,
+	inout  [44:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -51,7 +51,7 @@ module emu
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
-	// b[1]: 0 - LED status is system status ORed with b[0]
+	// b[1]: 0 - LED status is system status OR'd with b[0]
 	//       1 - LED status is controled solely by b[0]
 	// hint: supply 2'b00 to let the system control the LED.
 	output  [1:0] LED_POWER,
@@ -60,6 +60,7 @@ module emu
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
+	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 	input         TAPE_IN,
 
 	// SD-SPI
@@ -67,6 +68,7 @@ module emu
 	output        SD_MOSI,
 	input         SD_MISO,
 	output        SD_CS,
+	input         SD_CD,
 
 	//High latency DDR3 RAM interface
 	//Use for non-critical time purposes
@@ -109,7 +111,7 @@ localparam CONF_STR = {
 	"ATARI5200;;",
 	"X;",
 	"J,Fire 1,Fire 2,ROM Select,*,#,Start,Pause,Reset,0,1,2,3;",
-	"V,v1.00.",`BUILD_DATE
+	"V,v1.01.",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -170,7 +172,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	
 	.ps2_kbd_led_use(0),
 	.ps2_kbd_led_status(0),
-	
+
 	.ps2_mouse(ps2_mouse),
 
 	.sd_lba(0),
@@ -185,7 +187,6 @@ wire pal;
 wire ratio;
 wire blank;
 assign VGA_DE = ~blank;
-assign AUDIO_S = 0;
 
 assign CLK_VIDEO = clk_sys;
 
@@ -193,6 +194,12 @@ wire joy_d1ena = ~&joya_0;
 wire joy_d2ena = ~&joya_1;
 
 wire cpu_halt;
+
+wire [15:0] laudio, raudio;
+assign AUDIO_R = {raudio[15],raudio[15:1]};
+assign AUDIO_L = {laudio[15],laudio[15:1]};
+assign AUDIO_S = 1;
+assign AUDIO_MIX = 0;
 
 atari5200top atari5200top
 (
@@ -221,18 +228,18 @@ atari5200top atari5200top
 	.VGA_RATIO(ratio),
 	.HBLANK_EX(hblank_ex),
 
-	.AUDIO_L(AUDIO_L),
-	.AUDIO_R(AUDIO_R),
+	.AUDIO_L(laudio),
+	.AUDIO_R(raudio),
 
 	.SD_CLK(SD_SCK),
 	.SD_DAT3(SD_CS),
 	.SD_CMD(SD_MOSI),
 	.SD_DAT0(SD_MISO),
 
+	.CPU_HALT(cpu_halt),
+
 	.PS2_CLK(PS2_CLK),
 	.PS2_DAT(PS2_DAT),
-
-	.CPU_HALT(cpu_halt),
 
 	.JOY1X(ax),
 	.JOY1Y(ay),
@@ -267,6 +274,7 @@ always @(posedge clk_sys) begin
 
 	if((old_mosi ^ SD_MOSI) || (old_miso ^ SD_MISO)) timeout <= 0;
 end
+
 
 //////////////////   ANALOG AXIS   ///////////////////
 
