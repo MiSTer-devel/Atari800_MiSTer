@@ -52,7 +52,8 @@ ENTITY atari5200core_simplesdram is
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
 		
-		HBLANK_EX : OUT STD_LOGIC;
+		HBLANK : OUT STD_LOGIC;
+		VBLANK : OUT STD_LOGIC;
 
 		POKEY_ENABLE : out std_logic;
 
@@ -242,7 +243,8 @@ atari5200_simple_sdram1 : entity work.atari5200core
 		VIDEO_START_OF_FIELD => VIDEO_START_OF_FIELD,
 		VIDEO_ODD_LINE => VIDEO_ODD_LINE,
 
-		HBLANK_EX => HBLANK_EX,
+		HBLANK => HBLANK,
+		VBLANK => VBLANK,
 		POKEY_ENABLE => POKEY_ENABLE,
 
 		AUDIO_L => AUDIO_L,

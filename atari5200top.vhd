@@ -25,9 +25,9 @@ PORT
 	VGA_B      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_G      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_R      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
-	VGA_RATIO  : OUT STD_LOGIC;
 
-	HBLANK_EX  : OUT STD_LOGIC;
+	HBLANK     : OUT STD_LOGIC;
+	VBLANK     : OUT STD_LOGIC;
 
 	AUDIO_L    : OUT STD_LOGIC_VECTOR(15 downto 0);
 	AUDIO_R    : OUT STD_LOGIC_VECTOR(15 downto 0);
@@ -50,6 +50,9 @@ PORT
 	SD_DAT3    : OUT STD_LOGIC;
 	SD_CMD     : OUT STD_LOGIC;
 	SD_DAT0    : IN  STD_LOGIC;
+	
+	CPU_SPEED  : IN std_logic_vector(5 downto 0);
+	MENU       : IN STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -115,7 +118,6 @@ signal zpu_pokey_enable : std_logic;
 -- system control from zpu
 signal reset_atari : std_logic;
 signal pause_atari : std_logic;
-SIGNAL speed_6502 : std_logic_vector(5 downto 0);
 
 -- ps2
 signal PS2_KEYS : STD_LOGIC_VECTOR(511 downto 0);
@@ -172,7 +174,8 @@ PORT MAP
 	VIDEO_G => VGA_G,
 	VIDEO_R => VGA_R,
 
-	HBLANK_EX => HBLANK_EX,
+	HBLANK => HBLANK,
+	VBLANK => VBLANK,
 
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
@@ -212,7 +215,7 @@ PORT MAP
 	DMA_MEMORY_DATA => dma_memory_data, 
 
 	HALT => pause_atari,
-	THROTTLE_COUNT_6502 => speed_6502
+	THROTTLE_COUNT_6502 => CPU_SPEED
 );
 
 sdram_adaptor : entity work.sdram_statemachine
@@ -301,7 +304,7 @@ PORT MAP
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(6)&(joy(4) or joy(5))&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			FKEYS(11)&(FKEYS(10) or joy(6))&FKEYS(9 downto 0),
+			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(6))&FKEYS(9 downto 0),
 	ZPU_IN2 => X"00000000",
 	ZPU_IN3 => X"00000000",
 	ZPU_IN4 => X"00000000",
@@ -315,8 +318,6 @@ PORT MAP
 
 pause_atari <= zpu_out1(0);
 reset_atari <= zpu_out1(1);
-speed_6502 <= zpu_out1(7 downto 2);
-VGA_RATIO <= zpu_out1(26);
 
 CPU_HALT <= pause_atari;
 

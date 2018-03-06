@@ -5,10 +5,6 @@ unsigned char freezer_rom_present = 0;
 
 void actions();
 
-#ifdef USB
-#include "usb.h"
-#endif
-
 void loadosrom()
 {
 	int j=0;
@@ -26,21 +22,8 @@ void loadosrom()
 	}
 }
 
-#ifdef USB
-struct usb_host usb_porta;
-#endif
-#ifdef USB2
-struct usb_host usb_portb;
-#endif
-
 void mainmenu()
 {
-#ifdef USB
-	usb_init(&usb_porta,0);
-#endif
-#ifdef USB2
-	usb_init(&usb_portb,1);
-#endif
 	memset8(SRAM_BASE+0x4000, 0, 32768);
 	memset32(SDRAM_BASE+0x4000, 0, 32768/4);
 
@@ -237,56 +220,20 @@ int settings()
 		printf("Se");
 		debug_adjust = 128;
 		printf("ttings");
-		debug_pos = 80;
-		debug_adjust = row==0 ? 128 : 0;
-		printf("Turbo:%dx", get_turbo_6502());
 		debug_pos = 120;
-		debug_adjust = row==1 ? 128 : 0;
+		debug_adjust = row==0 ? 128 : 0;
 		{
 			printf("Rom:%s", file_name(files[5]));
 		}
 		int i;
 
-		debug_pos = 160;
-		debug_adjust = row==2 ? 128 : 0;
+		debug_pos = 200;
+		debug_adjust = row==1 ? 128 : 0;
 		printf("Cart:%s", file_name(files[4]) ? file_name(files[4]) : "NONE");
 
-#ifdef USBSETTINGS
-		debug_pos = 240;
-		debug_adjust = row==3 ? 128 : 0;
-		printf("Rotate USB joysticks");
-
 		debug_pos = 320;
-		debug_adjust = row==4 ? 128 : 0;
+		debug_adjust = row==2 ? 128 : 0;
 		printf("Exit");
-
-		debug_adjust = 0;
-
-		usb_devices(400);
-#else
-		debug_pos = 240;
-		debug_adjust = row==3 ? 128 : 0;
-		printf("Aspect Ratio: %s", get_ratio() ? "4:3" : "16:9");
-		debug_pos = 320;
-		debug_adjust = row==4 ? 128 : 0;
-		printf("Exit");
-#endif
-
-/*
-while (1)
-{
-	*atari_consol = 4;
-	*atari_potgo = 0xff;
-
-	wait_us(1000000/25);
-
-	unsigned char pot0 = *atari_pot0;
-	unsigned char pot1 = *atari_pot1;
-		debug_pos = 320;
-		printf("                         ");
-		debug_pos = 320;
-		printf("pot0:%d pot1:%d",pot0,pot1);
-}*/
 
 		// Slow it down a bit
 		wait_us(100000);
@@ -298,56 +245,27 @@ while (1)
 		if (joy.escape_) break;
 
 		row+=joy.y_;
-		if (row<0) row = 4;
-		if (row>4) row = 0;
+		if (row<0) row = 2;
+		if (row>2) row = 0;
 
 		switch (row)
 		{
 		case 0:
+			if (joy.x_ || joy.fire_)
 			{
-				int turbo = get_turbo_6502();
-				if (joy.x_==1) turbo<<=1;
-				if (joy.x_==-1) turbo>>=1;
-				if (turbo>16) turbo = 16;
-				if (turbo<1) turbo = 1;
-				set_turbo_6502(turbo);
+				fil_type = fil_type_rom;
+				filter = filter_specified;
+				file_selector(files[5]);
+				loadosrom();
 			}
 			break;
 		case 1:
+			if (joy.x_ || joy.fire_)
 			{
-				if (joy.x_ || joy.fire_)
-				{
-					fil_type = fil_type_rom;
-					filter = filter_specified;
-					file_selector(files[5]);
-					loadosrom();
-				}
+				return select_cartridge();
 			}
 			break;
 		case 2:
-			{
-				if (joy.x_ || joy.fire_)
-				{
-					return select_cartridge();
-				}
-			}
-			break;
-#ifdef USBSETTINGS
-		case 3:
-			if (joy.fire_)
-			{
-				rotate_usb_sticks();
-			}
-			break;
-#else
-		case 3:
-			if (joy.x_)
-			{
-				set_ratio(get_ratio()^1);
-			}
-			break;
-#endif
-		case 4:
 			if (joy.fire_)
 			{
 				done = 1;
@@ -364,18 +282,6 @@ void actions()
 	struct joystick_status joy;
 	joy.x_ = joy.y_ = joy.fire_ = joy.escape_ = 0;
 
-#ifdef LINUX_BUILD
-	check_keys();
-#endif
-#ifdef USB
-	usb_poll(&usb_porta);
-#endif
-#ifdef USB2
-	usb_poll(&usb_portb);
-#endif
-	// Show some activity!
-	//*atari_colbk = *atari_random;
-	
 	// Hot keys
 	if (get_hotkey_softboot())
 	{

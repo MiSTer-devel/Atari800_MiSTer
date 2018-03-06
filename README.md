@@ -22,7 +22,7 @@ Turbo ROM has hot keys to control the turbo mode:
 * SHIFT+CONTROL+N    Disable highspeed SIO (normal speed)
 * SHIFT+CONTROL+H    Enable highspeed SIO 
   
-Additionally, you can control the speed of turbo loading in settings menu (F12).
+Additionally, you can control the speed of turbo loading in OSD menu.
 
 ### Differences from original version
 * Joystick/Paddle mode switched by joystick. Press **Paddle1/2** to switch to paddle mode (analog X/Y). Press **Fire** to switch to joystick mode (digital X/Y).
@@ -32,9 +32,9 @@ Additionally, you can control the speed of turbo loading in settings menu (F12).
 * Video aspect ratio switch in settings menu
 * Some optimizations and tweaks in file selector and settings menu navigation.
 * Combined cartridge/disk quick selector (F11).
+* Extended menu for disk/cartridge loading (WIN+F11).
 * WIN+Enter/Fire in quick selector loads Drive 2.
 * WIN+Enter/Fire in normal work swaps Drive 1 <-> Drive 2.
-* WIN+F12 opens reduced MiSTer menu where you can assign joystick buttons.
 * Mouse emulates analog joystick(Atari 5200) and paddles(Atari 800).
 
 ### More info

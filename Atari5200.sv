@@ -103,15 +103,25 @@ assign LED_USER  = sd_act;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
-assign VIDEO_ARX = ratio ? 8'd4 : 8'd16;
-assign VIDEO_ARY = ratio ? 8'd3 : 8'd9;
+assign VIDEO_ARX = status[6] ? 8'd16 : 8'd4;
+assign VIDEO_ARY = status[6] ? 8'd9  : 8'd3;
+
+wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI5200;;",
-	"X;",
+	"-;",
+	"RG,Cart;",
+	"-;",
+	"O79,CPU Speed,1x,2x,4x,8x,16x;",
+	"-;",
+	"O6,Aspect ratio,4:3,16:9;",
+	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"-;",
+	"O34,Stereo mix,None,25%,50%,100%;",
 	"J,Fire 1,Fire 2,ROM Select,*,#,Start,Pause,Reset,0,1,2,3;",
-	"V,v1.01.",`BUILD_DATE
+	"V,v1.10.",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -152,6 +162,8 @@ wire [24:0] ps2_mouse;
 wire PS2_CLK;
 wire PS2_DAT;
 
+wire forced_scandoubler;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -166,6 +178,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
+	.forced_scandoubler(forced_scandoubler),
 
 	.ps2_kbd_clk_out(PS2_CLK),
 	.ps2_kbd_data_out(PS2_DAT),
@@ -183,10 +196,21 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ioctl_wait(0)
 );
 
-wire pal;
-wire ratio;
-wire blank;
-assign VGA_DE = ~blank;
+reg menu = 0;
+always @(posedge clk_sys) begin
+	integer timeout = 0;
+
+	if(timeout) timeout <= timeout - 1;
+	menu <= |timeout;
+	
+	if(status[16]) timeout <= 28000000;
+end
+
+
+wire [7:0] R,G,B;
+wire HBlank,VBlank;
+wire VSync, HSync;
+wire ce_pix;
 
 assign CLK_VIDEO = clk_sys;
 
@@ -199,7 +223,7 @@ wire [15:0] laudio, raudio;
 assign AUDIO_R = {raudio[15],raudio[15:1]};
 assign AUDIO_L = {laudio[15],laudio[15:1]};
 assign AUDIO_S = 1;
-assign AUDIO_MIX = 0;
+assign AUDIO_MIX = status[4:3];
 
 atari5200top atari5200top
 (
@@ -218,15 +242,17 @@ atari5200top atari5200top
 	.SDRAM_A(SDRAM_A),
 	.SDRAM_DQ(SDRAM_DQ),
 
-	.VGA_VS(VGA_VS),
-	.VGA_HS(VGA_HS),
+	.VGA_VS(VSync),
+	.VGA_HS(HSync),
 	.VGA_B(B),
 	.VGA_G(G),
 	.VGA_R(R),
-	.VGA_BLANK(blank),
-	.VGA_PIXCE(CE_PIXEL),
-	.VGA_RATIO(ratio),
-	.HBLANK_EX(hblank_ex),
+	.VGA_PIXCE(ce_pix),
+	.HBLANK(HBlank),
+	.VBLANK(VBlank),
+
+	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
+	.MENU(menu),
 
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
@@ -250,11 +276,17 @@ atari5200top atari5200top
 	.JOY2(joy_1 & {12'b111111111111, {4{joy_d2ena}}})
 );
 
-wire hblank_ex;
+wire [1:0] scale = status[2:1];
+video_mixer video_mixer
+(
+	.*,
+	.ce_pix_out(CE_PIXEL),
 
-wire [7:0] R,G,B;
-assign {VGA_R,VGA_G,VGA_B} = hblank_ex ? 24'd0 : {R,G,B};
-
+	.scanlines({scale == 3, scale == 2}),
+	.scandoubler(scale || forced_scandoubler),
+	.hq2x(scale==1),
+	.mono(0)
+);
 
 //////////////////   LED   ///////////////////
 reg sd_act;
