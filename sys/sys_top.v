@@ -435,6 +435,7 @@ wire vde, hde;
 wire vs_hdmi;
 wire hs_hdmi;
 
+/*
 
 pattern_vg
 #(
@@ -457,7 +458,7 @@ pattern_vg
 	.b_in(0),
 	.vn_out(HDMI_TX_VS),
 	.hn_out(HDMI_TX_HS),
-	.den_out(hdmi_de),
+	.den_out(HDMI_TX_DE),
 	.r_out(hdmi_data[23:16]),
 	.g_out(hdmi_data[15:8]),
 	.b_out(hdmi_data[7:0]),
@@ -466,7 +467,7 @@ pattern_vg
 	.pattern(4),
 	.ramp_step(20'h0333)
 );
-
+*/
 
 wire reset;
 sysmem_lite sysmem
@@ -528,7 +529,7 @@ wire         vbuf_read;
 wire [127:0] vbuf_writedata;
 wire  [15:0] vbuf_byteenable;
 wire         vbuf_write;
-/*
+
 assign HDMI_TX_VS = vs_hdmi;
 assign HDMI_TX_HS = hs_hdmi;
 
@@ -566,7 +567,7 @@ hdmi_lite hdmi_lite
 	.vbuf_readdatavalid(vbuf_readdatavalid),
 	.vbuf_read(vbuf_read)
 );
-*/
+
 `endif
 
 
@@ -717,7 +718,7 @@ vga_out vga_out
 `ifdef LITE
 	.din(vga_q)
 `else
-	.din(vga_scaler ? HDMI_TX_D : vga_q)
+	.din(vga_scaler ? {24{HDMI_TX_DE}} & HDMI_TX_D : vga_q)
 `endif
 );
 
