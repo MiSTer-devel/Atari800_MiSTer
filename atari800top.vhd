@@ -376,11 +376,17 @@ freezer_enable <= zpu_out1(25);
 
 CPU_HALT <= pause_atari;
 
-zpu_rom1: entity work.zpu_rom
+zpu_rom1: entity work.gen_rom
+generic map
+(
+	INIT_FILE  => "zpu_rom.mif",
+	ADDR_WIDTH => 13,
+	DATA_WIDTH => 32
+)
 port map
 (
-  clock => clk,
-  address => zpu_addr_rom(14 downto 2),
+  rdclock => clk,
+  rdaddress => zpu_addr_rom(14 downto 2),
   q => zpu_rom_data
 );
 

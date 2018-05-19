@@ -5,18 +5,14 @@
 #include "pff.h"
 #include "diskio.h"
 
-//#include "printf.h"
-
 /*-------------------------------------------------------------------------*/
 /* Platform dependent macros and functions needed to be modified           */
 /*-------------------------------------------------------------------------*/
 
-#define SELECT() mmcChipSelect(1)
+#define SELECT()   mmcChipSelect(1)
 #define	DESELECT() mmcChipSelect(0)
 
 unsigned char mmc_sector_buffer[512];
-
-extern u32 n_actual_mmc_sector;
 
 /*--------------------------------------------------------------------------
 
@@ -44,41 +40,6 @@ extern u32 n_actual_mmc_sector;
 
 BYTE CardType;
 
-
-extern int debug_pos;
-
-void disk_debug()
-{
-/*	{
-		char buffer[512];
-		set_pause_6502(1);
-		freeze();
-		debug_pos = 0;	
-
-		printf("Hello world 5");
-		debug_pos = 40;
-
-		printf("Di");
-
-		debug_pos = 80;
-		disk_initialize();
-
-		printf("Did:%02x",CardType);
-
-		debug_pos = 120;
-
-		n_actual_mmc_sector = -1;
-		printf(" PP");
-		disk_readp(&buffer[0],0,0,512);
-		printf(" DD");
-		hexdump_pure(&buffer[0],512);
-
-		wait_us(10000000);
-		restore();
-	}
-*/
-}
-
 /*-----------------------------------------------------------------------*/
 /* Send a command packet to the SDC/MMC                                  */
 /*-----------------------------------------------------------------------*/
@@ -98,9 +59,6 @@ BYTE send_cmd (
 		if (res > 1) return res;
 	}
 
-	/* Select the card */
-	DESELECT();
-	spiTransferFF();
 	SELECT();
 	spiTransferFF();
 
@@ -123,8 +81,6 @@ BYTE send_cmd (
 
 	return res;			/* Return with the response value */
 }
-
-
 
 
 /*--------------------------------------------------------------------------

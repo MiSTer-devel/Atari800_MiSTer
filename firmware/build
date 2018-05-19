@@ -1,3 +1,3 @@
 #!/bin/sh
 
-make de1 && ./create_rom.pl 4 DE1.bin zpu_rom 13 > ../zpu_rom.vhdl
+make de1 && srec DE1.bin -binary -o ../zpu_rom.mif -mif 32

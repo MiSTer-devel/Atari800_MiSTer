@@ -68,7 +68,7 @@ BEGIN
     IF(reset_n = '0') THEN        --reset system
       busy <= '1';                --set busy signal
       ss_n <= (OTHERS => '1');    --deassert all slave select lines
-      mosi <= 'Z';                --set master out to high impedance
+      mosi <= '0';                --set master out to high impedance
       rx_data <= (OTHERS => '0'); --clear receive data port
       state <= ready;             --go to ready state when reset is exited
 
@@ -78,7 +78,7 @@ BEGIN
         WHEN ready =>
           busy <= '0';             --clock out not busy signal
           ss_n <= (OTHERS => '1'); --set all slave select outputs high
-          mosi <= 'Z';             --set mosi output high impedance
+          mosi <= '0';             --set mosi output high impedance
           continue <= '0';         --clear continue flag
 
           --user input to initiate transaction
@@ -154,7 +154,7 @@ BEGIN
             IF((clk_toggles = d_width*2 + 1) AND cont = '0') THEN   
               busy <= '0';             --clock out not busy signal
               ss_n <= (OTHERS => '1'); --set all slave selects high
-              mosi <= 'Z';             --set mosi output high impedance
+              mosi <= '0';             --set mosi output high impedance
               rx_data <= rx_buffer;    --clock out received data to output port
               state <= ready;          --return to ready state
             ELSE                       --not end of transaction
