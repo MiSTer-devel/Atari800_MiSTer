@@ -30,9 +30,7 @@ module sd_card
 	input         clk_sys,
 	input         reset,
 
-	// config
-	input         allow_sdhc,
-	output        using_sdhc,
+	input         sdhc,
 
 	output [31:0] sd_lba,
 	output reg    sd_rd,
@@ -46,16 +44,17 @@ module sd_card
 	input         sd_buff_wr,
 
 	// SPI interface
+	input         clk_spi,
+
 	input         ss,
 	input         sck,
 	input         mosi,
 	output reg    miso
 );
 
-assign using_sdhc = sdhc & allow_sdhc;
-assign sd_lba     = using_sdhc ? lba : {9'd0, lba[31:9]};
+assign sd_lba     = sdhc ? lba : {9'd0, lba[31:9]};
 
-wire[31:0] OCR = { 1'b1, using_sdhc, 30'd0 };  // bit30 = 1 -> high capaciry card (sdhc) // bit31 = 0 -> card power up finished
+wire[31:0] OCR = { 1'b1, sdhc, 30'd0 };  // bit30 = 1 -> high capaciry card (sdhc) // bit31 = 0 -> card power up finished
 wire [7:0] READ_DATA_TOKEN     = 8'hfe;
 wire [7:0] WRITE_DATA_RESPONSE = 8'h05;
 
@@ -77,13 +76,13 @@ localparam WR_STATE_BUSY       = 3'd6;
 
 sdbuf buffer
 (
-	.clock(clk_sys),
-
+	.clock_a(clk_sys),
 	.address_a(sd_buff_addr),
 	.data_a(sd_buff_dout),
 	.wren_a(sd_ack & sd_buff_wr),
 	.q_a(sd_buff_din),
 
+	.clock_b(clk_spi),
 	.address_b(buffer_ptr),
 	.data_b(buffer_din),
 	.wren_b(buffer_wr),
@@ -92,23 +91,15 @@ sdbuf buffer
 
 sdbuf conf
 (
-	.clock(clk_sys),
-
+	.clock_a(clk_sys),
 	.address_a(sd_buff_addr),
 	.data_a(sd_buff_dout),
 	.wren_a(sd_ack_conf & sd_buff_wr),
 
+	.clock_b(clk_spi),
 	.address_b(buffer_ptr),
-	.wren_b(0),
 	.q_b(config_dout)
 );
-
-reg sdhc;
-always @(posedge clk_sys) begin
-	reg old_wr;
-	old_wr <= sd_buff_wr;
-	if(sd_ack_conf & ~old_wr & sd_buff_wr & (sd_buff_addr == 32)) sdhc <= sd_buff_dout[0];
-end
 
 reg [31:0] lba;
 reg  [8:0] buffer_ptr;
@@ -117,7 +108,7 @@ wire [7:0] buffer_dout;
 wire [7:0] config_dout;
 reg        buffer_wr;
 
-always @(posedge clk_sys) begin
+always @(posedge clk_spi) begin
 	reg [1:0] read_state;
 	reg [2:0] write_state;
 	reg [6:0] sbuf;
@@ -157,13 +148,13 @@ always @(posedge clk_sys) begin
 	else if(~old_sck && sck && idle_cnt) idle_cnt <= idle_cnt - 1'd1;
 
 	if(reset || !idle_cnt) begin
-		bit_cnt  <= 0;
-		byte_cnt <= 15;
-		synced   <= 0;
-		miso   <= 1;
-		sbuf     <= 7'b1111111;
-		tx_finish<= 0;
-		rx_finish<= 0;
+		bit_cnt     <= 0;
+		byte_cnt    <= 15;
+		synced      <= 0;
+		miso        <= 1;
+		sbuf        <= 7'b1111111;
+		tx_finish   <= 0;
+		rx_finish   <= 0;
 		read_state  <= RD_STATE_IDLE;
 		write_state <= WR_STATE_IDLE;
 	end
@@ -413,7 +404,8 @@ endmodule
 
 module sdbuf
 (
-	input	       clock,
+	input	       clock_a,
+	input	       clock_b,
 	input	 [8:0] address_a,
 	input	 [8:0] address_b,
 	input	 [7:0] data_a,
@@ -424,38 +416,40 @@ module sdbuf
 	output [7:0] q_b
 );
 
-altsyncram	altsyncram_component (
-			.clock0 (clock),
-			.wren_a (wren_a),
-			.address_b (address_b),
-			.data_b (data_b),
-			.wren_b (wren_b),
-			.address_a (address_a),
-			.data_a (data_a),
-			.q_a (q_a),
-			.q_b (q_b),
-			.aclr0 (1'b0),
-			.aclr1 (1'b0),
-			.addressstall_a (1'b0),
-			.addressstall_b (1'b0),
-			.byteena_a (1'b1),
-			.byteena_b (1'b1),
-			.clock1 (1'b1),
-			.clocken0 (1'b1),
-			.clocken1 (1'b1),
-			.clocken2 (1'b1),
-			.clocken3 (1'b1),
-			.eccstatus (),
-			.rden_a (1'b1),
-			.rden_b (1'b1));
+altsyncram	altsyncram_component
+(
+	.address_a (address_a),
+	.address_b (address_b),
+	.clock0 (clock_a),
+	.clock1 (clock_b),
+	.data_a (data_a),
+	.data_b (data_b),
+	.wren_a (wren_a),
+	.wren_b (wren_b),
+	.q_a (q_a),
+	.q_b (q_b),
+	.aclr0 (1'b0),
+	.aclr1 (1'b0),
+	.addressstall_a (1'b0),
+	.addressstall_b (1'b0),
+	.byteena_a (1'b1),
+	.byteena_b (1'b1),
+	.clocken0 (1'b1),
+	.clocken1 (1'b1),
+	.clocken2 (1'b1),
+	.clocken3 (1'b1),
+	.eccstatus (),
+	.rden_a (1'b1),
+	.rden_b (1'b1)
+);
 defparam
-	altsyncram_component.address_reg_b = "CLOCK0",
+	altsyncram_component.address_reg_b = "CLOCK1",
 	altsyncram_component.clock_enable_input_a = "BYPASS",
 	altsyncram_component.clock_enable_input_b = "BYPASS",
 	altsyncram_component.clock_enable_output_a = "BYPASS",
 	altsyncram_component.clock_enable_output_b = "BYPASS",
-	altsyncram_component.indata_reg_b = "CLOCK0",
-	altsyncram_component.intended_device_family = "Cyclone III",
+	altsyncram_component.indata_reg_b = "CLOCK1",
+	altsyncram_component.intended_device_family = "Cyclone V",
 	altsyncram_component.lpm_type = "altsyncram",
 	altsyncram_component.numwords_a = 512,
 	altsyncram_component.numwords_b = 512,
@@ -465,7 +459,6 @@ defparam
 	altsyncram_component.outdata_reg_a = "UNREGISTERED",
 	altsyncram_component.outdata_reg_b = "UNREGISTERED",
 	altsyncram_component.power_up_uninitialized = "FALSE",
-	altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
 	altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
 	altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ",
 	altsyncram_component.widthad_a = 9,
@@ -474,7 +467,7 @@ defparam
 	altsyncram_component.width_b = 8,
 	altsyncram_component.width_byteena_a = 1,
 	altsyncram_component.width_byteena_b = 1,
-	altsyncram_component.wrcontrol_wraddress_reg_b = "CLOCK0";
-
+	altsyncram_component.wrcontrol_wraddress_reg_b = "CLOCK1";
 
 endmodule
+
