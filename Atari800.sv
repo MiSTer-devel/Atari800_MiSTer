@@ -125,8 +125,8 @@ localparam CONF_STR = {
 	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
 	"O34,Stereo mix,None,25%,50%,100%;",
-	"J,Fire,Paddle1,Paddle2,ROM Select;",
-	"V,v1.20.",`BUILD_DATE
+	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,ROM Select;",
+	"V,v1.21.",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -299,7 +299,7 @@ atari800top atari800top
 	.JOY2Y(joya_1[15:8]),
 
 	.JOY1(j0),
-	.JOY2(joy_1[7:0])
+	.JOY2(joy_1[9:0])
 );
 
 wire [1:0] scale = status[2:1];
@@ -329,9 +329,9 @@ wire vsdmiso;
 sd_card sd_card
 (
 	.*,
+	.clk_spi(clk_sys),
 
-	.allow_sdhc(1),
-	.using_sdhc(),
+	.sdhc(1),
 
 	.sck(sdclk),
 	.ss(~vsd_sel | sdss),
@@ -366,7 +366,7 @@ end
 reg        emu = 0;
 wire [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
 wire [7:0] ay = emu ? my[7:0] : joya_0[15:8];
-wire [7:0] j0 = emu ? {joy_0[7], ps2_mouse[1:0], joy_0[4:0]} : joy_0[7:0];
+wire [9:0] j0 = {joy_0[9], emu ? ps2_mouse[1:0] : joy_0[8:7], joy_0[6:0]};
 
 reg  signed [8:0] mx = 0;
 wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};

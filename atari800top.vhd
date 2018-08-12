@@ -63,8 +63,8 @@ PORT
 	JOY2X      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
-	JOY1       : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	JOY2       : IN  STD_LOGIC_VECTOR(7 DOWNTO 0)
+	JOY1       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
+	JOY2       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0)
 );
 
 END atari800top;
@@ -82,7 +82,11 @@ signal capsheld_reg : std_logic;
 
 signal JOY1_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
 signal JOY2_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
-signal JOY    :  STD_LOGIC_VECTOR(7 DOWNTO 0);
+signal JOY    :  STD_LOGIC_VECTOR(9 DOWNTO 0);
+signal JOY1_X :  STD_LOGIC_VECTOR(7 downto 0);
+signal JOY2_X :  STD_LOGIC_VECTOR(7 downto 0);
+signal JOY1_Y :  STD_LOGIC_VECTOR(7 downto 0);
+signal JOY2_Y :  STD_LOGIC_VECTOR(7 downto 0);
 
 SIGNAL KEYBOARD_RESPONSE :  STD_LOGIC_VECTOR(1 DOWNTO 0);
 SIGNAL KEYBOARD_SCAN :  STD_LOGIC_VECTOR(5 DOWNTO 0);
@@ -144,27 +148,36 @@ signal freezer_enable : std_logic;
 signal freezer_activate: std_logic;
 
 -- paddles
-signal paddle_1 : std_logic;
-signal paddle_2 : std_logic;
+signal paddle_1 : std_logic_vector(2 downto 0);
+signal paddle_2 : std_logic_vector(2 downto 0);
 
 BEGIN
 
 process(clk,RESET_N)
 begin
 	if (RESET_N = '0') then
-		paddle_1 <= '0';
-		paddle_2 <= '0';
+		paddle_1 <= "000";
+		paddle_2 <= "000";
 	elsif rising_edge(clk) then
-		if JOY1(4)='1' then paddle_1 <= '0'; end if;
-		if JOY1(5)='1' or JOY1(6)='1' then paddle_1 <= '1'; end if;
+		if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
+		if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
+		if JOY1(6) = '1'             then paddle_1(2) <= '1';   end if;
+		if JOY1(8 downto 7) /= "00"  then paddle_1    <= "001"; end if;
 
-		if JOY2(4)='1' then paddle_2 <= '0'; end if;
-		if JOY2(5)='1' or JOY2(6)='1' then paddle_2 <= '1'; end if;
+		if JOY2(6 downto 4) /= "000" then paddle_2(0) <= '0';   end if;
+		if JOY2(5) = '1'             then paddle_2(1) <= '1';   end if;
+		if JOY2(6) = '1'             then paddle_2(2) <= '1';   end if;
+		if JOY2(8 downto 7) /= "00"  then paddle_2    <= "001"; end if;
 	end if;
 end process;
 
-JOY1_n <= '1'&not(JOY1(6)&JOY1(5))&"11" when paddle_1 = '1' else not(JOY1(4)&JOY1(0)&JOY1(1)&JOY1(2)&JOY1(3)); --FRLDU
-JOY2_n <= '1'&not(JOY2(6)&JOY2(5))&"11" when paddle_2 = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
+JOY1_n <= '1'&not(JOY1(8)&JOY1(7))&"11" when paddle_1(0) = '1' else not(JOY1(4)&JOY1(0)&JOY1(1)&JOY1(2)&JOY1(3)); --FRLDU
+JOY1_X <= JOY1X when paddle_1(0) = '1' else X"00" when paddle_1(1) = '0' else X"70" when JOY1(5) = '0' else X"90";
+JOY1_Y <= JOY1Y when paddle_1(0) = '1' else X"00" when paddle_1(2) = '0' else X"70" when JOY1(6) = '0' else X"90";
+
+JOY2_n <= '1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
+JOY2_X <= JOY2X when paddle_2(0) = '1' else X"00" when paddle_2(1) = '0' else X"70" when JOY2(5) = '0' else X"90";
+JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"00" when paddle_2(2) = '0' else X"70" when JOY2(6) = '0' else X"90";
 
 -- PS2 to pokey
 keyboard_map1 : entity work.ps2_to_atari800
@@ -222,10 +235,10 @@ PORT MAP
 	JOY1_n => JOY1_n,
 	JOY2_n => JOY2_n,
 
-	PADDLE0 => signed(joy1x and (paddle_1&paddle_1&paddle_1&paddle_1&paddle_1&paddle_1&paddle_1&paddle_1)),
-	PADDLE1 => signed(joy1y and (paddle_1&paddle_1&paddle_1&paddle_1&paddle_1&paddle_1&paddle_1&paddle_1)),
-	PADDLE2 => signed(joy2x and (paddle_2&paddle_2&paddle_2&paddle_2&paddle_2&paddle_2&paddle_2&paddle_2)),
-	PADDLE3 => signed(joy2y and (paddle_2&paddle_2&paddle_2&paddle_2&paddle_2&paddle_2&paddle_2&paddle_2)),
+	PADDLE0 => signed(JOY1_X),
+	PADDLE1 => signed(JOY1_Y),
+	PADDLE2 => signed(JOY2_X),
+	PADDLE3 => signed(JOY2_Y),
 
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
@@ -356,8 +369,8 @@ PORT MAP
 	-- switches etc. sector DMA blah blah.
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
-			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(7)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(7))&FKEYS(9 downto 0),
+			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(9)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
+			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(9))&FKEYS(9 downto 0),
 	ZPU_IN2 => X"0000000" & '0' & DRV_SPEED,
 	ZPU_IN3 => X"00000000",
 	ZPU_IN4 => X"00000000",
