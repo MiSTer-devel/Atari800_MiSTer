@@ -160,12 +160,14 @@ areset_n <= RESET_N and SDRAM_RESET_N and not reset_atari;
 
 process(clk)
 	variable cnt : integer := 0;
+	variable old_reset : std_logic := '1';
 begin
 	if rising_edge(clk) then
-		if (areset_n = '0') then
+		if (old_reset = '1' and areset_n = '0') then
 			paddle_1 <= "000";
 			paddle_2 <= "000";
 			cnt := 0;
+			option_tmp <= '0';
 		else
 			if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
 			if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
@@ -177,13 +179,15 @@ begin
 			if JOY2(6) = '1'             then paddle_2(2) <= '1';   end if;
 			if JOY2(8 downto 7) /= "00"  then paddle_2    <= "001"; end if;
 			
-			
-			option_tmp <= '0';
-			if cnt < 120000000 then
+			if cnt < 150000000 then
 				cnt := cnt + 1;
-				option_tmp <= JOY(5);
+				option_tmp <= option_tmp or JOY(5);
+			else
+				option_tmp <= '0';
 			end if;
 		end if;
+
+		old_reset := areset_n;
 	end if;
 end process;
 
