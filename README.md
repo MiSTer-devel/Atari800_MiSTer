@@ -36,6 +36,11 @@ Additionally, you can control the speed of turbo loading in OSD menu.
 * WIN+Enter/Fire in quick selector loads Drive 2.
 * WIN+Enter/Fire in normal work swaps Drive 1 <-> Drive 2.
 * Mouse emulates analog joystick(Atari 5200) and paddles(Atari 800).
+* Fire 2 and Fire 3 on joystick.
+
+### Disable Basic ROM by Joystick.
+Fire 2 on joystick acts as an OPTION key while reboot. It's valid only 2 seconds after reboot. After that Fire 2 doesn't affect the OPTION key.
+Fire 2 can be used to select the file in ROM selection menu to disable the Basic ROM. You need to press the Fire 2 and hold it down til ROM start to load.
 
 ### More info
 See more info in original [instructions](https://github.com/MiSTer-devel/Atari800_MiSTer/tree/master/instructions.txt)

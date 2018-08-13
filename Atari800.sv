@@ -123,10 +123,11 @@ localparam CONF_STR = {
 	"O5,Video mode,PAL,NTSC;",
 	"O6,Aspect ratio,4:3,16:9;",
 	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
-	"-;",
 	"O34,Stereo mix,None,25%,50%,100%;",
+	"-;",
+	"R0,Reset;",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,ROM Select;",
-	"V,v1.21.",`BUILD_DATE
+	"V,v1.22.",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////

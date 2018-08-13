@@ -151,23 +151,39 @@ signal freezer_activate: std_logic;
 signal paddle_1 : std_logic_vector(2 downto 0);
 signal paddle_2 : std_logic_vector(2 downto 0);
 
+signal areset_n   : std_logic;
+signal option_tmp : std_logic;
+
 BEGIN
 
-process(clk,RESET_N)
-begin
-	if (RESET_N = '0') then
-		paddle_1 <= "000";
-		paddle_2 <= "000";
-	elsif rising_edge(clk) then
-		if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
-		if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
-		if JOY1(6) = '1'             then paddle_1(2) <= '1';   end if;
-		if JOY1(8 downto 7) /= "00"  then paddle_1    <= "001"; end if;
+areset_n <= RESET_N and SDRAM_RESET_N and not reset_atari;
 
-		if JOY2(6 downto 4) /= "000" then paddle_2(0) <= '0';   end if;
-		if JOY2(5) = '1'             then paddle_2(1) <= '1';   end if;
-		if JOY2(6) = '1'             then paddle_2(2) <= '1';   end if;
-		if JOY2(8 downto 7) /= "00"  then paddle_2    <= "001"; end if;
+process(clk)
+	variable cnt : integer := 0;
+begin
+	if rising_edge(clk) then
+		if (areset_n = '0') then
+			paddle_1 <= "000";
+			paddle_2 <= "000";
+			cnt := 0;
+		else
+			if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
+			if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
+			if JOY1(6) = '1'             then paddle_1(2) <= '1';   end if;
+			if JOY1(8 downto 7) /= "00"  then paddle_1    <= "001"; end if;
+
+			if JOY2(6 downto 4) /= "000" then paddle_2(0) <= '0';   end if;
+			if JOY2(5) = '1'             then paddle_2(1) <= '1';   end if;
+			if JOY2(6) = '1'             then paddle_2(2) <= '1';   end if;
+			if JOY2(8 downto 7) /= "00"  then paddle_2    <= "001"; end if;
+			
+			
+			option_tmp <= '0';
+			if cnt < 120000000 then
+				cnt := cnt + 1;
+				option_tmp <= JOY(5);
+			end if;
+		end if;
 	end if;
 end process;
 
@@ -214,7 +230,7 @@ GENERIC MAP
 PORT MAP
 (
 	CLK => CLK,
-	RESET_N => RESET_N and SDRAM_RESET_N and not(reset_atari),
+	RESET_N => areset_n,
 
 	VIDEO_VS => VGA_VS,
 	VIDEO_HS => VGA_HS,
@@ -247,7 +263,7 @@ PORT MAP
 	SIO_RXD => zpu_sio_txd,
 	SIO_TXD => zpu_sio_rxd,
 
-	CONSOL_OPTION => CONSOL_OPTION,
+	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
 	CONSOL_START => CONSOL_START,
 
@@ -369,7 +385,7 @@ PORT MAP
 	-- switches etc. sector DMA blah blah.
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
-			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(9)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
+			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(9)&(joy(4) or joy(5))&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
 			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(9))&FKEYS(9 downto 0),
 	ZPU_IN2 => X"0000000" & '0' & DRV_SPEED,
 	ZPU_IN3 => X"00000000",
