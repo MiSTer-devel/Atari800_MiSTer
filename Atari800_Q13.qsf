@@ -29,7 +29,7 @@ set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEBA6U23I7
 set_global_assignment -name TOP_LEVEL_ENTITY sys_top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 16.1.2
-set_global_assignment -name LAST_QUARTUS_VERSION "17.0.2 Standard Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "01:53:30  APRIL 20, 2017"
 set_global_assignment -name DEVICE_FILTER_PACKAGE UFBGA
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 672
@@ -50,8 +50,17 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS OFF
 set_global_assignment -name OPTIMIZE_POWER_DURING_FITTING OFF
 set_global_assignment -name FINAL_PLACEMENT_OPTIMIZATION ALWAYS
+set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS ON
+set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
+set_global_assignment -name OPTIMIZATION_TECHNIQUE SPEED
+set_global_assignment -name PLACEMENT_EFFORT_MULTIPLIER 2.0
+set_global_assignment -name ROUTER_CLOCKING_TOPOLOGY_ANALYSIS ON
+set_global_assignment -name ALLOW_SYNCH_CTRL_USAGE OFF
+set_global_assignment -name OPTIMIZE_POWER_DURING_SYNTHESIS OFF
+set_global_assignment -name SYNTH_GATED_CLOCK_CONVERSION ON
+set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
+set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
 set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
-set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
 set_global_assignment -name SEED 1
 
 #============================================================
@@ -354,7 +363,7 @@ set_location_assignment PIN_W20 -to SW[3]
 set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
 
 set_global_assignment -name CDF_FILE jtag.cdf
-set_global_assignment -name QIP_FILE sys/sys.qip
+set_global_assignment -name QIP_FILE sys/sys_q13.qip
 set_global_assignment -name VHDL_FILE ./common/a8core/atari800core.vhd
 set_global_assignment -name VHDL_FILE ./common/a8core/atari800core_simple_sdram.vhd
 set_global_assignment -name VHDL_FILE ./common/a8core/cart_logic.vhd

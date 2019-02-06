@@ -4,12 +4,9 @@
 # and it will be marked as changed with every commit.
 #
 
-QUARTUS_VERSION = "16.1"
+QUARTUS_VERSION = "13.1"
 DATE = "23:13:02  April 27, 2017"
 
 # Revisions
 
-PROJECT_REVISION = "Atari800"
-PROJECT_REVISION = "Atari5200"
-PROJECT_REVISION = "Atari800-lite"
-PROJECT_REVISION = "Atari5200-lite"
+PROJECT_REVISION = "Atari800_Q13"

@@ -2,7 +2,7 @@
 //  Atari 800 replica
 // 
 //  Port to MiSTer
-//  Copyright (C) 2017,2018 Sorgelig
+//  Copyright (C) 2017-2019 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -48,6 +48,8 @@ module emu
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
+	output        VGA_F1,
+	output [1:0]  VGA_SL,
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -94,8 +96,19 @@ module emu
 	output        SDRAM_nCS,
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
-	output        SDRAM_nWE
+	output        SDRAM_nWE,
+
+	input         UART_CTS,
+	output        UART_RTS,
+	input         UART_RXD,
+	output        UART_TXD,
+	output        UART_DTR,
+	input         UART_DSR,
+
+	input         OSD_STATUS
 );
+
+assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 
@@ -122,7 +135,7 @@ localparam CONF_STR = {
 	"-;",
 	"O5,Video mode,PAL,NTSC;",
 	"O6,Aspect ratio,4:3,16:9;",
-	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"R0,Reset;",
@@ -303,13 +316,17 @@ atari800top atari800top
 	.JOY2(joy_1[9:0])
 );
 
-wire [1:0] scale = status[2:1];
+assign VGA_F1 = 0;
+assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
+
+wire [2:0] scale = status[19:17];
+
 video_mixer video_mixer
 (
 	.*,
 	.ce_pix_out(CE_PIXEL),
 
-	.scanlines({scale == 3, scale == 2}),
+	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 	.mono(0)
