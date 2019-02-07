@@ -11,6 +11,7 @@
 // a) Command line
 // b) Pokey
 // Both these are mapped into zpu config regs
+#include "file.h"
 
 void actions(); // this is called whenever possible - should be quick
 

@@ -65,6 +65,7 @@ ENTITY zpucore IS
 		ZPU_IN2 : in std_logic_vector(31 downto 0);
 		ZPU_IN3 : in std_logic_vector(31 downto 0);
 		ZPU_IN4 : in std_logic_vector(31 downto 0);
+		ZPU_IN_RD : out std_logic_vector(15 downto 0);
 
 		-- ouputs - e.g. Atari system control, halt, throttle, rom select
 		ZPU_OUT1 : out std_logic_vector(31 downto 0);
@@ -73,6 +74,7 @@ ENTITY zpucore IS
 		ZPU_OUT4 : out std_logic_vector(31 downto 0);
 		ZPU_OUT5 : out std_logic_vector(31 downto 0);
 		ZPU_OUT6 : out std_logic_vector(31 downto 0);
+		ZPU_OUT_WR : out std_logic_vector(15 downto 0);
 
 		-- USB host
 		CLK_USB : in std_logic := '0';
@@ -156,14 +158,16 @@ PORT MAP (
 	IN2 => ZPU_IN2,
 	IN3 => ZPU_IN3,
 	IN4 => ZPU_IN4,
-	
+	IN_RD => ZPU_IN_RD,
+
 	OUT1 => ZPU_OUT1,
 	OUT2 => ZPU_OUT2,
 	OUT3 => ZPU_OUT3,
 	OUT4 => ZPU_OUT4,
 	OUT5 => ZPU_OUT5,
 	OUT6 => ZPU_OUT6,
-	
+	OUT_WR => ZPU_OUT_WR,
+
 	SDCARD_DAT => ZPU_SD_DAT0,
 	SDCARD_CLK => ZPU_SD_CLK,
 	SDCARD_CMD => ZPU_SD_CMD,

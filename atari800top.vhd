@@ -64,7 +64,14 @@ PORT
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
 	JOY1       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
-	JOY2       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0)
+	JOY2       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
+	
+	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
+	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
+	ZPU_IN3    : IN  STD_LOGIC_VECTOR(31 downto 0);
+	ZPU_OUT3   : OUT STD_LOGIC_VECTOR(31 downto 0);
+	ZPU_IN_RD  : OUT STD_LOGIC_VECTOR(15 downto 0);
+	ZPU_OUT_WR : OUT STD_LOGIC_VECTOR(15 downto 0)
 );
 
 END atari800top;
@@ -121,8 +128,6 @@ signal ZPU_ADDR_ROM : std_logic_vector(15 downto 0);
 signal ZPU_ROM_DATA :  std_logic_vector(31 downto 0);
 
 signal ZPU_OUT1 : std_logic_vector(31 downto 0);
-signal ZPU_OUT2 : std_logic_vector(31 downto 0);
-signal ZPU_OUT3 : std_logic_vector(31 downto 0);
 signal ZPU_OUT4 : std_logic_vector(31 downto 0);
 
 signal zpu_pokey_enable : std_logic;
@@ -153,6 +158,13 @@ signal paddle_2 : std_logic_vector(2 downto 0);
 
 signal areset_n   : std_logic;
 signal option_tmp : std_logic;
+
+
+signal BIOS_DATA : std_logic_vector(7 downto 0);
+signal BASIC_DATA : std_logic_vector(7 downto 0);
+
+signal RAM_DATA : std_logic_vector(31 downto 0);
+
 
 BEGIN
 
@@ -276,7 +288,7 @@ PORT MAP
 	SDRAM_READ_ENABLE => SDRAM_READ_ENABLE,
 	SDRAM_WRITE_ENABLE => SDRAM_WRITE_ENABLE,
 	SDRAM_ADDR => SDRAM_ADDR,
-	SDRAM_DO => SDRAM_DO,
+	SDRAM_DO => RAM_DATA,
 	SDRAM_DI => SDRAM_DI,
 	SDRAM_32BIT_WRITE_ENABLE => SDRAM_WIDTH_32bit_ACCESS,
 	SDRAM_16BIT_WRITE_ENABLE => SDRAM_WIDTH_16bit_ACCESS,
@@ -342,6 +354,38 @@ PORT MAP
 
 joy <= joy1 or joy2;
 
+bios: work.dpram generic map(14,8, "rom/ATARIXLn.mif")
+port map
+(
+	clock => clk,
+
+	address_a => (others => '0'),
+	data_b => (others => '0'),
+	wren_b => '0',
+
+	address_b => SDRAM_ADDR(13 downto 0),
+	q_b => BIOS_DATA
+);
+
+basic: work.dpram generic map(13,8, "rom/ATARIBAS.mif")
+port map
+(
+	clock => clk,
+
+	address_a => (others => '0'),
+	data_b => (others => '0'),
+	wren_b => '0',
+
+	address_b => SDRAM_ADDR(12 downto 0),
+	q_b => BASIC_DATA
+);
+
+RAM_DATA <= x"000000"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001"  else
+            (others=>'1')        when SDRAM_ADDR(22 downto 13) = "1110000001" else
+            x"000000"&BASIC_DATA when SDRAM_ADDR(22 downto 13) = "1110000000" else
+            SDRAM_DO;
+
+
 zpu: entity work.zpucore
 GENERIC MAP
 (
@@ -391,9 +435,12 @@ PORT MAP
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(9)&(joy(4) or joy(5))&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
 			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(9))&FKEYS(9 downto 0),
-	ZPU_IN2 => X"0000000" & '0' & DRV_SPEED,
-	ZPU_IN3 => X"00000000",
+	ZPU_IN2 => X"0000"& ZPU_IN2 & x"0" & '0' & DRV_SPEED,
+	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",
+	
+	ZPU_IN_RD => ZPU_IN_RD,
+	ZPU_OUT_WR => ZPU_OUT_WR,
 
 	-- ouputs - e.g. Atari system control, halt, throttle, rom select
 	ZPU_OUT1 => zpu_out1,
@@ -409,17 +456,12 @@ freezer_enable <= zpu_out1(25);
 
 CPU_HALT <= pause_atari;
 
-zpu_rom1: entity work.gen_rom
-generic map
-(
-	INIT_FILE  => "zpu_rom.mif",
-	ADDR_WIDTH => 13,
-	DATA_WIDTH => 32
-)
+zpu_rom1: entity work.spram
+generic map(13,32,"zpu_rom.mif")
 port map
 (
-  rdclock => clk,
-  rdaddress => zpu_addr_rom(14 downto 2),
+  clock => clk,
+  address => zpu_addr_rom(14 downto 2),
   q => zpu_rom_data
 );
 

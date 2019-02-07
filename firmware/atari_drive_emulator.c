@@ -1,11 +1,10 @@
 #include "atari_drive_emulator.h"
-#include "fileutils.h"
+//#include "fileutils.h"
 
 #include "uart.h"
 #include "regs.h"
 #include "pause.h"
-#include "simplefile.h"
-#include "hexdump.h"
+//#include "hexdump.h"
 
 //#include "printf.h"
 //#include <stdio.h>
@@ -194,7 +193,6 @@ void getCommand(struct command * cmd)
 void set_drive_status(int driveNumber, struct SimpleFile * file)
 {
 	int read = 0;
-	int xfd = 0;
 	unsigned char info = 0;
 
 	drives[driveNumber] = 0;
@@ -208,6 +206,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	read = 0;
 	file_seek(file,0);
 	file_read(file,(unsigned char *)&atr_header, 16, &read);
+
 	if (read!=16)
 	{
 		//printf("Could not read header\n");
@@ -228,11 +227,10 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	printf("%d",atr_header.dwCRC);
 	printf("\n");
 	*/
-
+	
 	xex_loader = 0;
-	xfd = compare_ext(file_name(file),"XFD");
 
-	if (xfd == 1)
+	if (file_type(file) == 2)
 	{
 		//printf("XFD ");
 		// build a fake atr header
@@ -398,7 +396,7 @@ void processCommand()
 				send_ACK();
 				clearAtariSectorBuffer();
 				atari_sector_buffer[0] = speedfast;
-				hexdump_pure(atari_sector_buffer,1);
+				//hexdump_pure(atari_sector_buffer,1);
 				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(1);
 				sent = 1;
 				if (sector == 0)
@@ -442,7 +440,7 @@ void processCommand()
 				atari_sector_buffer[1] = 0xff;
 				atari_sector_buffer[2] = 0xe0;
 				atari_sector_buffer[3] = 0x0;
-				hexdump_pure(atari_sector_buffer,4); // Somehow with this...
+				//hexdump_pure(atari_sector_buffer,4); // Somehow with this...
 				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(4);
 				sent = 1;
 				//printf("%d",atari_sector_buffer[0]); // and this... The wrong checksum is sent!!

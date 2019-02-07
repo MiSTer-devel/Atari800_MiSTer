@@ -1,7 +1,5 @@
 #include "memory.h"
-#include "simpledir.h"
 #include "cartridge.h"
-#include "log.h"
 
 struct CartDef {
 	unsigned char carttype;	// type from CAR header
@@ -87,36 +85,57 @@ static struct CartDef cartdef[] = {
 
 int load_car(struct SimpleFile* file)
 {
-	if (CARTRIDGE_MEM == 0) {
-		LOG("no cartridge memory\n");
+	if (CARTRIDGE_MEM == 0)
+	{
+		//LOG("no cartridge memory\n");
 		return 0;
 	}
-	int len;
-	enum SimpleFileStatus ok;
-	unsigned char header[16];
-	ok = file_read(file, header, 16, &len);
-	if (ok != SimpleFile_OK || len != 16) {
-		LOG("cannot read cart header\n");
-		return 0;
-	}
-	unsigned char carttype = header[7];
 
-	// search for cartridge definition
-	struct CartDef* def = cartdef;
-	while (def->carttype && def->carttype != carttype) {
-		def++;
+	enum SimpleFileStatus ok;
+	unsigned char mode = TC_MODE_OFF;
+	int len;
+	
+	unsigned int byte_len = file_size(file);
+	if(byte_len == 16384)
+	{
+		mode = TC_MODE_16K;
 	}
-	if (def->carttype == 0) {
-		LOG("illegal cart type %d\n", carttype);
-		return 0;
+	else if(byte_len == 8192)
+	{
+		mode = TC_MODE_8K;
 	}
-	unsigned int byte_len = (unsigned int) def->size << 10;
+	else
+	{
+		unsigned char header[16];
+		ok = file_read(file, header, 16, &len);
+		if (ok != SimpleFile_OK || len != 16)
+		{
+			//LOG("cannot read cart header\n");
+			return 0;
+		}
+		unsigned char carttype = header[7];
+
+		// search for cartridge definition
+		struct CartDef* def = cartdef;
+		while (def->carttype && def->carttype != carttype) {
+			def++;
+		}
+		if (def->carttype == 0)
+		{
+			//LOG("illegal cart type %d\n", carttype);
+			return 0;
+		}
+		byte_len = (unsigned int) def->size << 10;
+		mode = def->mode;
+	}
+
 	ok = file_read(file, CARTRIDGE_MEM, byte_len, &len);
-	if (ok != SimpleFile_OK || len != byte_len) {
-		LOG("cannot read cart data\n");
+	if (ok != SimpleFile_OK || len != byte_len)
+	{
+		//LOG("cannot read cart data\n");
 		return 0;
 	}
-	LOG("cart type: %d size: %dk\n",
-		 def->mode, def->size);
-	return def->mode;
+
+	//LOG("cart type: %d size: %dk\n", def->mode, def->size);
+	return mode;
 }

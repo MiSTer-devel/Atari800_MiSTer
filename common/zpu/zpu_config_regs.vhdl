@@ -32,7 +32,8 @@ PORT
 	IN1 : in std_logic_vector(31 downto 0); 
 	IN2 : in std_logic_vector(31 downto 0); 
 	IN3 : in std_logic_vector(31 downto 0); 
-	IN4 : in std_logic_vector(31 downto 0); 
+	IN4 : in std_logic_vector(31 downto 0);
+	IN_RD : out std_logic_vector(15 downto 0);
 	
 	-- GENERIC OUTPUT REGS
 	OUT1 : out  std_logic_vector(31 downto 0); 
@@ -41,7 +42,8 @@ PORT
 	OUT4 : out  std_logic_vector(31 downto 0); 
 	OUT5 : out  std_logic_vector(31 downto 0); 
 	OUT6 : out  std_logic_vector(31 downto 0); 
-	
+	OUT_WR : out std_logic_vector(15 downto 0);
+
 	-- SDCARD
 	SDCARD_CLK : out std_logic;
 	SDCARD_CMD : out std_logic;
@@ -254,6 +256,9 @@ begin
 
 	device_wr_en <= device_decoded and (wr_en&wr_en&wr_en&wr_en&wr_en&wr_en&wr_en&wr_en);
 	device_rd_en <= device_decoded and (rd_en&rd_en&rd_en&rd_en&rd_en&rd_en&rd_en&rd_en);
+	
+	IN_RD  <= addr_decoded when device_rd_en(0) = '1' else (others => '0');
+	OUT_WR <= addr_decoded when device_wr_en(0) = '1' else (others => '0');
 	
 	-- uart - another Pokey! Running at atari frequency.
 	-- with a state machine to capture command packets

@@ -70,12 +70,11 @@ LINUXSIM_5200_BUILD_DIR = $(BUILD_DIR)/$(LINUXSIM_5200_DIR)
 MINSTARTUP_SRC = mycrt0.s
 MINSTARTUP_OBJ = $(patsubst $(STARTUP_DIR)/%.s,$(BUILD_DIR)/%.o,$(MINSTARTUP_SRC))
 
-CORE_SRC = cartridge.c fileutils.c fileselector.c pokey/uart.c hexdump.c common/utils.c printf/printf.c 
-FAT_SRC = fat/pff_file.c fat/pff.c 
-COMMON_SRC = ${FAT_SRC} ${CORE_SRC}
-SDCARD_SRC = sd_direct/diskio_mmc.c sd_direct/spi.c sd_direct/mmc2.c
-A800_SRC_LIGHT = a800/freeze.c  a800/mainmenu.c atari_drive_emulator.c libgcc_divmod.c
-A800_SRC = ${A800_SRC_LIGHT} a800/joystick.c 
+CORE_SRC = cartridge.c uart.c
+COMMON_SRC = ${CORE_SRC}
+SDCARD_SRC = file.c
+A800_SRC_LIGHT = main800.c atari_drive_emulator.c libgcc_divmod.c
+A800_SRC = ${A800_SRC_LIGHT}
 5200_SRC_LIGHT = 5200/freeze.c  5200/mainmenu.c
 5200_SRC = ${5200_SRC_LIGHT} 5200/joystick.c
 USB_SRC = usb/hid.c  usb/hidparser.c  usb/hub.c usb/timer.c  usb/usb.c usb/debug.c
@@ -89,7 +88,7 @@ PAPILIODUO_SRC = $(COMMON_SRC) $(SDCARD_SRC) $(A800_SRC) de1/dirs.c
 PAPILIODUO_OBJ = $(patsubst %.c,$(PAPILIODUO_BUILD_DIR)/%.o,$(PAPILIODUO_SRC))
 
 DE1_PRJ = DE1
-DE1_SRC = $(COMMON_SRC) $(SDCARD_SRC) $(A800_SRC) de1/dirs.c
+DE1_SRC = $(COMMON_SRC) $(SDCARD_SRC) $(A800_SRC)
 DE1_OBJ = $(patsubst %.c,$(DE1_BUILD_DIR)/%.o,$(DE1_SRC))
 
 DE1_5200_PRJ = DE1_5200

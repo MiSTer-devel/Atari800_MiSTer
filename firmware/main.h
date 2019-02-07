@@ -3,33 +3,11 @@
 #include "integer.h"
 #include "regs.h"
 #include "pause.h"
-#include "printf.h"
-#include "joystick.h"
-#include "freeze.h"
 
-#include "simpledir.h"
-#include "simplefile.h"
-#include "fileselector.h"
+#include "file.h"
 #include "cartridge.h"
 
-#ifdef LINUX_BUILD
-#include "curses_screen.h"
-#define after_set_reg_hook() display_out_regs()
-#else
-#define after_set_reg_hook() do { } while(0)
-#endif
-
-#ifdef USB
-#include "usb.h"
-#include "usb/debug.h"
-#define USBSETTINGS
-#endif
-
 #include "memory.h"
-#include "pff_file.h"
-
-extern char ROM_DIR[];
-extern unsigned char freezer_rom_present;
 
 void mainmenu();
 
@@ -66,7 +44,6 @@ void set_ ## name(int param) \
 	val |= op(param)<<shift; \
 	 \
 	*reg = val; \
-	after_set_reg_hook(); \
 }
 
 #define BIT_REG_RO(op,mask,shift,name,reg) \
@@ -95,6 +72,22 @@ BIT_REG_RO(,0x3f,12,controls,zpu_in1) // (esc)FLRDU
 
 BIT_REG_RO(,0x7,0,speeddrv,zpu_in2)
 
+// file i/o registers
+BIT_REG_RO(,0x1,8,sd_done,zpu_in2)
+BIT_REG_RO(,0x1,9,sd_mounted,zpu_in2)
+BIT_REG_RO(,0x7,10,sd_fileno,zpu_in2)
+BIT_REG_RO(,0x3,13,sd_filetype,zpu_in2)
+BIT_REG_RO(,0x1,15,sd_readonly,zpu_in2)
+
+BIT_REG(,0x1,0,sd_data_mode,zpu_out2) //0 - write/read the buffer, 1 - write LBA
+BIT_REG(,0x1,1,sd_read,zpu_out2)
+BIT_REG(,0x1,2,sd_write,zpu_out2)
+BIT_REG(,0x7,3,sd_num,zpu_out2)
+
+// zpu_in3 - read the buffer;
+// zpu_out3 - write to buffer;
+
+
 void
 wait_us(int unsigned num)
 {
@@ -112,15 +105,13 @@ wait_us(int unsigned num)
 void memset8(void * address, int value, int length)
 {
 	char * mem = address;
-	while (length--)
-		*mem++=value;
+	while (length--) *mem++=value;
 }
 
 void memset32(void * address, int value, int length)
 {
 	int * mem = address;
-	while (length--)
-		*mem++=value;
+	while (length--) *mem++=value;
 }
 
 void clear_main_ram()
@@ -137,7 +128,6 @@ reboot(int cold)
 	{
 		set_freezer_enable(0);
 		clear_main_ram();
-		set_freezer_enable(freezer_rom_present);
 	}
 	set_reset_6502(1);
 	// Do nothing in here - this resets the memory controller!
@@ -145,104 +135,8 @@ reboot(int cold)
 	set_pause_6502(0);
 }
 
-unsigned char toatarichar(int val)
-{
-	int inv = val>=128;
-	if (inv)
-	{
-		val-=128;
-	}
-	if (val>='A' && val<='Z')
-	{
-		val+=-'A'+33;
-	}
-	else if (val>='a' && val<='z')
-	{
-		val+=-'a'+33+64;
-	}
-	else if (val>='0' && val<='9')
-	{
-		val+=-'0'+16;	
-	}
-	else if (val>=32 && val<=47)
-	{
-		val+=-32;
-	}
-	else if (val == ':')
-	{
-		val = 26;
-	}
-	else
-	{
-		val = 0;
-	}
-	if (inv)
-	{
-		val+=128;
-	}
-	return val;
-}
-
-int debug_pos;
-int debug_adjust;
-unsigned char volatile * baseaddr;
-
-#ifdef LINUX_BUILD
-void char_out(void* p, char c)
-{
-	// get rid of unused parameter p warning
-	(void)(p);
-	int x, y;
-	x = debug_pos % 40;
-	y = debug_pos / 40;
-	display_char(x, y, c, debug_adjust == 128);
-	debug_pos++;
-}
-
-#else
-void clearscreen()
-{
-	unsigned volatile char * screen;
-	for (screen=(unsigned volatile char *)(screen_address+atari_regbase); screen!=(unsigned volatile char *)(atari_regbase+screen_address+1024); ++screen)
-		*screen = 0x00;
-}
-
-void char_out ( void* p, char c)
-{
-	unsigned char val = toatarichar(c);
-	if (debug_pos>=0)
-	{
-		*(baseaddr+debug_pos) = val|debug_adjust;
-		++debug_pos;
-	}
-}
-#endif
-
-#define NUM_FILES 9
+#define NUM_FILES 8
 struct SimpleFile * files[NUM_FILES];
-
-void loadromfile(struct SimpleFile * file, int size, size_t ram_address)
-{
-	void* absolute_ram_address = SDRAM_BASE + ram_address;
-	int read = 0;
-	file_read(file, absolute_ram_address, size, &read);
-}
-
-void loadrom(char const * path, int size, size_t ram_address)
-{
-	if (SimpleFile_OK == file_open_name(path, files[5]))
-	{
-		loadromfile(files[5], size, ram_address);
-	}
-}
-
-void loadrom_indir(struct SimpleDirEntry * entries, char const * filename, int size, size_t ram_address)
-{
-	if (SimpleFile_OK == file_open_name_in_dir(entries, filename, files[5]))
-	{
-		loadromfile(files[5], size, ram_address);
-	}
-}
 
 #ifdef LINUX_BUILD
 int zpu_main(void)
@@ -252,23 +146,13 @@ int main(void)
 {
 	INIT_MEM
 
-	fil_type_rom = "ROM";
-	fil_type_bin = "BIN";
-	fil_type_car = "CAR";
-	fil_type_mem = "MEM";
-
 	int i;
 	for (i=0; i!=NUM_FILES; ++i)
 	{
-		files[i] = (struct SimpleFile *)alloca(file_struct_size());
-		file_init(files[i]);
+		files[i] = (struct SimpleFile *)alloca(sizeof(struct SimpleFile));
+		file_init(files[i], i);
 	}
 
-	freeze_init((void*)FREEZE_MEM); // 128k
-
-	debug_pos = -1;
-	debug_adjust = 0;
-	baseaddr = (unsigned char volatile *)(screen_address + atari_regbase);
 	set_pause_6502(1);
 	set_reset_6502(1);
 	set_reset_6502(0);
@@ -280,105 +164,6 @@ int main(void)
 	set_cart_select(0);
 	set_freezer_enable(0);
 
-	init_printf(0, char_out);
-
 	mainmenu();
 	return 0;
 }
-
-#ifdef USBSETTINGS
-void rotate_usb_sticks()
-{
-	int max_jindex = hid_get_joysticks()-1;
-	if (max_jindex == 0) // If only one stick connected allow it to be 0 or 1
-	{
-		max_jindex = 1;
-	}
-
-	int i;
-
-	usb_device_t * devices = usb_get_devices();
-	for (i=0;i!=USB_NUMDEVICES;++i)	
-	{
-		usb_device_t *dev  = devices + i;
-		if (dev->bAddress)
-		{
-			if (dev->class == &usb_hid_class)
-			{
-				int j=0;
-				for (j=0;j!=dev->hid_info.bNumIfaces;++j)
-				{
-					int type = dev->hid_info.iface[j].device_type;
-					if (type == HID_DEVICE_JOYSTICK)
-					{
-						int jindex = dev->hid_info.iface[j].jindex;
-						event_digital_joystick(jindex, 0);
-						event_analog_joystick(jindex, 0,0);
-
-						jindex++;
-						if (jindex > max_jindex)
-							jindex = 0;
-						
-						dev->hid_info.iface[j].jindex = jindex;
-					}
-				}
-			}
-		}
-	}
-}
-
-void usb_devices(int debugPos)
-{
-	usb_device_t *devices = usb_get_devices();
-	int nextDebugPos = debugPos;
-	int i=0;
-	int j=0;
-	for (i=0;i!=USB_NUMDEVICES;++i)	
-	{
-		debug_pos = nextDebugPos;
-		usb_device_t *dev  = devices + i;
-		if (dev->bAddress)
-		{
-			if (dev->class == &usb_hub_class)
-			{
-				//printf("%x.Hub. %d ports. poll=%d",dev->bAddress,dev->hub_info.bNbrPorts, dev->hub_info.bPollEnable);
-				printf("%x.Hub. %d ports",dev->bAddress,dev->hub_info.bNbrPorts);
-			}
-			else if (dev->class == &usb_hid_class)
-			{
-				//printf("%x.HID. %d ifaces. poll=%d",dev->bAddress,dev->hid_info.bNumIfaces,dev->hid_info.bPollEnable);
-				printf("%x.HID",dev->bAddress);
-				int adjPos = 0;
-				for (j=0;j!=dev->hid_info.bNumIfaces;++j)
-				{
-					//usb_device_descriptor_t desc;
-					int type = dev->hid_info.iface[j].device_type;
-					if (adjPos && (type == HID_DEVICE_MOUSE || type == HID_DEVICE_KEYBOARD || type == HID_DEVICE_JOYSTICK))
-					{
-						nextDebugPos = nextDebugPos+40;
-						debug_pos = nextDebugPos;
-					}
-					if (type == HID_DEVICE_MOUSE)
-						printf(" Mouse");
-					else if (type == HID_DEVICE_KEYBOARD)
-						printf(" Keyboard");
-					else if (type == HID_DEVICE_JOYSTICK)
-					{
-						printf(" Joystick:%d",dev->hid_info.iface[j].jindex+1);
-					}
-					else
-						continue;
-
-					adjPos = 1;
-
-					/*int rcode = usb_get_dev_descr( dev, 12, &desc );
-					if( !rcode ) {
-						printf(" V:%02x%02x P:%02x%02x C:%02x",desc.idVendorH,desc.idVendorL,desc.idProductH,desc.idProductL,desc.bDeviceClass);
-					}*/
-				}
-			}
-		}
-		nextDebugPos = nextDebugPos+40;
-	}
-}
-#endif
