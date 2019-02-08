@@ -355,6 +355,7 @@ set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
 
 set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
+set_global_assignment -name QIP_FILE t65/t65.qip
 set_global_assignment -name VHDL_FILE ./common/a8core/atari800core.vhd
 set_global_assignment -name VHDL_FILE ./common/a8core/atari800core_simple_sdram.vhd
 set_global_assignment -name VHDL_FILE ./common/a8core/cart_logic.vhd
