@@ -47,11 +47,6 @@ PORT
 	PS2_CLK    : IN  STD_LOGIC;
 	PS2_DAT    : IN  STD_LOGIC;
 
-	SD_CLK     : OUT STD_LOGIC;
-	SD_DAT3    : OUT STD_LOGIC;
-	SD_CMD     : OUT STD_LOGIC;
-	SD_DAT0    : IN  STD_LOGIC;
-	
 	CPU_SPEED  : IN std_logic_vector(5 downto 0);
 	RAM_SIZE   : IN std_logic_vector(2 downto 0);
 	DRV_SPEED  : IN std_logic_vector(2 downto 0);
@@ -78,8 +73,8 @@ PORT
 	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
 	ZPU_IN3    : IN  STD_LOGIC_VECTOR(31 downto 0);
 	ZPU_OUT3   : OUT STD_LOGIC_VECTOR(31 downto 0);
-	ZPU_IN_RD  : OUT STD_LOGIC_VECTOR(15 downto 0);
-	ZPU_OUT_WR : OUT STD_LOGIC_VECTOR(15 downto 0)
+	ZPU_RD     : OUT STD_LOGIC_VECTOR(15 downto 0);
+	ZPU_WR     : OUT STD_LOGIC_VECTOR(15 downto 0)
 );
 
 END atari800top;
@@ -136,7 +131,6 @@ signal ZPU_ADDR_ROM : std_logic_vector(15 downto 0);
 signal ZPU_ROM_DATA :  std_logic_vector(31 downto 0);
 
 signal ZPU_OUT1 : std_logic_vector(31 downto 0);
-signal ZPU_OUT4 : std_logic_vector(31 downto 0);
 
 signal zpu_pokey_enable : std_logic;
 signal zpu_sio_txd : std_logic;
@@ -154,7 +148,6 @@ signal emulated_cartridge_select: std_logic_vector(5 downto 0);
 
 -- ps2
 signal PS2_KEYS : STD_LOGIC_VECTOR(511 downto 0);
-signal PS2_KEYS_NEXT : STD_LOGIC_VECTOR(511 downto 0);
 
 -- turbo freezer!
 signal freezer_enable : std_logic;
@@ -239,7 +232,7 @@ PORT MAP
 	FKEYS => FKEYS,
 	FREEZER_ACTIVATE => freezer_activate,
 
-	PS2_KEYS_NEXT_OUT => ps2_keys_next,
+	PS2_KEYS_NEXT_OUT => open,
 	PS2_KEYS => ps2_keys
 );
 
@@ -399,8 +392,7 @@ RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001" and
 zpu: entity work.zpucore
 GENERIC MAP
 (
-	platform => 1,
-	spi_clock_div => 3 -- Max for SD cards is 25MHz...
+	platform => 1
 )
 PORT MAP
 (
@@ -426,12 +418,6 @@ PORT MAP
 
 	ZPU_ROM_WREN => open,
 
-	-- spi master
-	ZPU_SD_DAT0 => SD_DAT0,
-	ZPU_SD_CLK  => SD_CLK,
-	ZPU_SD_CMD  => SD_CMD,
-	ZPU_SD_DAT3 => SD_DAT3,
-
 	-- SIO
 	-- Ditto for speaking to Atari, we have a built in Pokey
 	ZPU_POKEY_ENABLE => zpu_pokey_enable,
@@ -449,14 +435,13 @@ PORT MAP
 	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",
 	
-	ZPU_IN_RD => ZPU_IN_RD,
-	ZPU_OUT_WR => ZPU_OUT_WR,
+	ZPU_RD => ZPU_RD,
+	ZPU_WR => ZPU_WR,
 
 	-- ouputs - e.g. Atari system control, halt, throttle, rom select
 	ZPU_OUT1 => zpu_out1,
 	ZPU_OUT2 => zpu_out2,
-	ZPU_OUT3 => zpu_out3,
-	ZPU_OUT4 => zpu_out4
+	ZPU_OUT3 => zpu_out3
 );
 
 pause_atari <= zpu_out1(0);
@@ -467,11 +452,11 @@ freezer_enable <= zpu_out1(25);
 CPU_HALT <= pause_atari;
 
 zpu_rom1: entity work.spram
-generic map(13,32,"zpu_rom.mif")
+generic map(11,32,"zpu_rom.mif")
 port map
 (
   clock => clk,
-  address => zpu_addr_rom(14 downto 2),
+  address => zpu_addr_rom(12 downto 2),
   q => zpu_rom_data
 );
 

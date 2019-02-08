@@ -89,8 +89,6 @@ component ZPUMediumCore is
 	signal zpu_addr_unsigned : unsigned(23 downto 0);
 	signal zpu_do_unsigned : unsigned(31 downto 0);
 	signal ZPU_DI_unsigned : unsigned(31 downto 0);
-	signal zpu_break : std_logic;
-	signal zpu_debug : zpu_dbgo_t;
 	
 	signal zpu_mem_busy : std_logic;
 	
@@ -301,7 +299,7 @@ begin
 				ZPU_config_read <= ZPU_READ_temp; 
 				zpu_addr_next <= std_logic_vector(zpu_addr_unsigned);				
 			when "00001"|"00011"|"00101"|"00111"|"01001"|"01011"|"01101"|"01111"|
-				  "10001"|"10011"|"10101"|"10111"|"11001"|"11011"|"11101"|"11111"|"00X01" =>
+				  "10001"|"10011"|"10101"|"10111"|"11001"|"11011"|"11101"|"11111" =>
 				ZPU_MEM_BUSY <= not(memory_ready_reg) or pause;
 				zpu_memory_fetch_pending_next <= not(memory_ready);
 			when others =>
@@ -350,7 +348,7 @@ begin
 	zpu_enable <= '1'; -- does nothing useful...
 	
 myzpu: ZPUMediumCore
-	port map (clk_i=>clk, reset_i=>reset,enable_i=>zpu_enable,break_o=>zpu_break,dbg_o=>zpu_debug,mem_busy_i=>ZPU_MEM_BUSY,
+	port map (clk_i=>clk, reset_i=>reset,enable_i=>zpu_enable,mem_busy_i=>ZPU_MEM_BUSY,
 	data_i=>zpu_di_unsigned,data_o=>zpu_do_unsigned,addr_o=>zpu_addr_unsigned,write_en_o=>zpu_32bit_write_enable_temp,read_en_o=>zpu_32bit_read_enable_temp,
 	byte_read_o=>zpu_8bit_read_enable_temp, byte_write_o=>zpu_8bit_write_enable_temp,short_write_o=>zpu_16bit_write_enable_temp);
 	

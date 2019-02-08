@@ -18,9 +18,7 @@ ENTITY zpucore IS
 	GENERIC
 	(
 		platform : integer := 1; -- So ROM can detect which type of system...
-		spi_clock_div : integer := 4;  -- see notes on zpu_config_regs
-		memory : integer := 4096; -- up to 32K allowed
-		usb : integer := 0
+		memory : integer := 4096 -- up to 32K allowed
 	);
 	PORT
 	(
@@ -45,13 +43,6 @@ ENTITY zpucore IS
 		ZPU_ROM_DATA : in std_logic_vector(31 downto 0);
 		ZPU_ROM_WREN : out std_logic;
 
-		-- spi master
-		-- Too painful to bit bang spi from zpu, so we have a hardware master in here
-		ZPU_SD_DAT0 :  IN  STD_LOGIC;
-		ZPU_SD_CLK :  OUT  STD_LOGIC;
-		ZPU_SD_CMD :  OUT  STD_LOGIC;
-		ZPU_SD_DAT3 :  OUT  STD_LOGIC;
-
 		-- SIO
 		-- Ditto for speaking to Atari, we have a built in Pokey
 		ZPU_POKEY_ENABLE : in std_logic; -- if run at 1.79MHz we can use standard dividers...
@@ -65,7 +56,7 @@ ENTITY zpucore IS
 		ZPU_IN2 : in std_logic_vector(31 downto 0);
 		ZPU_IN3 : in std_logic_vector(31 downto 0);
 		ZPU_IN4 : in std_logic_vector(31 downto 0);
-		ZPU_IN_RD : out std_logic_vector(15 downto 0);
+		ZPU_RD  : out std_logic_vector(15 downto 0);
 
 		-- ouputs - e.g. Atari system control, halt, throttle, rom select
 		ZPU_OUT1 : out std_logic_vector(31 downto 0);
@@ -74,16 +65,7 @@ ENTITY zpucore IS
 		ZPU_OUT4 : out std_logic_vector(31 downto 0);
 		ZPU_OUT5 : out std_logic_vector(31 downto 0);
 		ZPU_OUT6 : out std_logic_vector(31 downto 0);
-		ZPU_OUT_WR : out std_logic_vector(15 downto 0);
-
-		-- USB host
-		CLK_USB : in std_logic := '0';
-	
-		USBWireVPin :in std_logic_vector(usb-1 downto 0) := (others=>'0');
-		USBWireVMin :in std_logic_vector(usb-1 downto 0) := (others=>'0');
-		USBWireVPout :out std_logic_vector(usb-1 downto 0);
-		USBWireVMout :out std_logic_vector(usb-1 downto 0);
-		USBWireOE_n :out std_logic_vector(usb-1 downto 0)
+		ZPU_WR   : out std_logic_vector(15 downto 0)
 	);
 END zpucore;
 
@@ -101,11 +83,6 @@ ARCHITECTURE vhdl OF zpucore IS
 	signal ZPU_CONFIG_DO : std_logic_vector(31 downto 0);
 	signal ZPU_CONFIG_WRITE_ENABLE : std_logic;
 	signal ZPU_CONFIG_READ_ENABLE : std_logic;
-
-	signal ZPU_SD_DMA_ADDR : std_logic_vector(15 downto 0);
-	signal ZPU_SD_DMA_DATA : std_logic_vector(7 downto 0);
-	signal ZPU_SD_DMA_WRITE : std_logic;
-	signal ZPU_SD_DMA_WRITE_BITS : std_logic_vector(3 downto 0);
 
 	signal ZPU_ADDR_ROM_RAM_DMA : std_logic_vector(15 downto 0);
 	signal ZPU_DO_DMA : std_logic_vector(31 downto 0);
@@ -139,9 +116,7 @@ PORT MAP(CLK => CLK,
 
 config_regs : entity work.zpu_config_regs
 GENERIC MAP (
-	platform => platform,
-	spi_clock_div => spi_clock_div,
-	usb => usb
+	platform => platform
 )
 PORT MAP (
 	CLK => CLK,
@@ -158,7 +133,7 @@ PORT MAP (
 	IN2 => ZPU_IN2,
 	IN3 => ZPU_IN3,
 	IN4 => ZPU_IN4,
-	IN_RD => ZPU_IN_RD,
+	IN_RD => ZPU_RD,
 
 	OUT1 => ZPU_OUT1,
 	OUT2 => ZPU_OUT2,
@@ -166,49 +141,21 @@ PORT MAP (
 	OUT4 => ZPU_OUT4,
 	OUT5 => ZPU_OUT5,
 	OUT6 => ZPU_OUT6,
-	OUT_WR => ZPU_OUT_WR,
+	OUT_WR => ZPU_WR,
 
-	SDCARD_DAT => ZPU_SD_DAT0,
-	SDCARD_CLK => ZPU_SD_CLK,
-	SDCARD_CMD => ZPU_SD_CMD,
-	SDCARD_DAT3 => ZPU_SD_DAT3,
-	
 	SIO_DATA_IN => ZPU_SIO_TXD,
 	SIO_DATA_OUT => ZPU_SIO_RXD,
 	SIO_COMMAND => ZPU_SIO_COMMAND,
 
-	sd_addr => ZPU_SD_DMA_ADDR,
-	sd_data => ZPU_SD_DMA_DATA,
-	sd_write => ZPU_SD_DMA_WRITE,
-	
 	DATA_OUT => ZPU_CONFIG_DO,
-	PAUSE_ZPU => ZPU_PAUSE,
-
-	CLK_USB => CLK_USB,
-	
-	USBWireVPin => USBWireVPin,
-	USBWireVMin => USBWireVMin,
-	USBWireVPout => USBWireVPout,
-	USBWireVMout => USBWireVMout,
-	USBWireOE_n => USBWireOE_n
+	PAUSE_ZPU => ZPU_PAUSE
 	);
 
-decode_addr1 : entity work.complete_address_decoder
-	generic map(width=>2)
-	port map (addr_in=>ZPU_SD_DMA_ADDR(1 downto 0), addr_decoded=>ZPU_SD_DMA_WRITE_BITS);
-
-process(ZPU_DO, ZPU_ADDR_ROM_RAM, ZPU_STACK_WRITE, ZPU_SD_DMA_ADDR, ZPU_SD_DMA_DATA, ZPU_SD_DMA_WRITE, ZPU_SD_DMA_WRITE_BITS)
+process(ZPU_DO, ZPU_ADDR_ROM_RAM, ZPU_STACK_WRITE)
 begin
 	ZPU_DO_DMA <= ZPU_DO;
 	ZPU_ADDR_ROM_RAM_DMA <= ZPU_ADDR_ROM_RAM;
 	ZPU_STACK_WRITE_DMA <= ZPU_STACK_WRITE;
-
-	if (ZPU_SD_DMA_WRITE = '1') then
-		ZPU_DO_DMA <= ZPU_SD_DMA_DATA&ZPU_SD_DMA_DATA&ZPU_SD_DMA_DATA&ZPU_SD_DMA_DATA;
-		ZPU_ADDR_ROM_RAM_DMA <= ZPU_SD_DMA_ADDR(15 downto 2)&"00";
-		ZPU_STACK_WRITE_DMA <= ZPU_SD_DMA_WRITE_BITS(0)&ZPU_SD_DMA_WRITE_BITS(1)&ZPU_SD_DMA_WRITE_BITS(2)&ZPU_SD_DMA_WRITE_BITS(3);
-	end if;
-	
 end process;
 
 ram_31_24 : entity work.generic_ram_infer

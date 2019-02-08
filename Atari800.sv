@@ -277,8 +277,8 @@ wire  [7:0]	ZPU_IN2;
 wire [31:0]	ZPU_OUT2;
 wire [31:0]	ZPU_IN3;
 wire [31:0]	ZPU_OUT3;
-wire [15:0]	ZPU_IN_RD;
-wire [15:0]	ZPU_OUT_WR;
+wire [15:0]	ZPU_RD;
+wire [15:0]	ZPU_WR;
 
 atari800top atari800top
 (
@@ -319,8 +319,8 @@ atari800top atari800top
 	.ZPU_OUT2(ZPU_OUT2),
 	.ZPU_IN3(ZPU_IN3),
 	.ZPU_OUT3(ZPU_OUT3),
-	.ZPU_IN_RD(ZPU_IN_RD),
-   .ZPU_OUT_WR(ZPU_OUT_WR),
+	.ZPU_RD(ZPU_RD),
+	.ZPU_WR(ZPU_WR),
 	
 	.CPU_HALT(cpu_halt),
 
@@ -413,9 +413,9 @@ wire      zpu_lba      = ZPU_OUT2[0];
 wire      zpu_block_rd = ZPU_OUT2[1];
 wire      zpu_block_wr = ZPU_OUT2[2];
 wire[2:0] zpu_drv_num  = ZPU_OUT2[5:3];
-wire      zpu_io_wr    = ZPU_OUT_WR[5];
-wire      zpu_data_wr  = ZPU_OUT_WR[6];
-wire      zpu_data_rd  = ZPU_IN_RD[2];
+wire      zpu_io_wr    = ZPU_WR[5];
+wire      zpu_data_wr  = ZPU_WR[6];
+wire      zpu_data_rd  = ZPU_RD[2];
 
 always @(posedge clk_sys) begin
 	reg old_wr, old_wr2, old_rd, old_lba;
