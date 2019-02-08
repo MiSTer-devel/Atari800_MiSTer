@@ -65,6 +65,10 @@ PORT
 
 	JOY1       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
 	JOY2       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
+
+	LDROM_ADDR : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
+	LDROM_DATA : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
+	LDROM_WR   : IN  STD_LOGIC;
 	
 	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
 	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
@@ -160,7 +164,8 @@ signal areset_n   : std_logic;
 signal option_tmp : std_logic;
 
 
-signal BIOS_DATA : std_logic_vector(7 downto 0);
+signal BIOS_OFF   : unsigned(13 downto 0);
+signal BIOS_DATA  : std_logic_vector(7 downto 0);
 signal BASIC_DATA : std_logic_vector(7 downto 0);
 
 signal RAM_DATA : std_logic_vector(31 downto 0);
@@ -359,11 +364,11 @@ port map
 (
 	clock => clk,
 
-	address_a => (others => '0'),
-	data_b => (others => '0'),
-	wren_b => '0',
+	address_a => LDROM_ADDR,
+	data_a => LDROM_DATA,
+	wren_a => LDROM_WR,
 
-	address_b => SDRAM_ADDR(13 downto 0),
+	address_b => std_logic_vector(unsigned(SDRAM_ADDR(13 downto 0)) - BIOS_OFF),
 	q_b => BIOS_DATA
 );
 
@@ -371,20 +376,16 @@ basic: work.dpram generic map(13,8, "rom/ATARIBAS.mif")
 port map
 (
 	clock => clk,
-
-	address_a => (others => '0'),
-	data_b => (others => '0'),
-	wren_b => '0',
-
-	address_b => SDRAM_ADDR(12 downto 0),
-	q_b => BASIC_DATA
+	address_a => SDRAM_ADDR(12 downto 0),
+	q_a => BASIC_DATA
 );
 
-RAM_DATA <= x"000000"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001"  else
-            (others=>'1')        when SDRAM_ADDR(22 downto 13) = "1110000001" else
-            x"000000"&BASIC_DATA when SDRAM_ADDR(22 downto 13) = "1110000000" else
-            SDRAM_DO;
+BIOS_OFF <= ("00"& x"000") - unsigned(LDROM_ADDR);
 
+RAM_DATA <= x"000000"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001" and unsigned(SDRAM_ADDR(13 downto 0)) >= BIOS_OFF else
+            x"000000"&BASIC_DATA when SDRAM_ADDR(22 downto 13) = "1110000000" else
+            (others=>'0')        when SDRAM_ADDR(22 downto 20) = "111" else
+            SDRAM_DO;
 
 zpu: entity work.zpucore
 GENERIC MAP

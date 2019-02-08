@@ -113,7 +113,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
 
-assign LED_USER  = 0;
+assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
@@ -125,7 +125,6 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
-	"-;",
 	"S0,ATRXEXXFD,Mount Drive 1;",
 	"S1,ATRXEXXFD,Mount Drive 2;",
 	"S2,CARROM,Load Cart;",
@@ -142,7 +141,7 @@ localparam CONF_STR = {
 	"-;",
 	"R0,Reset;",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,ROM Select;",
-	"V,v1.22.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -197,6 +196,11 @@ wire  [2:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
 wire        sd_ack_conf;
+
+wire [13:0] ioctl_addr;
+wire  [7:0] ioctl_dout;
+wire        ioctl_wr;
+wire        ioctl_download;
 wire  [7:0] ioctl_index;
 
 hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(3)) hps_io
@@ -236,6 +240,10 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(3)) hps_io
 	.img_readonly(img_readonly),
 	.img_size(img_size),
 
+	.ioctl_download(ioctl_download),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_dout(ioctl_dout),
+	.ioctl_wr(ioctl_wr),
 	.ioctl_index(ioctl_index)
 );
 
@@ -318,6 +326,10 @@ atari800top atari800top
 
 	.PS2_CLK(PS2_CLK),
 	.PS2_DAT(PS2_DAT),
+
+	.LDROM_ADDR(ioctl_addr),
+	.LDROM_DATA(ioctl_dout),
+	.LDROM_WR(ioctl_wr),
 
 	.JOY1X(ax),
 	.JOY1Y(ay),
