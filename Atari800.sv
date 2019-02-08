@@ -327,9 +327,13 @@ atari800top atari800top
 	.PS2_CLK(PS2_CLK),
 	.PS2_DAT(PS2_DAT),
 
-	.LDROM_ADDR(ioctl_addr),
-	.LDROM_DATA(ioctl_dout),
-	.LDROM_WR(ioctl_wr),
+	.OSROM_ADDR(osrom_addr),
+	.OSROM_DATA(ioctl_dout),
+	.OSROM_WR(osrom_wr),
+
+	.BASROM_ADDR(ioctl_addr[12:0]),
+	.BASROM_DATA(ioctl_dout),
+	.BASROM_WR(ioctl_wr && ioctl_index[7:6] == 1),
 
 	.JOY1X(ax),
 	.JOY1Y(ay),
@@ -356,6 +360,18 @@ video_mixer video_mixer
 	.mono(0)
 );
 
+reg [13:0] osrom_addr;
+reg        osrom_wr;
+always @(posedge clk_sys) begin
+	osrom_wr <= 0;
+	if(osrom_wr) osrom_addr <= osrom_addr + 1'd1;
+	if(ioctl_wr) begin
+		if(ioctl_index[7:6] == 0) begin
+			osrom_addr <= ioctl_addr;
+			osrom_wr <= ioctl_wr;
+		end
+	end
+end
 
 //////////////////   SD   ///////////////////
 

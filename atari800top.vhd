@@ -66,10 +66,14 @@ PORT
 	JOY1       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
 	JOY2       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
 
-	LDROM_ADDR : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
-	LDROM_DATA : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	LDROM_WR   : IN  STD_LOGIC;
+	OSROM_ADDR : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
+	OSROM_DATA : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
+	OSROM_WR   : IN  STD_LOGIC;
 	
+	BASROM_ADDR: IN  STD_LOGIC_VECTOR(12 DOWNTO 0);
+	BASROM_DATA: IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
+	BASROM_WR  : IN  STD_LOGIC;
+
 	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
 	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
 	ZPU_IN3    : IN  STD_LOGIC_VECTOR(31 downto 0);
@@ -359,14 +363,14 @@ PORT MAP
 
 joy <= joy1 or joy2;
 
-bios: work.dpram generic map(14,8, "rom/ATARIXLn.mif")
+bios: work.dpram generic map(14,8, "rom/ATARIXL.mif")
 port map
 (
 	clock => clk,
 
-	address_a => LDROM_ADDR,
-	data_a => LDROM_DATA,
-	wren_a => LDROM_WR,
+	address_a => OSROM_ADDR,
+	data_a => OSROM_DATA,
+	wren_a => OSROM_WR,
 
 	address_b => std_logic_vector(unsigned(SDRAM_ADDR(13 downto 0)) - BIOS_OFF),
 	q_b => BIOS_DATA
@@ -376,15 +380,20 @@ basic: work.dpram generic map(13,8, "rom/ATARIBAS.mif")
 port map
 (
 	clock => clk,
-	address_a => SDRAM_ADDR(12 downto 0),
-	q_a => BASIC_DATA
+
+	address_a => BASROM_ADDR,
+	data_a => BASROM_DATA,
+	wren_a => BASROM_WR,
+
+	address_b => SDRAM_ADDR(12 downto 0),
+	q_b => BASIC_DATA
 );
 
-BIOS_OFF <= ("00"& x"000") - unsigned(LDROM_ADDR);
+BIOS_OFF <= ("00"& x"000") - unsigned(OSROM_ADDR);
 
-RAM_DATA <= x"000000"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001" and unsigned(SDRAM_ADDR(13 downto 0)) >= BIOS_OFF else
-            x"000000"&BASIC_DATA when SDRAM_ADDR(22 downto 13) = "1110000000" else
-            (others=>'0')        when SDRAM_ADDR(22 downto 20) = "111" else
+RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001" and unsigned(SDRAM_ADDR(13 downto 0)) >= BIOS_OFF else
+            x"FFFFFF"&BASIC_DATA when SDRAM_ADDR(22 downto 13) = "1110000000" else
+            (others=>'1')        when SDRAM_ADDR(22 downto 20) = "111" else
             SDRAM_DO;
 
 zpu: entity work.zpucore
