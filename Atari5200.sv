@@ -111,8 +111,10 @@ module emu
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 
-assign LED_USER  = vsd_sel & sd_act;
-assign LED_DISK  = {1'b1, ~vsd_sel & sd_act};
+assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
+
+assign LED_USER  = 0;
+assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
 assign VIDEO_ARX = status[6] ? 8'd16 : 8'd4;
@@ -124,17 +126,17 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 localparam CONF_STR = {
 	"ATARI5200;;",
 	"-;",
-	"RG,Cart;",
-	"S,VHD;",
+	"S,CARA52BINROM,Load Cart;",
 	"-;",
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",
 	"-;",
 	"O6,Aspect ratio,4:3,16:9;",
-	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
-	"-;",
+	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"O34,Stereo mix,None,25%,50%,100%;",
+	"-;",
+	"R0,Reset;",
 	"J,Fire 1,Fire 2,ROM Select,*,#,Start,Pause,Reset,0,1,2,3;",
-	"V,v1.10.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -153,7 +155,7 @@ pll pll
 	.locked(locked)
 );
 
-wire reset = RESET | status[0] | ~initReset_n | buttons[1] | img_mounted;
+wire reset = RESET | status[0] | ~initReset_n | buttons[1];
 
 reg initReset_n = 0;
 always @(posedge clk_sys) begin
@@ -186,10 +188,8 @@ wire  [7:0] sd_buff_dout;
 wire  [7:0] sd_buff_din;
 wire        sd_buff_wr;
 wire        img_mounted;
-wire        img_readonly;
 wire [63:0] img_size;
-wire        sd_conf;
-wire        sd_ack_conf;
+wire  [7:0] ioctl_index;
 
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
@@ -219,17 +219,14 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
-	.sd_conf(sd_conf),
-	.sd_ack_conf(sd_ack_conf),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din),
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
-	.img_readonly(img_readonly),
 	.img_size(img_size),
-
-	.ioctl_wait(0)
+	
+	.ioctl_index(ioctl_index)
 );
 
 reg menu = 0;
@@ -260,6 +257,13 @@ assign AUDIO_R = {raudio[15],raudio[15:1]};
 assign AUDIO_L = {laudio[15],laudio[15:1]};
 assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
+
+wire  [7:0]	ZPU_IN2;
+wire [31:0]	ZPU_OUT2;
+wire [31:0]	ZPU_IN3;
+wire [31:0]	ZPU_OUT3;
+wire [15:0]	ZPU_RD;
+wire [15:0]	ZPU_WR;
 
 atari5200top atari5200top
 (
@@ -293,10 +297,12 @@ atari5200top atari5200top
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
 
-	.SD_CLK(sdclk),
-	.SD_DAT3(sdss),
-	.SD_CMD(sdmosi),
-	.SD_DAT0(sdmiso),
+	.ZPU_IN2(ZPU_IN2),
+	.ZPU_OUT2(ZPU_OUT2),
+	.ZPU_IN3(ZPU_IN3),
+	.ZPU_OUT3(ZPU_OUT3),
+	.ZPU_RD(ZPU_RD),
+	.ZPU_WR(ZPU_WR),
 
 	.CPU_HALT(cpu_halt),
 
@@ -312,13 +318,17 @@ atari5200top atari5200top
 	.JOY2(joy_1 & {12'b111111111111, {4{joy_d2ena}}})
 );
 
-wire [1:0] scale = status[2:1];
+assign VGA_F1 = 0;
+assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
+
+wire [2:0] scale = status[19:17];
+
 video_mixer video_mixer
 (
 	.*,
 	.ce_pix_out(CE_PIXEL),
 
-	.scanlines({scale == 3, scale == 2}),
+	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 	.mono(0)
@@ -327,53 +337,90 @@ video_mixer video_mixer
 
 //////////////////   SD   ///////////////////
 
-wire sdclk;
-wire sdmosi;
-wire sdmiso = vsd_sel ? vsdmiso : SD_MISO;
-wire sdss;
-
-reg vsd_sel = 0;
-always @(posedge clk_sys) if(img_mounted) vsd_sel <= |img_size;
-
-wire vsdmiso;
-sd_card sd_card
+dpram #(9,8) sdbuf
 (
-	.*,
+	.clock(clk_sys),
 
-	.allow_sdhc(1),
-	.using_sdhc(),
+	.address_a(sd_buff_addr),
+	.data_a(sd_buff_dout),
+	.wren_a(sd_buff_wr),
+	.q_a(sd_buff_din),
 
-	.sck(sdclk),
-	.ss(~vsd_sel | sdss),
-	.mosi(sdmosi),
-	.miso(vsdmiso)
+	.address_b(zpu_buff_addr),
+	.data_b(ZPU_OUT3[7:0]),
+	.wren_b(zpu_buf_wr),
+	.q_b(zpu_buf_q)
 );
 
-assign SD_CS   = vsd_sel | sdss;
-assign SD_SCK  = sdclk & ~SD_CS;
-assign SD_MOSI = sdmosi & ~SD_CS;
+wire[7:0] zpu_buf_q;
 
-reg sd_act;
+assign ZPU_IN2[0]   = zpu_io_done;
+assign ZPU_IN2[1]   = zpu_mounted;
+assign ZPU_IN2[4:2] = zpu_fileno;
+assign ZPU_IN2[6:5] = zpu_filetype;
+assign ZPU_IN2[7]   = zpu_readonly;
+
+assign ZPU_IN3 = zpu_lba ? zpu_filesize : zpu_buf_q;
+
+reg [8:0] zpu_buff_addr;
+reg       zpu_buf_wr;
+reg       zpu_io_done;
+reg       zpu_mounted = 0;
+reg [2:0] zpu_fileno;
+reg [1:0] zpu_filetype;
+reg       zpu_readonly;
+reg[31:0] zpu_filesize;
+
+wire      zpu_lba      = ZPU_OUT2[0];
+wire      zpu_block_rd = ZPU_OUT2[1];
+wire      zpu_block_wr = ZPU_OUT2[2];
+wire      zpu_io_wr    = ZPU_WR[5];
+wire      zpu_data_wr  = ZPU_WR[6];
+wire      zpu_data_rd  = ZPU_RD[2];
 
 always @(posedge clk_sys) begin
-	reg old_mosi, old_miso;
-	integer timeout = 0;
+	reg old_wr, old_wr2, old_rd, old_lba;
+	reg old_blrd, old_blwr, old_ack;
+	reg old_mounted;
 
-	old_mosi <= sdmosi;
-	old_miso <= sdmiso;
+	zpu_buf_wr <= 0;
+	if(zpu_buf_wr) zpu_buff_addr <= zpu_buff_addr + 1'd1;
 
-	sd_act <= 0;
-	if(timeout < 1000000) begin
-		timeout <= timeout + 1;
-		sd_act <= 1;
+	old_wr <= zpu_data_wr;
+	old_wr2 <= old_wr;
+	if(~old_wr2 & old_wr) begin
+		if(zpu_lba) sd_lba <= ZPU_OUT3;
+		else zpu_buf_wr <= 1;
 	end
 
-	if((old_mosi ^ sdmosi) || (old_miso ^ sdmiso)) timeout <= 0;
+	old_rd <= zpu_data_rd;
+	if(old_rd & ~zpu_data_rd) zpu_buff_addr <= zpu_buff_addr + 1'd1;
+
+	if(zpu_io_wr) zpu_buff_addr <= 0;
+
+	old_blrd <= zpu_block_rd;
+	if(~old_blrd & zpu_block_rd) {zpu_io_done,sd_rd} <= 1;
+
+	old_blwr <= zpu_block_wr;
+	if(~old_blwr & zpu_block_wr) {zpu_io_done,sd_wr} <= 1;
+
+	if(sd_ack) {sd_rd, sd_wr} <= 0;
+
+	old_ack <= sd_ack;
+	if(old_ack & ~sd_ack) zpu_io_done <= 1;
+
+	old_mounted <= img_mounted;
+	if(~old_mounted && img_mounted) begin
+		zpu_fileno <= 0;
+		zpu_filetype <= ioctl_index[7:6];
+		zpu_readonly <= 1;
+		zpu_mounted  <= ~zpu_mounted;
+		zpu_filesize <= img_size[31:0];
+	end
 end
 
 
 //////////////////   ANALOG AXIS   ///////////////////
-
 reg         emu = 0;
 wire  [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
 wire  [7:0] ay = emu ? my[7:0] : joya_0[15:8];

@@ -45,11 +45,6 @@ PORT
 
 	PS2_CLK    : IN  STD_LOGIC;
 	PS2_DAT    : IN  STD_LOGIC;
-
-	SD_CLK     : OUT STD_LOGIC;
-	SD_DAT3    : OUT STD_LOGIC;
-	SD_CMD     : OUT STD_LOGIC;
-	SD_DAT0    : IN  STD_LOGIC;
 	
 	CPU_SPEED  : IN std_logic_vector(5 downto 0);
 	MENU       : IN STD_LOGIC;
@@ -61,7 +56,14 @@ PORT
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
 	JOY1       : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
-	JOY2       : IN  STD_LOGIC_VECTOR(15 DOWNTO 0)
+	JOY2       : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+
+	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
+	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
+	ZPU_IN3    : IN  STD_LOGIC_VECTOR(31 downto 0);
+	ZPU_OUT3   : OUT STD_LOGIC_VECTOR(31 downto 0);
+	ZPU_RD     : OUT STD_LOGIC_VECTOR(15 downto 0);
+	ZPU_WR     : OUT STD_LOGIC_VECTOR(15 downto 0)
 );
 
 END atari5200top;
@@ -109,9 +111,6 @@ signal ZPU_ADDR_ROM : std_logic_vector(15 downto 0);
 signal ZPU_ROM_DATA :  std_logic_vector(31 downto 0);
 
 signal ZPU_OUT1 : std_logic_vector(31 downto 0);
-signal ZPU_OUT2 : std_logic_vector(31 downto 0);
-signal ZPU_OUT3 : std_logic_vector(31 downto 0);
-signal ZPU_OUT4 : std_logic_vector(31 downto 0);
 
 signal zpu_pokey_enable : std_logic;
 
@@ -121,7 +120,9 @@ signal pause_atari : std_logic;
 
 -- ps2
 signal PS2_KEYS : STD_LOGIC_VECTOR(511 downto 0);
-signal PS2_KEYS_NEXT : STD_LOGIC_VECTOR(511 downto 0);
+
+signal BIOS_DATA  : std_logic_vector(7 downto 0);
+signal RAM_DATA : std_logic_vector(31 downto 0);
 
 BEGIN
 
@@ -146,8 +147,7 @@ PORT MAP
 
 	FKEYS => FKEYS,
 
-	PS2_KEYS => PS2_KEYS,
-	PS2_KEYS_NEXT_OUT => PS2_KEYS_NEXT
+	PS2_KEYS => PS2_KEYS
 );
 
 
@@ -197,7 +197,7 @@ PORT MAP
 	SDRAM_READ_ENABLE => SDRAM_READ_ENABLE,
 	SDRAM_WRITE_ENABLE => SDRAM_WRITE_ENABLE,
 	SDRAM_ADDR => SDRAM_ADDR,
-	SDRAM_DO => SDRAM_DO,
+	SDRAM_DO => RAM_DATA,
 	SDRAM_DI => SDRAM_DI,
 	SDRAM_32BIT_WRITE_ENABLE => SDRAM_WIDTH_32bit_ACCESS,
 	SDRAM_16BIT_WRITE_ENABLE => SDRAM_WIDTH_16bit_ACCESS,
@@ -255,12 +255,23 @@ PORT MAP
 	SDRAM_ADDR => SDRAM_A,
 	reset_client_n => SDRAM_RESET_N
 );
+bios: work.spram generic map(11,8, "rom/5200.mif")
+port map
+(
+	clock => clk,
+
+	address => SDRAM_ADDR(10 downto 0),
+	q => BIOS_DATA
+);
+
+RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001"  else
+            (others=>'1')        when SDRAM_ADDR(22 downto 20) = "111" else
+            SDRAM_DO;
 
 zpu: entity work.zpucore
 GENERIC MAP
 (
-	platform => 1,
-	spi_clock_div => 3 -- Max for SD cards is 25MHz...
+	platform => 1
 )
 PORT MAP
 (
@@ -286,12 +297,6 @@ PORT MAP
 
 	ZPU_ROM_WREN => open,
 
-	-- spi master
-	ZPU_SD_DAT0 => SD_DAT0,
-	ZPU_SD_CLK  => SD_CLK,
-	ZPU_SD_CMD  => SD_CMD,
-	ZPU_SD_DAT3 => SD_DAT3,
-
 	-- SIO
 	-- Ditto for speaking to Atari, we have a built in Pokey
 	ZPU_POKEY_ENABLE => zpu_pokey_enable,
@@ -305,15 +310,17 @@ PORT MAP
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(6)&(joy(4) or joy(5))&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
 			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(6))&FKEYS(9 downto 0),
-	ZPU_IN2 => X"00000000",
-	ZPU_IN3 => X"00000000",
+	ZPU_IN2 => X"0000"& ZPU_IN2 & x"00",
+	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",
+	
+	ZPU_RD => ZPU_RD,
+	ZPU_WR => ZPU_WR,
 
 	-- ouputs - e.g. Atari system control, halt, throttle, rom select
 	ZPU_OUT1 => zpu_out1,
 	ZPU_OUT2 => zpu_out2,
-	ZPU_OUT3 => zpu_out3,
-	ZPU_OUT4 => zpu_out4
+	ZPU_OUT3 => zpu_out3
 );
 
 pause_atari <= zpu_out1(0);
@@ -321,17 +328,12 @@ reset_atari <= zpu_out1(1);
 
 CPU_HALT <= pause_atari;
 
-zpu_rom1: entity work.gen_rom
-generic map
-(
-	INIT_FILE  => "zpu_rom_5200.mif",
-	ADDR_WIDTH => 12,
-	DATA_WIDTH => 32
-)
+zpu_rom1: entity work.spram
+generic map(11,32,"zpu_rom_5200.mif")
 port map
 (
-  rdclock => clk,
-  rdaddress => zpu_addr_rom(13 downto 2),
+  clock => clk,
+  address => zpu_addr_rom(12 downto 2),
   q => zpu_rom_data
 );
 
