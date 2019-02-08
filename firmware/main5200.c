@@ -1,51 +1,77 @@
 static const int main_ram_size=16384;
 #include "main.h" //!!!
 
-unsigned char freezer_rom_present = 0;
+#include "printf.h"
+#include "joystick.h" 
+#include "freeze.h"
 
-void actions();
+int debug_pos;
+int debug_adjust;
+unsigned char volatile * baseaddr;
 
-void loadosrom()
+unsigned char toatarichar(int val)
 {
-	int j=0;
-	if (file_size(files[5]) == 0x0800)
+	int inv = val>=128;
+	if (inv)
 	{
-		int i=0;
-		unsigned char * src = (unsigned char *)(ROM_OFS + 0x4000 + SDRAM_BASE);
-		unsigned char * dest1 = (unsigned char *)(ROM_OFS + 0x4800 + SDRAM_BASE);
-		loadromfile(files[5],0x0800, ROM_OFS + 0x4000);
-
-		for (i=0; i!=0x800; ++i)
-		{
-			dest1[i] = src[i];
-		}
+		val-=128;
 	}
-}
-
-void mainmenu()
-{
-	memset8(SRAM_BASE+0x4000, 0, 32768);
-	memset32(SDRAM_BASE+0x4000, 0, 32768/4);
-
-	if (SimpleFile_OK == dir_init((void *)DIR_INIT_MEM, DIR_INIT_MEMSIZE))
+	if (val>='A' && val<='Z')
 	{
-		#ifdef USB
-			usb_log_init(files[7]);
-		#endif
-		struct SimpleDirEntry * entries = dir_entries(ROM_DIR);
-
-		if (SimpleFile_OK == file_open_name_in_dir(entries, "5200.rom", files[5]))
-		{
-			loadosrom();
-		}
+		val+=-'A'+33;
+	}
+	else if (val>='a' && val<='z')
+	{
+		val+=-'a'+33+64;
+	}
+	else if (val>='0' && val<='9')
+	{
+		val+=-'0'+16;	
+	}
+	else if (val>=32 && val<=47)
+	{
+		val+=-32;
+	}
+	else if (val == ':')
+	{
+		val = 26;
 	}
 	else
 	{
-		//printf("DIR init failed\n");
+		val = 0;
 	}
-	reboot(1);
-	for (;;) actions();
+	if (inv)
+	{
+		val+=128;
+	}
+	return val;
+} 
+
+void clearscreen()
+{
+	unsigned volatile char * screen;
+	for (screen=(unsigned volatile char *)(screen_address+atari_regbase); screen!=(unsigned volatile char *)(atari_regbase+screen_address+1024); ++screen)
+		*screen = 0x00;
 }
+
+void char_out ( void* p, char c)
+{
+	unsigned char val = toatarichar(c);
+	if (debug_pos>=0)
+	{
+		*(baseaddr+debug_pos) = val|debug_adjust;
+		++debug_pos;
+	}
+}
+
+int last_mount;
+
+void loadromfile(struct SimpleFile * file, int size, size_t ram_address)
+{
+	void* absolute_ram_address = SDRAM_BASE + ram_address;
+	int read = 0;
+	file_read(file, absolute_ram_address, size, &read);
+} 
 
 void load_cartridge(int type)
 {
@@ -142,28 +168,16 @@ void load_cartridge(int type)
 	}
 }
 
-int filter_5200(struct SimpleDirEntry * entry)
-{
-	if (dir_is_subdir(entry)) return 1;
-	char const * f = dir_filename(entry);
-	int res = (compare_ext(f,"A52") || compare_ext(f,"CAR") || compare_ext(f,"BIN"));
-	//printf("filter_disks:%s:%d\n",f,res);
-	return res;
-}
-
 int select_cartridge()
 {
-	filter = filter_5200; // .a52, .car and .bin
-	if(!file_selector(files[4])) return 0;
-
 	// work out the type
-	char const * name = file_name(files[4]);
 	int type = -1;
-	if (compare_ext(name,"CAR"))
+
+	if (file_type(files[4]) == 0)
 	{
 		char header[16];
 		int read = 0;
-		file_read(files[4],&header,16,&read);
+		file_read(files[4],header,16,&read);
 		type = header[7];
 	}
 	else
@@ -171,7 +185,7 @@ int select_cartridge()
 		int size = file_size(files[4]);
 
 		if (size == 32768) type = 4;
-		if (size == 16384) // uff!
+		if (size == 16384)
 		{
 			struct joystick_status joy;
 			joy.x_ = joy.y_ = joy.fire_ = joy.escape_ = 0;
@@ -182,7 +196,7 @@ int select_cartridge()
 			printf("16k cart type");
 			debug_pos = 80;
 			printf("Left for one chip");
-			debug_pos = 120;
+			debug_pos = 160;
 			printf("Right for two chip");
 
 			while(type <0)
@@ -194,7 +208,6 @@ int select_cartridge()
 				if (joy.x_>0) type = 6;
 			}
 		}
-		
 		if (size == 8192) type = 19;
 		if (size == 4096) type = 20;
 	}
@@ -203,86 +216,10 @@ int select_cartridge()
 	return 1;
 }
 
-int settings()
-{
-	struct joystick_status joy;
-	joy.x_ = joy.y_ = joy.fire_ = joy.escape_ = 0;
-
-	int row = 0;
-
-	int done = 0;
-	for (;!done;)
-	{
-		// Render
-		clearscreen();
-		debug_pos = 0;
-		debug_adjust = 0;
-		printf("Se");
-		debug_adjust = 128;
-		printf("ttings");
-		debug_pos = 120;
-		debug_adjust = row==0 ? 128 : 0;
-		{
-			printf("Rom:%s", file_name(files[5]));
-		}
-		int i;
-
-		debug_pos = 200;
-		debug_adjust = row==1 ? 128 : 0;
-		printf("Cart:%s", file_name(files[4]) ? file_name(files[4]) : "NONE");
-
-		debug_pos = 320;
-		debug_adjust = row==2 ? 128 : 0;
-		printf("Exit");
-
-		// Slow it down a bit
-		wait_us(100000);
-
-		// move
-		while(get_hotkey_settings());
-		joystick_wait(&joy,WAIT_QUIET);
-		joystick_wait(&joy,WAIT_EITHER);
-		if (joy.escape_) break;
-
-		row+=joy.y_;
-		if (row<0) row = 2;
-		if (row>2) row = 0;
-
-		switch (row)
-		{
-		case 0:
-			if (joy.x_ || joy.fire_)
-			{
-				fil_type = fil_type_rom;
-				filter = filter_specified;
-				file_selector(files[5]);
-				loadosrom();
-			}
-			break;
-		case 1:
-			if (joy.x_ || joy.fire_)
-			{
-				return select_cartridge();
-			}
-			break;
-		case 2:
-			if (joy.fire_)
-			{
-				done = 1;
-			}
-			break;
-		}
-	}
-
-	return 0;
-}
-
 void actions()
 {
-	struct joystick_status joy;
-	joy.x_ = joy.y_ = joy.fire_ = joy.escape_ = 0;
+	int mounted = get_sd_mounted();
 
-	// Hot keys
 	if (get_hotkey_softboot())
 	{
 		reboot(0);	
@@ -291,29 +228,45 @@ void actions()
 	{
 		reboot(1);	
 	}
-	else if (get_hotkey_settings())
+	
+	if (last_mount != mounted)
 	{
+		last_mount = mounted;
+		
 		set_pause_6502(1);
 		freeze();
-		debug_pos = 0;	
-		int do_reboot = settings();
-		joystick_wait(&joy,WAIT_QUIET);
-		while(get_hotkey_settings());
-		debug_pos = -1;
+
+		set_sd_data_mode(1);
+		struct SimpleFile *file = files[4];
+		file->size = *zpu_in3;
+		file->type = get_sd_filetype();
+		file->is_readonly = get_sd_readonly();
+		file->offset = 0;
+		file_reset();
+
+		select_cartridge();
+
 		restore();
-		if (do_reboot)
-			reboot(1);
-		else
-			set_pause_6502(0);
+		reboot(1);	
 	}
-	else if (get_hotkey_fileselect())
-	{
-		set_pause_6502(1);
-		freeze();
-		int res = select_cartridge();
-		joystick_wait(&joy,WAIT_QUIET); 
-		while(get_hotkey_settings());
-		restore();
-		if(res) reboot(1);
-	}
+}
+
+void mainmenu()
+{
+	memset8(SRAM_BASE+0x4000, 0, 32768);
+	memset32(SDRAM_BASE+0x4000, 0, 32768/4);
+
+	freeze_init((void*)FREEZE_MEM); // 128k
+ 
+	debug_pos = -1;
+	debug_adjust = 0;
+	baseaddr = (unsigned char volatile *)(screen_address + atari_regbase);
+
+	init_printf(0, char_out);
+	
+	last_mount = get_sd_mounted();
+	file_reset();
+
+	reboot(1);
+	for (;;) actions();
 }

@@ -75,8 +75,8 @@ COMMON_SRC = ${CORE_SRC}
 SDCARD_SRC = file.c
 A800_SRC_LIGHT = main800.c atari_drive_emulator.c libgcc_divmod.c
 A800_SRC = ${A800_SRC_LIGHT}
-5200_SRC_LIGHT = 5200/freeze.c  5200/mainmenu.c
-5200_SRC = ${5200_SRC_LIGHT} 5200/joystick.c
+5200_SRC_LIGHT = main5200.c
+5200_SRC = ${5200_SRC_LIGHT} printf.c joystick.c freeze.c
 USB_SRC = usb/hid.c  usb/hidparser.c  usb/hub.c usb/timer.c  usb/usb.c usb/debug.c
 
 AEON_LITE_PRJ = AEON_LITE
@@ -92,7 +92,7 @@ DE1_SRC = $(COMMON_SRC) $(SDCARD_SRC) $(A800_SRC)
 DE1_OBJ = $(patsubst %.c,$(DE1_BUILD_DIR)/%.o,$(DE1_SRC))
 
 DE1_5200_PRJ = DE1_5200
-DE1_5200_SRC = $(COMMON_SRC) $(SDCARD_SRC) $(5200_SRC) de1_5200/dirs.c
+DE1_5200_SRC = $(COMMON_SRC) $(SDCARD_SRC) $(5200_SRC)
 DE1_5200_OBJ = $(patsubst %.c,$(DE1_5200_BUILD_DIR)/%.o,$(DE1_5200_SRC))
 
 CHAMELEON_PRJ = CHAMELEON
