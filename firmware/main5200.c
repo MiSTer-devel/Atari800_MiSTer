@@ -36,6 +36,14 @@ unsigned char toatarichar(int val)
 	{
 		val = 26;
 	}
+	else if (val == '<')
+	{
+		val = 28;
+	}
+	else if (val == '>')
+	{
+		val = 30;
+	}
 	else
 	{
 		val = 0;
@@ -172,44 +180,40 @@ int select_cartridge()
 {
 	// work out the type
 	int type = -1;
+	int size = file_size(files[4]);
 
-	if (file_type(files[4]) == 0)
+	if (size == 32768) type = 4;
+	else if (size == 16384)
+	{
+		struct joystick_status joy;
+		joy.x_ = joy.y_ = joy.fire_ = joy.escape_ = 0;
+
+		clearscreen();
+		debug_pos = 0;
+		debug_adjust = 0;
+		printf("16k cart type");
+		debug_pos = 80;
+		printf("           PRESS            ");
+		debug_pos = 120;
+		printf("One chip <--   --> Two chips");
+
+		while(type <0)
+		{
+			joystick_wait(&joy,WAIT_QUIET);
+			joystick_wait(&joy,WAIT_EITHER);
+
+			if (joy.x_<0) type = 16;
+			if (joy.x_>0) type = 6;
+		}
+	}
+	else if (size == 8192) type = 19;
+	else if (size == 4096) type = 20;
+	else if (file_type(files[4]) == 0)
 	{
 		char header[16];
 		int read = 0;
 		file_read(files[4],header,16,&read);
 		type = header[7];
-	}
-	else
-	{
-		int size = file_size(files[4]);
-
-		if (size == 32768) type = 4;
-		if (size == 16384)
-		{
-			struct joystick_status joy;
-			joy.x_ = joy.y_ = joy.fire_ = joy.escape_ = 0;
-
-			clearscreen();
-			debug_pos = 0;
-			debug_adjust = 0;
-			printf("16k cart type");
-			debug_pos = 80;
-			printf("Left for one chip");
-			debug_pos = 160;
-			printf("Right for two chip");
-
-			while(type <0)
-			{
-				joystick_wait(&joy,WAIT_QUIET);
-				joystick_wait(&joy,WAIT_EITHER);
-
-				if (joy.x_<0) type = 16;
-				if (joy.x_>0) type = 6;
-			}
-		}
-		if (size == 8192) type = 19;
-		if (size == 4096) type = 20;
 	}
 
 	load_cartridge(type);
