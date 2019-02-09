@@ -30,9 +30,16 @@ END cpu;
 architecture vhdl of cpu is
 	signal CPU_ENABLE: std_logic; -- Apply Antic HALT and throttle
 	signal addr : std_logic_vector(23 downto 0);
+	signal cpu_do : std_logic_vector(7 downto 0);
+	signal cpu_di : std_logic_vector(7 downto 0);
+	signal cpu_rwn : std_logic;
 	
 BEGIN
 	CPU_ENABLE <= ENABLE and MEMORY_READY and THROTTLE;
+	DO <= cpu_do;
+	R_W_n <= cpu_rwn;
+
+	cpu_di <= cpu_do when cpu_rwn='0' else DI;
 	
 	cpu : work.T65
 	port map
@@ -46,10 +53,10 @@ BEGIN
 		IRQ_n => IRQ_n,
 		NMI_n => NMI_n,
 		SO_n => '1',
-		R_W_n => R_W_n,
+		R_W_n => cpu_rwn,
 		A => addr,
-		DI => DI,
-		DO => DO
+		DI => cpu_di,
+		DO => cpu_do
 	);	
 	
 	A <= addr(15 downto 0);
