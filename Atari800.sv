@@ -127,7 +127,7 @@ localparam CONF_STR = {
 	"ATARI800;;",
 	"S0,ATRXEXXFD,Mount Drive 1;",
 	"S1,ATRXEXXFD,Mount Drive 2;",
-	"S2,CARROM,Load Cart;",
+	"S2,CARROMBIN,Load Cart;",
 	"-;",
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",
 	"OAC,Drive Speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
@@ -140,7 +140,7 @@ localparam CONF_STR = {
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"R0,Reset;",
-	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,ROM Select;",
+	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT;",
 	"V,v",`BUILD_DATE
 };
 
@@ -247,16 +247,6 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(3)) hps_io
 	.ioctl_index(ioctl_index)
 );
 
-reg menu = 0;
-always @(posedge clk_sys) begin
-	integer timeout = 0;
-
-	if(timeout) timeout <= timeout - 1;
-	menu <= |timeout;
-	
-	if(status[16]) timeout <= 28000000;
-end
-
 
 wire [7:0] R,G,B;
 wire HBlank,VBlank;
@@ -310,7 +300,6 @@ atari800top atari800top
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
 	.RAM_SIZE(status[15:13]),
 	.DRV_SPEED(status[12:10]),
-	.MENU(menu),
 
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
@@ -341,7 +330,7 @@ atari800top atari800top
 	.JOY2Y(joya_1[15:8]),
 
 	.JOY1(j0),
-	.JOY2(joy_1[9:0])
+	.JOY2(joy_1[8:0])
 );
 
 assign VGA_F1 = 0;
@@ -466,7 +455,7 @@ end
 reg        emu = 0;
 wire [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
 wire [7:0] ay = emu ? my[7:0] : joya_0[15:8];
-wire [9:0] j0 = {joy_0[9], emu ? ps2_mouse[1:0] : joy_0[8:7], joy_0[6:0]};
+wire [8:0] j0 = {emu ? ps2_mouse[1:0] : joy_0[8:7], joy_0[6:0]};
 
 reg  signed [8:0] mx = 0;
 wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};

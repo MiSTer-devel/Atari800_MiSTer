@@ -47,7 +47,6 @@ PORT
 	PS2_DAT    : IN  STD_LOGIC;
 	
 	CPU_SPEED  : IN std_logic_vector(5 downto 0);
-	MENU       : IN STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -308,8 +307,8 @@ PORT MAP
 	-- switches etc. sector DMA blah blah.
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
-			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(6)&(joy(4) or joy(5))&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(6))&FKEYS(9 downto 0),
+			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
+			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&FKEYS(9 downto 0),
 	ZPU_IN2 => X"0000"& ZPU_IN2 & x"00",
 	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",

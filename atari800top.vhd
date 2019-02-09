@@ -50,7 +50,6 @@ PORT
 	CPU_SPEED  : IN std_logic_vector(5 downto 0);
 	RAM_SIZE   : IN std_logic_vector(2 downto 0);
 	DRV_SPEED  : IN std_logic_vector(2 downto 0);
-	MENU       : IN STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -58,8 +57,8 @@ PORT
 	JOY2X      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
-	JOY1       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
-	JOY2       : IN  STD_LOGIC_VECTOR(9 DOWNTO 0);
+	JOY1       : IN  STD_LOGIC_VECTOR(8 DOWNTO 0);
+	JOY2       : IN  STD_LOGIC_VECTOR(8 DOWNTO 0);
 
 	OSROM_ADDR : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 	OSROM_DATA : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -92,7 +91,7 @@ signal capsheld_reg : std_logic;
 
 signal JOY1_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
 signal JOY2_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
-signal JOY    :  STD_LOGIC_VECTOR(9 DOWNTO 0);
+signal JOY    :  STD_LOGIC_VECTOR(8 DOWNTO 0);
 signal JOY1_X :  STD_LOGIC_VECTOR(7 downto 0);
 signal JOY2_X :  STD_LOGIC_VECTOR(7 downto 0);
 signal JOY1_Y :  STD_LOGIC_VECTOR(7 downto 0);
@@ -429,8 +428,8 @@ PORT MAP
 	-- switches etc. sector DMA blah blah.
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
-			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(9)&(joy(4) or joy(5))&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			((FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#))) or MENU)&((FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#))) or joy(9))&FKEYS(9 downto 0),
+			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
+			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&FKEYS(9 downto 0),
 	ZPU_IN2 => X"0000"& ZPU_IN2 & x"0" & '0' & DRV_SPEED,
 	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",
@@ -452,12 +451,12 @@ freezer_enable <= zpu_out1(25);
 CPU_HALT <= pause_atari;
 
 zpu_rom1: entity work.spram
-generic map(11,32,"firmware/zpu_rom_800.mif")
+generic map(12,32,"firmware/zpu_rom_800.mif")
 port map
 (
-  clock => clk,
-  address => zpu_addr_rom(12 downto 2),
-  q => zpu_rom_data
+	clock => clk,
+	address => zpu_addr_rom(13 downto 2),
+	q => zpu_rom_data
 );
 
 END vhdl;

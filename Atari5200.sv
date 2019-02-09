@@ -135,7 +135,7 @@ localparam CONF_STR = {
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"R0,Reset;",
-	"J,Fire 1,Fire 2,ROM Select,*,#,Start,Pause,Reset,0,1,2,3;",
+	"J,Fire 1,Fire 2,*,#,Start,Pause,Reset,0,1,2,3;",
 	"V,v",`BUILD_DATE
 };
 
@@ -229,17 +229,6 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ioctl_index(ioctl_index)
 );
 
-reg menu = 0;
-always @(posedge clk_sys) begin
-	integer timeout = 0;
-
-	if(timeout) timeout <= timeout - 1;
-	menu <= |timeout;
-	
-	if(status[16]) timeout <= 28000000;
-end
-
-
 wire [7:0] R,G,B;
 wire HBlank,VBlank;
 wire VSync, HSync;
@@ -292,7 +281,6 @@ atari5200top atari5200top
 	.VBLANK(VBlank),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
-	.MENU(menu),
 
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
