@@ -1,3 +1,0 @@
-#!/bin/sh
-
-make de1_5200 && srec DE1_5200.bin -binary -o ../zpu_rom_5200.mif -mif 32

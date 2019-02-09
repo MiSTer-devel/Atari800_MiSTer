@@ -329,7 +329,7 @@ reset_atari <= zpu_out1(1);
 CPU_HALT <= pause_atari;
 
 zpu_rom1: entity work.spram
-generic map(11,32,"zpu_rom_5200.mif")
+generic map(11,32,"firmware/zpu_rom_5200.mif")
 port map
 (
   clock => clk,

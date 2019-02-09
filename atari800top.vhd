@@ -452,7 +452,7 @@ freezer_enable <= zpu_out1(25);
 CPU_HALT <= pause_atari;
 
 zpu_rom1: entity work.spram
-generic map(11,32,"zpu_rom.mif")
+generic map(11,32,"firmware/zpu_rom_800.mif")
 port map
 (
   clock => clk,
