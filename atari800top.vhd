@@ -258,7 +258,6 @@ PORT MAP
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
-	POKEY_ENABLE => zpu_pokey_enable,
 
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
@@ -456,5 +455,9 @@ port map
 	address => zpu_addr_rom(13 downto 2),
 	q => zpu_rom_data
 );
+
+enable_179_clock_div_zpu_pokey : entity work.enable_divider
+	generic map (COUNT=>32) -- cycle_length
+	port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>zpu_pokey_enable);
 
 END vhdl;
