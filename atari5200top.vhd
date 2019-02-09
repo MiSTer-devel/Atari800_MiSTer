@@ -154,8 +154,6 @@ atarixl_simple_sdram1 : entity work.atari5200core_simplesdram
 GENERIC MAP
 (
 	cycle_length => 32,
-	internal_rom => 0,
-	internal_ram => 0,
 	video_bits => 8,
 	palette => 1
 )

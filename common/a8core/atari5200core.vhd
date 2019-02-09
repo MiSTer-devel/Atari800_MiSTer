@@ -180,8 +180,6 @@ SIGNAL	ANTIC_HIGHRES_COLOUR_CLOCK_OUT :  STD_LOGIC;
 SIGNAL	ANTIC_ORIGINAL_COLOUR_CLOCK_OUT :  STD_LOGIC;
 SIGNAL	ANTIC_RDY :  STD_LOGIC;
 SIGNAL	ANTIC_WRITE_ENABLE :  STD_LOGIC;
-signal hcount_temp : std_logic_vector(7 downto 0);
-signal vcount_temp : std_logic_vector(8 downto 0);
 signal ANTIC_REFRESH_CYCLE : STD_LOGIC;
 
 -- GTIA
@@ -292,8 +290,6 @@ PORT MAP(CLK => CLK,
 		 COLOUR_CLOCK_OUT => ANTIC_COLOUR_CLOCK_OUT,
 		 HIGHRES_COLOUR_CLOCK_OUT => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
 		 dma_fetch_out => ANTIC_FETCH,
-		 hcount_out => hcount_temp,
-		 vcount_out => vcount_temp,
 		 HBLANK => HBLANK,
 		 VBLANK => VBLANK,
 		 refresh_out => ANTIC_REFRESH_CYCLE,

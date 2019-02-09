@@ -30,10 +30,6 @@ ENTITY atari800core_simple_sdram is
 		video_bits : integer := 8;
 		palette : integer :=1; -- 0:gtia colour on VIDEO_B, 1:altirra, 2:laoo
 	
-		-- For initial port may help to have no
-		internal_rom : integer := 1;  -- if 0 expects it in sdram,is 1:16k os+basic, is 2:... TODO
-		internal_ram : integer := 16384;  -- at start of memory map
-	
 		-- Use 1MB memory map if low memory set (for Aeon lite)
 		low_memory : integer := 0;
 
@@ -148,7 +144,7 @@ ENTITY atari800core_simple_sdram is
 		DMA_MEMORY_DATA : out std_logic_vector(31 downto 0);
 
 		-- Special config params
-   		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
+   	RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
@@ -188,18 +184,6 @@ ARCHITECTURE vhdl OF atari800core_simple_sdram IS
 	-- PBI
 	SIGNAL PBI_WRITE_DATA : std_logic_vector(31 downto 0);
 	
-	-- INTERNAL ROM/RAM
-	SIGNAL	RAM_ADDR :  STD_LOGIC_VECTOR(18 DOWNTO 0);
-	SIGNAL	RAM_DO :  STD_LOGIC_VECTOR(15 DOWNTO 0);
-	SIGNAL	RAM_REQUEST :  STD_LOGIC;
-	SIGNAL	RAM_REQUEST_COMPLETE :  STD_LOGIC;
-	SIGNAL	RAM_WRITE_ENABLE :  STD_LOGIC;
-	
-	SIGNAL	ROM_ADDR :  STD_LOGIC_VECTOR(21 DOWNTO 0);
-	SIGNAL	ROM_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	SIGNAL	ROM_REQUEST :  STD_LOGIC;
-	SIGNAL	ROM_REQUEST_COMPLETE :  STD_LOGIC;
-	
 	-- CONFIG
 	SIGNAL USE_SDRAM : STD_LOGIC;
 	SIGNAL ROM_IN_RAM : STD_LOGIC;
@@ -234,216 +218,185 @@ SDRAM_DI <= PBI_WRITE_DATA;
 
 -- Paddles!
 pot0 : entity work.pot_from_signed
-	GENERIC MAP
-	(
-		cycle_length=>cycle_length,
-		reverse => 1
-	)
-	PORT MAP
-	(
-		CLK => CLK,
-		RESET_N => RESET_N,
-		ENABLED => '1',
-		POT_RESET => POT_RESET,
-		POS => PADDLE0,
-		POT_HIGH => POT_IN(0)
-	);
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE0,
+	POT_HIGH => POT_IN(0)
+);
+
 pot1 : entity work.pot_from_signed
-	GENERIC MAP
-	(
-		cycle_length=>cycle_length,
-		reverse => 1
-	)
-	PORT MAP
-	(
-		CLK => CLK,
-		RESET_N => RESET_N,
-		ENABLED => '1',
-		POT_RESET => POT_RESET,
-		POS => PADDLE1,
-		POT_HIGH => POT_IN(1)
-	);
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE1,
+	POT_HIGH => POT_IN(1)
+);
+
 pot2 : entity work.pot_from_signed
-	GENERIC MAP
-	(
-		cycle_length=>cycle_length,
-		reverse => 1
-	)
-	PORT MAP
-	(
-		CLK => CLK,
-		RESET_N => RESET_N,
-		ENABLED => '1',
-		POT_RESET => POT_RESET,
-		POS => PADDLE2,
-		POT_HIGH => POT_IN(2)
-	);
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE2,
+	POT_HIGH => POT_IN(2)
+);
+
 pot3 : entity work.pot_from_signed
-	GENERIC MAP
-	(
-		cycle_length=>cycle_length,
-		reverse => 1
-	)
-	PORT MAP
-	(
-		CLK => CLK,
-		RESET_N => RESET_N,
-		ENABLED => '1',
-		POT_RESET => POT_RESET,
-		POS => PADDLE3,
-		POT_HIGH => POT_IN(3)
-	);
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE3,
+	POT_HIGH => POT_IN(3)
+);
 POT_IN(7 downto 4) <= (others=>'0');
 
--- Internal rom/ram
-internalromram1 : entity work.internalromram
-	GENERIC MAP
-	(
-		internal_rom => internal_rom,
-		internal_ram => internal_ram
-	)
-	PORT MAP (
- 		clock   => CLK,
-		reset_n => RESET_N,
-
-		ROM_ADDR => ROM_ADDR,
-		ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
-		ROM_REQUEST => ROM_REQUEST,
-		ROM_DATA => ROM_DO,
-		
-		RAM_ADDR => RAM_ADDR,
-		RAM_WR_ENABLE => RAM_WRITE_ENABLE,
-		RAM_DATA_IN => PBI_WRITE_DATA(7 downto 0),
-		RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
-		RAM_REQUEST => RAM_REQUEST,
-		RAM_DATA => RAM_DO(7 downto 0)
-	);
-
-	USE_SDRAM <= '1' when internal_ram=0 else '0';
-	ROM_IN_RAM <= '1' when internal_rom=0 else '0';
-
 atari800xl : entity work.atari800core
-	GENERIC MAP
-	(
-		cycle_length => cycle_length,
-		video_bits => video_bits,
-		palette => palette,
-		low_memory => low_memory,
-		stereo => stereo,
-		covox => covox
-	)
-	PORT MAP
-	(
-		CLK => CLK,
-		RESET_N => RESET_N,
+GENERIC MAP
+(
+	cycle_length => cycle_length,
+	video_bits => video_bits,
+	palette => palette,
+	low_memory => low_memory,
+	stereo => stereo,
+	covox => covox
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
 
-		VIDEO_VS => VIDEO_VS,
-		VIDEO_HS => VIDEO_HS,
-		VIDEO_CS => VIDEO_CS,
-		VIDEO_B => VIDEO_B,
-		VIDEO_G => VIDEO_G,
-		VIDEO_R => VIDEO_R,
-		VIDEO_BLANK => VIDEO_BLANK,
-		VIDEO_PIXCE => VIDEO_PIXCE,
-		VIDEO_BURST => VIDEO_BURST,
-		VIDEO_START_OF_FIELD => VIDEO_START_OF_FIELD,
-		VIDEO_ODD_LINE => VIDEO_ODD_LINE,
+	VIDEO_VS => VIDEO_VS,
+	VIDEO_HS => VIDEO_HS,
+	VIDEO_CS => VIDEO_CS,
+	VIDEO_B => VIDEO_B,
+	VIDEO_G => VIDEO_G,
+	VIDEO_R => VIDEO_R,
+	VIDEO_BLANK => VIDEO_BLANK,
+	VIDEO_PIXCE => VIDEO_PIXCE,
+	VIDEO_BURST => VIDEO_BURST,
+	VIDEO_START_OF_FIELD => VIDEO_START_OF_FIELD,
+	VIDEO_ODD_LINE => VIDEO_ODD_LINE,
 
-		HBLANK => HBLANK,
-		VBLANK => VBLANK,
-		POKEY_ENABLE => POKEY_ENABLE,
+	HBLANK => HBLANK,
+	VBLANK => VBLANK,
+	POKEY_ENABLE => POKEY_ENABLE,
 
-		AUDIO_L => AUDIO_L,
-		AUDIO_R => AUDIO_R,
+	AUDIO_L => AUDIO_L,
+	AUDIO_R => AUDIO_R,
 
-		CA1_IN => CA1_IN,
-		CB1_IN => CB1_IN,
-		CA2_IN => CA2_IN,
-		CA2_OUT => CA2_OUT,
-		CA2_DIR_OUT => CA2_DIR_OUT,
-		CB2_IN => CB2_IN,
-		CB2_OUT => CB2_OUT,
-		CB2_DIR_OUT => CB2_DIR_OUT,
-		PORTA_IN => PORTA_IN,
-		PORTA_DIR_OUT => PORTA_DIR_OUT,
-		PORTA_OUT => PORTA_OUT,
-		PORTB_IN => PORTB_IN,
-		PORTB_DIR_OUT => open,--PORTB_DIR_OUT,
-		PORTB_OUT => PORTB_OUT,
+	CA1_IN => CA1_IN,
+	CB1_IN => CB1_IN,
+	CA2_IN => CA2_IN,
+	CA2_OUT => CA2_OUT,
+	CA2_DIR_OUT => CA2_DIR_OUT,
+	CB2_IN => CB2_IN,
+	CB2_OUT => CB2_OUT,
+	CB2_DIR_OUT => CB2_DIR_OUT,
+	PORTA_IN => PORTA_IN,
+	PORTA_DIR_OUT => PORTA_DIR_OUT,
+	PORTA_OUT => PORTA_OUT,
+	PORTB_IN => PORTB_IN,
+	PORTB_DIR_OUT => open,--PORTB_DIR_OUT,
+	PORTB_OUT => PORTB_OUT,
 
-		KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
-		KEYBOARD_SCAN => KEYBOARD_SCAN,
+	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
+	KEYBOARD_SCAN => KEYBOARD_SCAN,
 
-		POT_IN => POT_IN,
-		POT_RESET => POT_RESET,
-		
-		-- PBI
-		PBI_ADDR => open,
-		PBI_WRITE_ENABLE => open,
-		PBI_SNOOP_DATA => DMA_MEMORY_DATA,
-		PBI_WRITE_DATA => PBI_WRITE_DATA,
-		PBI_WIDTH_8bit_ACCESS => SDRAM_8BIT_WRITE_ENABLE,
-		PBI_WIDTH_16bit_ACCESS => SDRAM_16BIT_WRITE_ENABLE,
-		PBI_WIDTH_32bit_ACCESS => SDRAM_32BIT_WRITE_ENABLE,
+	POT_IN => POT_IN,
+	POT_RESET => POT_RESET,
+	
+	-- PBI
+	PBI_ADDR => open,
+	PBI_WRITE_ENABLE => open,
+	PBI_SNOOP_DATA => DMA_MEMORY_DATA,
+	PBI_WRITE_DATA => PBI_WRITE_DATA,
+	PBI_WIDTH_8bit_ACCESS => SDRAM_8BIT_WRITE_ENABLE,
+	PBI_WIDTH_16bit_ACCESS => SDRAM_16BIT_WRITE_ENABLE,
+	PBI_WIDTH_32bit_ACCESS => SDRAM_32BIT_WRITE_ENABLE,
 
-		PBI_ROM_DO => "11111111",
-		PBI_REQUEST => open,
-		PBI_REQUEST_COMPLETE => '1',
+	PBI_ROM_DO => "11111111",
+	PBI_REQUEST => open,
+	PBI_REQUEST_COMPLETE => '1',
 
-		CART_RD4 => CART_RD4,
-		CART_RD5 => CART_RD5,
-		CART_S4_n => open,
-		CART_S5_N => open,
-		CART_CCTL_N => open,
+	CART_RD4 => CART_RD4,
+	CART_RD5 => CART_RD5,
+	CART_S4_n => open,
+	CART_S5_N => open,
+	CART_CCTL_N => open,
 
-		SIO_RXD => SIO_RXD,
-		SIO_TXD => SIO_TXD,
+	SIO_RXD => SIO_RXD,
+	SIO_TXD => SIO_TXD,
 
-		CONSOL_OPTION => CONSOL_OPTION,
-		CONSOL_SELECT => CONSOL_SELECT,
-		CONSOL_START=> CONSOL_START,
-		GTIA_TRIG => GTIA_TRIG,
-		
-		ANTIC_LIGHTPEN => ANTIC_LIGHTPEN,
-		ANTIC_REFRESH => SDRAM_REFRESH,
+	CONSOL_OPTION => CONSOL_OPTION,
+	CONSOL_SELECT => CONSOL_SELECT,
+	CONSOL_START=> CONSOL_START,
+	GTIA_TRIG => GTIA_TRIG,
+	
+	ANTIC_LIGHTPEN => ANTIC_LIGHTPEN,
+	ANTIC_REFRESH => SDRAM_REFRESH,
 
-		SDRAM_REQUEST => SDRAM_REQUEST,
-		SDRAM_REQUEST_COMPLETE => SDRAM_REQUEST_COMPLETE,
-		SDRAM_READ_ENABLE => SDRAM_READ_ENABLE,
-		SDRAM_WRITE_ENABLE => SDRAM_WRITE_ENABLE,
-		SDRAM_ADDR => SDRAM_ADDR,
-		SDRAM_DO => SDRAM_DO,
+	SDRAM_REQUEST => SDRAM_REQUEST,
+	SDRAM_REQUEST_COMPLETE => SDRAM_REQUEST_COMPLETE,
+	SDRAM_READ_ENABLE => SDRAM_READ_ENABLE,
+	SDRAM_WRITE_ENABLE => SDRAM_WRITE_ENABLE,
+	SDRAM_ADDR => SDRAM_ADDR,
+	SDRAM_DO => SDRAM_DO,
 
-		RAM_ADDR => RAM_ADDR,
-		RAM_DO => RAM_DO,
-		RAM_REQUEST => RAM_REQUEST,
-		RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
-		RAM_WRITE_ENABLE => RAM_WRITE_ENABLE,
-		
-		ROM_ADDR => ROM_ADDR,
-		ROM_DO => ROM_DO,
-		ROM_REQUEST => ROM_REQUEST,
-		ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
+	RAM_DO => (others => '1'),
+	RAM_REQUEST_COMPLETE => '1',
+	ROM_DO => (others => '1'),
+	ROM_REQUEST_COMPLETE => '1',
 
-		DMA_FETCH => DMA_FETCH,
-		DMA_READ_ENABLE => DMA_READ_ENABLE,
-		DMA_32BIT_WRITE_ENABLE => DMA_32BIT_WRITE_ENABLE,
-		DMA_16BIT_WRITE_ENABLE => DMA_16BIT_WRITE_ENABLE,
-		DMA_8BIT_WRITE_ENABLE => DMA_8BIT_WRITE_ENABLE,
-		DMA_ADDR => DMA_ADDR,
-		DMA_WRITE_DATA => DMA_WRITE_DATA,
-		MEMORY_READY_DMA => MEMORY_READY_DMA,
+	DMA_FETCH => DMA_FETCH,
+	DMA_READ_ENABLE => DMA_READ_ENABLE,
+	DMA_32BIT_WRITE_ENABLE => DMA_32BIT_WRITE_ENABLE,
+	DMA_16BIT_WRITE_ENABLE => DMA_16BIT_WRITE_ENABLE,
+	DMA_8BIT_WRITE_ENABLE => DMA_8BIT_WRITE_ENABLE,
+	DMA_ADDR => DMA_ADDR,
+	DMA_WRITE_DATA => DMA_WRITE_DATA,
+	MEMORY_READY_DMA => MEMORY_READY_DMA,
 
-		RAM_SELECT => RAM_SELECT,
-		CART_EMULATION_SELECT => emulated_cartridge_select,
-		PAL => PAL,
-		USE_SDRAM => USE_SDRAM,
-		ROM_IN_RAM => ROM_IN_RAM,
-		THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
-		HALT => HALT,
-		freezer_enable => freezer_enable,
-		freezer_activate => freezer_activate
-	);
+	RAM_SELECT => RAM_SELECT,
+	CART_EMULATION_SELECT => emulated_cartridge_select,
+	PAL => PAL,
+	USE_SDRAM => '1',
+	ROM_IN_RAM => '1',
+	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
+	HALT => HALT,
+	freezer_enable => freezer_enable,
+	freezer_activate => freezer_activate
+);
 
 end vhdl;
-
