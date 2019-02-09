@@ -19,6 +19,7 @@ ENTITY generic_ram_infer IS
    PORT
    (
       clock: IN   std_logic;
+      reset_n: IN   std_logic :='1';
       data:  IN   std_logic_vector (data_width-1 DOWNTO 0);
       address:  IN   std_logic_vector(address_width-1 downto 0);
       we:    IN   std_logic;
@@ -36,8 +37,12 @@ ARCHITECTURE rtl OF generic_ram_infer IS
    signal address2 : std_logic_vector(address_width-1 downto 0);
 BEGIN
 
+--   PROCESS (clock,reset_n)
    PROCESS (clock)
    BEGIN
+--     IF (RESET_N = '0') then
+--	ram_block <= (others=>(others=>'1'));
+--     ELSIF (clock'event AND clock = '1') THEN
      IF (clock'event AND clock = '1') THEN
 	 IF (we_ram = '1') THEN
 		 ram_block(to_integer(to_01(unsigned(address2), '0'))) <= data;

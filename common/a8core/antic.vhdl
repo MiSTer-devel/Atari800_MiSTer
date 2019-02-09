@@ -25,6 +25,7 @@ PORT
 	WR_EN : IN STD_LOGIC;
 	
 	RESET_N : IN STD_LOGIC;
+	RNMI_N : IN STD_LOGIC := '1';
 	
 	MEMORY_READY_ANTIC : IN STD_LOGIC;
 	MEMORY_READY_CPU : IN STD_LOGIC;
@@ -48,16 +49,23 @@ PORT
 	
 	HBLANK : OUT STD_LOGIC;
 	VBLANK : OUT STD_LOGIC;
-
+	
 	-- DMA fetch
 	dma_fetch_out : out std_logic;
 	dma_address_out : out std_logic_vector(15 downto 0);
 	
 	-- refresh
 	refresh_out : out std_logic; -- used by sdram
+
+	-- next cycle
+	next_cycle_type : out STD_LOGIC_VECTOR(2 downto 0); --000=cpu,001=dma,010=refresh,011=undef,100=undef,101=dma_wsync,110=refresh_wsync,101=undef
+
+	-- if we are in turbo mode
+	turbo_out : out std_logic;
 	
 	-- for debugging
-	dma_clock_out : out std_logic;
+	shift_out : out std_logic_vector(7 downto 0);
+	dma_clock_out : out std_logic_vector(3 downto 0);
 	hcount_out : out std_logic_vector(7 downto 0);
 	vcount_out : out std_logic_vector(8 downto 0)
 );
@@ -73,7 +81,7 @@ ARCHITECTURE vhdl OF antic IS
 	);
 	END component;
 	
-	COMPONENT antic_dma_clock IS
+	COMPONENT antic_dma_clock_del IS
 	PORT 
 	( 
 		CLK : IN STD_LOGIC;
@@ -129,52 +137,7 @@ ARCHITECTURE vhdl OF antic IS
 		current_value : out std_logic_vector(COUNT_WIDTH-1 downto 0)
 	);
 	END component;
-	
-	component delay_line IS
-	generic(COUNT : natural := 1);
-	PORT 
-	( 
-		CLK : IN STD_LOGIC;
-		SYNC_RESET : IN STD_LOGIC;
-		DATA_IN : IN STD_LOGIC;
-		ENABLE : IN STD_LOGIC;
-		RESET_N : IN STD_LOGIC;
-		
-		DATA_OUT : OUT STD_LOGIC
-	);
-	END component;	
-		
-	component wide_delay_line IS
-	generic(COUNT : natural := 1; WIDTH : natural :=1);
-	PORT 
-	( 
-		CLK : IN STD_LOGIC;
-		SYNC_RESET : IN STD_LOGIC;
-		DATA_IN : IN STD_LOGIC_VECTOR(WIDTH-1 downto 0);
-		ENABLE : IN STD_LOGIC; -- i.e. shift on this clock
-		RESET_N : IN STD_LOGIC;
-		
-		DATA_OUT : OUT STD_LOGIC_VECTOR(WIDTH-1 downto 0)
-	);
-	END component;	
 
-	component reg_file IS
-	generic
-	(
-		BYTES : natural := 1;
-		WIDTH : natural := 1
-	);
-	PORT 
-	( 
-		CLK : IN STD_LOGIC;
-		ADDR : IN STD_LOGIC_VECTOR(width-1 DOWNTO 0);
-		DATA_IN : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
-		WR_EN : IN STD_LOGIC;
-		
-		DATA_OUT : OUT STD_LOGIC_VECTOR(7 DOWNTO 0)
-	);
-	END component;
-	
 	function To_Std_Logic(L: BOOLEAN) return std_ulogic is
 	begin
 		if L then
@@ -201,9 +164,6 @@ ARCHITECTURE vhdl OF antic IS
 	signal nmi_next : std_logic;
 	signal nmi_reg : std_logic;
 	
-	signal nmi_shiftreg_next : std_logic_vector(15 downto 0);
-	signal nmi_shiftreg_reg : std_logic_vector(15 downto 0);
-	
 	signal nmist_next : std_logic_vector(7 downto 5); -- dli/vbi/reset
 	signal nmist_reg : std_logic_vector(7 downto 5);
 	
@@ -222,8 +182,16 @@ ARCHITECTURE vhdl OF antic IS
 	--signal nmi_pending_next : std_logic; -- looks like on t65 the nmi_n is blocked by rdy being low, but not on real hardware?? XXX verify
 	--signal nmi_pending_reg : std_logic;
 	
+	signal playfield_dma_start_raw : std_logic;
+	signal playfield_dma_start_next : std_logic_vector(63 downto 0);
+	signal playfield_dma_start_reg : std_logic_vector(63 downto 0);
 	signal playfield_dma_start : std_logic;
+
+	signal playfield_dma_end_raw : std_logic;
+	signal playfield_dma_end_next : std_logic_vector(63 downto 0);
+	signal playfield_dma_end_reg : std_logic_vector(63 downto 0);
 	signal playfield_dma_end : std_logic;
+
 	signal playfield_display_active_next : std_logic;
 	signal playfield_display_active_reg : std_logic;
 	
@@ -370,8 +338,9 @@ ARCHITECTURE vhdl OF antic IS
 	signal playfield_load : std_logic;
 	
 	-- position in frame	
-	signal hcount_next : std_logic_vector(7 downto 0);
-	signal hcount_reg : std_logic_vector(7 downto 0);
+	signal hcount_next : std_logic_vector(9 downto 0);
+	signal hcount_reg : std_logic_vector(9 downto 0);
+	signal cycle_latter : std_logic;
 	
 	signal vcount_next : std_logic_vector(8 downto 0);
 	signal vcount_reg : std_logic_vector(8 downto 0);
@@ -386,8 +355,8 @@ ARCHITECTURE vhdl OF antic IS
 	signal hblank_ex_next : std_logic;
 	signal hblank_ex_reg : std_logic;
 
-	signal playfield_dma_start_cycle : std_logic_vector(7 downto 0);
-	signal playfield_dma_end_cycle : std_logic_vector(7 downto 0);
+	signal playfield_dma_start_cycle : std_logic_vector(9 downto 0);
+	signal playfield_dma_end_cycle : std_logic_vector(9 downto 0);
 	signal playfield_display_start_cycle : std_logic_vector(7 downto 0);
 	signal playfield_display_end_cycle : std_logic_vector(7 downto 0);
 	
@@ -398,6 +367,7 @@ ARCHITECTURE vhdl OF antic IS
 	-- scrolling	
 	signal hscrol_reg : std_logic_vector(3 downto 0);
 	signal hscrol_next : std_logic_vector(3 downto 0);
+	signal hscrol_adj : std_logic_vector(4 downto 0);
 
 	signal vscrol_raw_reg : std_logic_vector(3 downto 0);
 	signal vscrol_raw_next : std_logic_vector(3 downto 0);
@@ -462,11 +432,14 @@ ARCHITECTURE vhdl OF antic IS
 	signal line_buffer_data_out : std_logic_vector(7 downto 0);
 	
 	-- output registers
-	signal an_current : std_logic_vector(2 downto 0); -- live unregistered calculation of next output (not gated by cc)
-	signal an_prev_next : std_logic_vector(2 downto 0); -- previous - for hscrol
-	signal an_prev_reg : std_logic_vector(2 downto 0);  -- previous - for hscrol
+	signal an_current_raw : std_logic_vector(2 downto 0); -- live unregistered calculation of next output (not gated by cc)
+	signal an_current : std_logic_vector(2 downto 0); -- 0 colour clock delay for hscrol (after adjustment for 2x and 4x)
+	signal an_prev : std_logic_vector(2 downto 0); -- 1 colour clock delay for hscrol (after adjustment for 2x and 4x)
 	signal an_next : std_logic_vector(2 downto 0);
 	signal an_reg : std_logic_vector(2 downto 0);
+	type an_shift_type is array(3 downto 0) of std_logic_vector(2 downto 0);
+	signal an_current_next : an_shift_type;
+	signal an_current_reg : an_shift_type; -- delay shift output to align 2x and 4x
 	
 	-- light pendin
 	signal penv_next : std_logic_vector(7 downto 0);
@@ -483,10 +456,8 @@ ARCHITECTURE vhdl OF antic IS
 	signal colour_clock_selected : std_logic;
 	signal colour_clock_selected_highres : std_logic;
 	
-	constant cycle_length_bits: integer := integer(ceil(log2(real(cycle_length))));
-	signal colour_clock_count_next : std_logic_vector(cycle_length_bits-1 downto 0);
-	signal colour_clock_count_reg : std_logic_vector(cycle_length_bits-1 downto 0);
-	signal colour_clock_count_reg_topthree : std_logic_vector(2 downto 0);
+	signal colour_clock_shift_reg : std_logic_vector(cycle_length-1 downto 0);
+	signal colour_clock_shift_next : std_logic_vector(cycle_length-1 downto 0);
 	
 	signal memory_ready_both : std_logic;
 	
@@ -499,7 +470,7 @@ BEGIN
 			wsync_reg <= '0';
 			vcount_reg <= (others=>'0');
 			--hcount_reg <= X"01";
-			hcount_reg <= X"00";
+			hcount_reg <= (others=>'0');
 			dmactl_raw_reg <= (others=>'0');
 			chactl_reg <= (others=>'0');
 			vblank_reg <= '0';			
@@ -536,8 +507,8 @@ BEGIN
 			
 			hblank_reg <= '0';
 			
-			an_reg <= (others=>'0');
-			an_prev_reg <= (others=>'0');
+			an_reg <= (others=>('0'));
+			an_current_reg <= (others=>(others=>('0')));
 			
 			dma_fetch_reg <= '0';
 			dma_address_reg <= (others=>'0');			
@@ -565,12 +536,13 @@ BEGIN
 			
 			delay_display_shift_reg <= (others=>'0');
 			
-			nmi_shiftreg_reg <= (others=>'1');
-			
 			penh_reg <= (others=>'0');
 			penv_reg <= (others=>'0');
 			
-			colour_clock_count_reg <= (others=>'0');
+			colour_clock_shift_reg <= (others=>'0');
+
+			playfield_dma_start_reg <= (others=>'0');
+			playfield_dma_end_reg <= (others=>'0');
 			
 		elsif (clk'event and clk='1') then			
 			nmi_reg <= nmi_next;
@@ -614,9 +586,9 @@ BEGIN
 			
 			hblank_reg <= hblank_next;
 			hblank_ex_reg <= hblank_ex_next;
-
+			
 			an_reg <= an_next;
-			an_prev_reg <= an_prev_next;
+			an_current_reg <= an_current_next;
 			
 			dma_fetch_reg <= dma_fetch_next;
 			dma_address_reg <= dma_address_next;
@@ -642,12 +614,14 @@ BEGIN
 			
 			delay_display_shift_reg <= delay_display_shift_next;
 			
-			nmi_shiftreg_reg <= nmi_shiftreg_next;
-			
 			penh_reg <= penh_next;
 			penv_reg <= penv_next;
 			
-			colour_clock_count_reg <= colour_clock_count_next;
+			colour_clock_shift_reg <= colour_clock_shift_next;
+
+			playfield_dma_start_reg <= playfield_dma_start_next;
+			playfield_dma_end_reg <= playfield_dma_end_next;
+
 		end if;
 	end process;
 	
@@ -655,60 +629,73 @@ BEGIN
 	-- TODO - allow double for 640 pixel width and quadruple for 1280 pixel width)
 	-- TODO - allow other clocks for driving VGA (mostly higher dot clock + line doubling (buffer between antic and gtia??))
 
-        colour_clock_count_reg_topthree <= colour_clock_count_reg(cycle_length_bits-1 downto cycle_length_bits-3);
-	process(colour_clock_count_reg, colour_clock_count_reg_topthree, ANTIC_ENABLE_179)		
+	process(colour_clock_shift_reg, ANTIC_ENABLE_179,colour_clock_4x )		
+		variable reduce_1x : std_logic_vector(1 downto 0);
+		variable reduce_2x : std_logic_vector(1 downto 0);
+		variable reduce_4x : std_logic_vector(3 downto 0);
+		variable reduce_8x : std_logic_vector(7 downto 0);
 	begin
-		colour_clock_half_x <= '0';
-		colour_clock_1x<='0';
-		colour_clock_2x<='0';
-		colour_clock_4x<='0';
-		colour_clock_8x<='0';
-	
-		colour_clock_count_next <= std_logic_vector(unsigned(colour_clock_count_reg) + 1);
-		
-		if (ANTIC_ENABLE_179 = '1') then -- resync...
-			colour_clock_count_next <= std_logic_vector(to_unsigned(1,cycle_length_bits));
-		end if;
+		colour_clock_shift_next(cycle_length-1 downto 0) <= colour_clock_shift_reg(cycle_length-2 downto 0)&'0';
 
-		colour_clock_8x <= '1';
+		if(ANTIC_ENABLE_179='1') then
+			colour_clock_shift_next(cycle_length-1 downto 1) <= (others=>'0');
+			colour_clock_shift_next(0) <= '1';
+		end if;
 		
-		if (or_reduce(colour_clock_count_reg( cycle_length_bits-4 downto 0)) = '0') then
-			case colour_clock_count_reg_topthree is
-			when "000" =>
-				colour_clock_half_x <= '1';
-				colour_clock_1x <= '1';
-				colour_clock_2x <= '1';
-				colour_clock_4x <= '1';
-			when "001" =>
-				colour_clock_4x <= '1';
-			when "010" =>
-				colour_clock_2x <= '1';			
-				colour_clock_4x <= '1';			
-			when "011" =>
-				colour_clock_4x <= '1';
-			when "100" =>			
-				colour_clock_1x <= '1';
-				colour_clock_2x <= '1';
-				colour_clock_4x <= '1';
-			when "101" =>
-				colour_clock_4x <= '1';
-			when "110" =>
-				colour_clock_2x <= '1';			
-				colour_clock_4x <= '1';			
-			when "111" =>
-				colour_clock_4x <= '1';			
-			when others =>
-				-- nop
-			end case;
+		colour_clock_half_x <= antic_enable_179;
+
+		reduce_1x(0) := antic_enable_179;
+		reduce_1x(1) := colour_clock_shift_reg(cycle_length/2-1);
+
+		colour_clock_1x <= or_reduce(reduce_1x);
+
+		reduce_2x(0) := colour_clock_shift_reg(1*cycle_length/4-1);
+		reduce_2x(1) := colour_clock_shift_reg(3*cycle_length/4-1);
+
+		colour_clock_2x <= or_reduce(reduce_1x&reduce_2x);
+
+		reduce_4x(0) := colour_clock_shift_reg(1*cycle_length/8-1);
+		reduce_4x(1) := colour_clock_shift_reg(3*cycle_length/8-1);
+		reduce_4x(2) := colour_clock_shift_reg(5*cycle_length/8-1);
+		reduce_4x(3) := colour_clock_shift_reg(7*cycle_length/8-1);
+
+		colour_clock_4x <= or_reduce(reduce_1x&reduce_2x&reduce_4x);
+
+		reduce_8x(0) := colour_clock_shift_reg(1*cycle_length/16-1);
+		reduce_8x(1) := colour_clock_shift_reg(3*cycle_length/16-1);
+		reduce_8x(2) := colour_clock_shift_reg(5*cycle_length/16-1);
+		reduce_8x(3) := colour_clock_shift_reg(7*cycle_length/16-1);
+		reduce_8x(4) := colour_clock_shift_reg(9*cycle_length/16-1);
+		reduce_8x(5) := colour_clock_shift_reg(11*cycle_length/16-1);
+		reduce_8x(6) := colour_clock_shift_reg(13*cycle_length/16-1);
+		reduce_8x(7) := colour_clock_shift_reg(15*cycle_length/16-1);
+
+		colour_clock_8x <= or_reduce(colour_clock_4x&reduce_8x);
+	end process;
+
+	process(playfield_dma_end_raw, playfield_dma_end_reg, playfield_dma_start_raw, playfield_dma_start_reg, colour_clock_4x)
+	begin
+		playfield_dma_start_next <= playfield_dma_start_reg;
+		playfield_dma_end_next <= playfield_dma_end_reg;
+		if (colour_clock_4x='1') then
+			playfield_dma_start_next <= playfield_dma_start_reg(62 downto 0)&playfield_dma_start_raw;
+			playfield_dma_end_next <= playfield_dma_end_reg(62 downto 0)&playfield_dma_end_raw;
 		end if;
 	end process;
 	
-	process(colour_clock_half_x,colour_clock_1x,colour_clock_2x, colour_clock_4x, colour_clock_8x, dmactl_delayed_reg)
+	process(colour_clock_half_x,colour_clock_1x,colour_clock_2x, colour_clock_4x, colour_clock_8x, dmactl_delayed_reg, playfield_dma_start_reg, playfield_dma_start_raw, playfield_dma_end_reg, playfield_dma_end_raw, hcount_reg, hscrol_reg, an_current_next)
 	begin
 		enable_dma <= colour_clock_half_x;
 		colour_clock_selected <= colour_clock_1x;
 		colour_clock_selected_highres <= colour_clock_2x;		
 		dmactl_delayed_enabled <= '0';
+		playfield_dma_start <= playfield_dma_start_raw;
+		playfield_dma_end <= playfield_dma_end_raw;
+		cycle_latter <= not(hcount_reg(2));
+		hscrol_adj <= hscrol_reg(3 downto 1)&"00";
+
+		an_current <= an_current_next(0);
+		an_prev <= an_current_next(1);
 		
 		case dmactl_delayed_reg(6 downto 5) is
 		when "01" =>
@@ -718,16 +705,24 @@ BEGIN
 			colour_clock_selected <= colour_clock_2x;		
 			colour_clock_selected_highres <= colour_clock_4x;
 			dmactl_delayed_enabled <= '1';
+			playfield_dma_start <= playfield_dma_start_reg(3+24);
+			playfield_dma_end <= playfield_dma_end_reg(7+24);
+			cycle_latter <= hcount_reg(1);
+			hscrol_adj <= "0"&hscrol_reg(3 downto 1)&"0";
 		when "11" =>
 			enable_dma <= colour_clock_2x;
 			colour_clock_selected <= colour_clock_4x;
 			colour_clock_selected_highres <= colour_clock_8x;
 			dmactl_delayed_enabled <= '1';
+			playfield_dma_start <= playfield_dma_start_reg(5+36);
+			playfield_dma_end <= playfield_dma_end_reg(11+36);
+			cycle_latter <= hcount_reg(0);
+			hscrol_adj <= "00"&hscrol_reg(3 downto 1);
 		when others =>
 			--nop
 		end case;		
 	end process;	
-		
+
 	-- Counters (memory address for data, memory address for display list)
 	antic_counter_memory_scan : antic_counter
 		generic map (STORE_WIDTH=>16, COUNT_WIDTH=>12)
@@ -750,14 +745,14 @@ BEGIN
 	
 	-- Count position on screen
 	-- horizontal
-	process(hcount_reg, colour_clock_1x, colour_clock_half_x, hcount_reset)
+	process(hcount_reg, colour_clock_4x, colour_clock_half_x, hcount_reset)
 	begin
 		hcount_next <= hcount_reg;		
-		if (colour_clock_1x = '1') then
+		if (colour_clock_4x = '1') then
 			hcount_next <= std_logic_vector(unsigned(hcount_reg)+1);
 			
 			if (colour_clock_half_x = '1') then
-				hcount_next(0) <= '1';
+				hcount_next(2 downto 0) <= "100";
 			end if;
 		end if;
 		
@@ -767,11 +762,11 @@ BEGIN
 	end process;
 	
 	-- vertical
-	process(vcount_reg, vcount_increment, vcount_reset, colour_clock_1x)
+	process(vcount_reg, vcount_increment, vcount_reset, antic_enable_179)
 	begin
 		vcount_next <= vcount_reg;
 		
-		if (colour_clock_1x = '1') then		
+		if (antic_enable_179 = '1') then		
 			if (vcount_increment = '1') then
 				vcount_next <= std_logic_vector(unsigned(vcount_reg)+1);
 			end if;
@@ -818,10 +813,12 @@ BEGIN
 	end process;
 	
 	-- Calculate playfield start/end
-	process(hscrol_enabled_reg, dmactl_delayed_reg, hscrol_reg)
+	process(hscrol_enabled_reg, dmactl_delayed_reg, hscrol_adj, hscrol_reg)
+		variable width : std_logic_vector(1 downto 0);
+		variable hscrol_adj_en : std_logic_vector(5 downto 0);
 	begin		
-		playfield_dma_start_cycle <= (others=>'1');
-		playfield_dma_end_cycle <= (others=>'1');
+		playfield_dma_start_cycle <= x"ff"&"00";
+		playfield_dma_end_cycle <= x"ff"&"00";
 		playfield_display_start_cycle <= (others=>'1');
 		playfield_display_end_cycle <= (others=>'1');
 
@@ -843,60 +840,58 @@ BEGIN
 		-- i.e. for width=1 and hscrol=0 -> 164+0+16 = 180 (92 in cycles)
 		
 		-- hscrol interfers with playfield dma width (for dma purposes only!)
-		if (hscrol_enabled_reg='1') then
-			case dmactl_delayed_reg(1 downto 0) is
-				when "10"|"11" => -- normal and wide - both treated as wide due to hscrol
-					playfield_dma_start_cycle <= X"1"&hscrol_reg(3 downto 1)&'1'; -- 20  (10 in machine cycles)
-					playfield_dma_end_cycle   <= X"D"&hscrol_reg(3 downto 1)&'0'; -- 212 (106 in machine cycles)
-				when "01" => -- narrow - traated as normal due to hscrol
-					playfield_dma_start_cycle <= X"2"&hscrol_reg(3 downto 1)&'1'; -- 36  (18 in machine cycles)
-					playfield_dma_end_cycle <=   X"C"&hscrol_reg(3 downto 1)&'0'; -- 196 (98 in machine cycles)
-				when others =>
-					-- nothing
-			end case;
-		else
-			case dmactl_delayed_reg(1 downto 0) is
-				when "11" => -- wide
-					playfield_dma_start_cycle <= X"11";
-					playfield_dma_end_cycle   <= X"D0";
-				when "10" => -- normal
-					playfield_dma_start_cycle <= X"21";
-					playfield_dma_end_cycle   <= X"C0";
-				when "01" => -- narrow
-					playfield_dma_start_cycle <= X"31";
-					playfield_dma_end_cycle <=   X"B0";
-				when others =>
-					-- nothing
-			end case;		
+		width := dmactl_delayed_reg(1 downto 0);
+		if (hscrol_enabled_reg='1' and not(width="11")) then
+			width:= std_logic_vector(unsigned(width) + 1);
 		end if;
+
+		hscrol_adj_en := "000000";
+		if (hscrol_enabled_reg='1') then
+			hscrol_adj_en := hscrol_adj&"0";
+		end if;
+
+		-- subsequent delay by hscrol_reg(3 downto 1) if hscrol_enabled_reg
+		case width is
+			when "11" => -- wide
+				playfield_dma_start_cycle <= std_logic_vector(unsigned(std_logic_vector'(X"12"&"11")) + unsigned(hscrol_adj_en));
+				playfield_dma_end_cycle   <= std_logic_vector(unsigned(std_logic_vector'(X"D0"&"11")) + unsigned(hscrol_adj_en));
+			when "10" => -- normal
+				playfield_dma_start_cycle <= std_logic_vector(unsigned(std_logic_vector'(X"22"&"11")) + unsigned(hscrol_adj_en));
+				playfield_dma_end_cycle   <= std_logic_vector(unsigned(std_logic_vector'(X"C0"&"11")) + unsigned(hscrol_adj_en));
+			when "01" => -- narrow
+				playfield_dma_start_cycle <= std_logic_vector(unsigned(std_logic_vector'(X"32"&"11")) + unsigned(hscrol_adj_en));
+				playfield_dma_end_cycle <=   std_logic_vector(unsigned(std_logic_vector'(X"B0"&"11")) + unsigned(hscrol_adj_en));
+			when others =>
+				-- nothing
+		end case;		
 
 		-- background colour outside this area...
 		-- TODO - review these locations - should be clear due to garbage!
 		case dmactl_delayed_reg(1 downto 0) is
 			when "11" => -- wide
-				playfield_display_start_cycle <= X"2B"; -- TODO work out correct noise on left for large hscrol
+				playfield_display_start_cycle <= X"2C"; -- TODO work out correct noise on left for large hscrol
 				if (hscrol_reg > X"C") then
-					playfield_display_start_cycle <= X"2F"; -- TODO work out correct noise on left for large hscrol				
+					playfield_display_start_cycle <= X"30"; -- TODO work out correct noise on left for large hscrol				
 				end if;
-				playfield_display_end_cycle   <= X"DD"; -- last two colour clocks are corrupt (ie dc to dd), then there are two missing...
+				playfield_display_end_cycle   <= X"DE"; -- last two colour clocks are corrupt (ie dc to dd), then there are two missing...
 			when "10" => -- normal
-				playfield_display_start_cycle <= X"2F";
-				playfield_display_end_cycle   <= X"CF";
+				playfield_display_start_cycle <= X"30";
+				playfield_display_end_cycle   <= X"d0";
 			when "01" => -- narrow
-				playfield_display_start_cycle <= X"3F";
-				playfield_display_end_cycle <=   X"BF";
+				playfield_display_start_cycle <= X"40";
+				playfield_display_end_cycle <=   X"c0";
 			when others =>
 				-- nothing
 		end case;				
 	end process;
-	
+
 	-- Actions done based on horizontal position - notably dma!
-	process (dmactl_delayed_enabled, hcount_reg, vcount_reg, vblank_reg, hblank_reg, hblank_ex_reg, dmactl_delayed_reg, playfield_dma_start_cycle, playfield_dma_end_cycle, playfield_display_start_cycle, playfield_display_end_cycle, instruction_final_row_reg, display_list_address_reg, pmbase_reg, first_line_of_instruction_reg, last_line_of_instruction_live, last_line_of_instruction_reg, instruction_type_reg, dma_clock_character_name, dma_clock_character_data, dma_clock_bitmap_data, allow_real_dma_reg, row_count_reg, dma_address_reg, memory_scan_address_reg, chbase_delayed_reg, line_buffer_data_out, enable_dma, colour_clock_1x, two_part_instruction_reg, dma_fetch_destination_reg, playfield_display_active_reg, character_reg, dma_clock_character_inc, single_colour_character_reg, twoline_character_reg, instruction_reg, dli_enabled_reg, refresh_fetch_next, chactl_reg, vscrol_enabled_reg, vscrol_last_enabled_reg,twopixel_reg,dli_nmi_reg,vbi_nmi_reg,displayed_character_reg, playfield_dma_enabled)
+	process (dmactl_delayed_enabled, hcount_reg, vcount_reg, vblank_reg, hblank_reg, hblank_ex_reg, dmactl_delayed_reg, playfield_dma_start_cycle, playfield_dma_end_cycle, playfield_display_start_cycle, playfield_display_end_cycle, instruction_final_row_reg, display_list_address_reg, pmbase_reg, first_line_of_instruction_reg, last_line_of_instruction_live, last_line_of_instruction_reg, instruction_type_reg, dma_clock_character_name, dma_clock_character_data, dma_clock_bitmap_data, allow_real_dma_reg, row_count_reg, dma_address_reg, memory_scan_address_reg, chbase_delayed_reg, line_buffer_data_out, enable_dma, colour_clock_1x, colour_clock_selected, two_part_instruction_reg, dma_fetch_destination_reg, playfield_display_active_reg, character_reg, dma_clock_character_inc, single_colour_character_reg, twoline_character_reg, instruction_reg, dli_enabled_reg, refresh_fetch_next, chactl_reg, vscrol_enabled_reg, vscrol_last_enabled_reg,twopixel_reg,dli_nmi_reg,vbi_nmi_reg,displayed_character_reg, playfield_dma_enabled)
 	begin
 		allow_real_dma_next <= allow_real_dma_reg;
 
-		playfield_dma_start <= '0';
-		playfield_dma_end <= '0';
+		playfield_dma_start_raw <= '0';
+		playfield_dma_end_raw <= '0';
 		playfield_display_active_next <= playfield_display_active_reg;
 		
 		dma_fetch_request <= '0';
@@ -914,17 +909,15 @@ BEGIN
 		load_line_buffer_address <= '0';
 		increment_line_buffer_address <= '0';
 		
-		playfield_load <= '0';
-		
 		hblank_next <= hblank_reg;
 		hblank_ex_next <= hblank_ex_reg;
 		hcount_reset <= '0';
-
+		
 		vcount_increment <= '0';
-
+		
 		character_next <= character_reg;
 		displayed_character_next <= displayed_character_reg;
-
+		
 		dli_nmi_next <= dli_nmi_reg;
 		vbi_nmi_next <= vbi_nmi_reg;
 		wsync_reset <= '0';
@@ -934,26 +927,8 @@ BEGIN
 		
 		update_row_count <= '0'; 
 		vscrol_last_enabled_next <= vscrol_last_enabled_reg;
-	
-		if (colour_clock_1x = '1') then	
-			-- Playfield start/end
-			if (unsigned(hcount_reg) = (unsigned(playfield_dma_start_cycle))) then
-				playfield_dma_start <= '1';				
-				load_line_buffer_address <= '1';
-			end if;
-			
-			if (unsigned(hcount_reg) = (unsigned(playfield_dma_end_cycle))) then
-				playfield_dma_end <= '1';
-			end if;	
-			
-			if (hcount_reg = playfield_display_start_cycle) then
-				playfield_display_active_next <= '1';				
-			end if;
-			
-			if (hcount_reg = playfield_display_end_cycle) then
-				playfield_display_active_next <= '0';
-			end if;	
 
+		if (colour_clock_selected='1') then
 			if (dma_clock_character_data = '1') then -- Final cycle of this is cycle 114 (0 based) - aka cycle 0... Which clashes with pmg dma.
 				if (dmactl_delayed_enabled='1' and instruction_type_reg = mode_character) then -- Sooo only enable, never disable
 					dma_fetch_request <= '1';
@@ -982,110 +957,127 @@ BEGIN
 				load_display_shift_from_line_buffer <= to_std_logic(instruction_type_reg = mode_bitmap);								
 				increment_line_buffer_address <= '1';
 			end if;						
-		
-			case hcount_reg is 		
-				when X"00" => -- missile DMA, if missile or player DMA enabled					
-					dma_fetch_request <= dmactl_delayed_reg(2) or dmactl_delayed_reg(3);
-					dma_fetch_destination_next <= dma_fetch_null;									
-					if (dmactl_delayed_reg(4) = '1') then -- single line resolution
-						dma_address_next <= pmbase_reg(7 downto 3)&"011"&vcount_reg(7 downto 0);
-					else
-						dma_address_next <= pmbase_reg(7 downto 2)&"011"&vcount_reg(7 downto 1);
-					end if;
-					
-				when X"02" => -- display list dma if enabled
-					first_line_of_instruction_next <= '0';
-					
-					if (instruction_type_reg = mode_jvb) then
-						-- suppress when waiting for vblank
-						first_line_of_instruction_next <= first_line_of_instruction_reg or vblank_reg;
-					else				
-						if (last_line_of_instruction_reg = '1') then -- set on previous line at cycle 108
-							dma_fetch_request <= dmactl_delayed_enabled;
-							dma_address_next <= display_list_address_reg;
-							dma_fetch_destination_next <= dma_fetch_instruction;									
-							
-							first_line_of_instruction_next <= '1';						
-							
-							vscrol_last_enabled_next <= vscrol_enabled_reg;
-						end if;
-					end if;					
-				
-				when X"05" =>				
-					update_row_count <= '1'; -- done after instruction fetch...
-					
-				when X"04"|X"06"|X"08"|X"0A" =>  -- player DMA, if enabled
-					dma_fetch_request <= dmactl_delayed_reg(3);
-					dma_fetch_destination_next <= dma_fetch_null;	
-					if (dmactl_delayed_reg(4) = '1') then -- single line resolution
-						dma_address_next <= pmbase_reg(7 downto 3)&std_logic_vector(unsigned(hcount_reg(3 downto 1))+2)&vcount_reg(7 downto 0);
-					else
-						dma_address_next <= pmbase_reg(7 downto 2)&std_logic_vector(unsigned(hcount_reg(3 downto 1))+2)&vcount_reg(7 downto 1);
-					end if;
-					
-				when X"0C" => -- lms lower byte dma if display list dma enabled?;
-					dma_fetch_request <= dmactl_delayed_enabled and first_line_of_instruction_reg and two_part_instruction_reg;
-					dma_address_next <= display_list_address_reg;				
-					dma_fetch_destination_next <= dma_fetch_list_low;
-				
-				when X"0E" => -- lms upper byte dma if display list dma enabled?
-					dma_fetch_request <= dmactl_delayed_enabled and first_line_of_instruction_reg and two_part_instruction_reg;
-					dma_address_next <= display_list_address_reg;				
-					dma_fetch_destination_next <= dma_fetch_list_high;
-					
-					if (instruction_type_reg = mode_jvb) then
-						-- turn off this extra dma for jvb mode, re-enabled by vblank_reg
-						first_line_of_instruction_next <= '0';
-					end if;
-					
-					dli_nmi_next <= dli_enabled_reg and last_line_of_instruction_live and not vblank_reg;
-					if (vcount_reg = '0'&X"F8") then
-						vbi_nmi_next <= '1';
-					end if;
-					
-				when X"12" =>
-					dli_nmi_next <= '0';
-					vbi_nmi_next <= '0';
 
-				when X"21" =>
-					hblank_next <= '0';					
-					
-				when X"24" => 
-					playfield_load <= '1'; -- start the shift register
-					
-				when X"29" =>
-					hblank_ex_next <= '0';
-
-				when X"31" => -- start refresh					
-					load_refresh_count <= '1';
-					refresh_count_next <= (others=>'0');
-				
-				when X"D2" => -- cycle 105 - reset wsync so we process from 105 on
-					wsync_reset <= '1';				
+			-- Playfield start/end
+			if (hcount_reg = playfield_dma_start_cycle) then
+				playfield_dma_start_raw <= '1';				
+				load_line_buffer_address <= '1';
+			end if;
 			
-				when X"D4" => -- Force playfield DMA into virtual mode (cycle 105)
-					allow_real_dma_next <= '0';				
-					load_refresh_count <= '1';
-					refresh_count_next <= "1001";
-					
-				when X"D8" => -- vscrol value checked at cycle 108
-					last_line_of_instruction_next <= last_line_of_instruction_live;
+			if (hcount_reg = playfield_dma_end_cycle) then
+				playfield_dma_end_raw <= '1';
+			end if;	
 				
-				when X"DE" => -- Increment vcount immediately before cycle 111 (again the 4 offset as seen in hscrol...)
-					vcount_increment <= '1';
-										
-				when X"DB" =>
-					hblank_ex_next <= '1';
+			if (colour_clock_1x='1') then
+				if (hcount_reg(9 downto 2) = playfield_display_start_cycle) then
+					playfield_display_active_next <= '1';				
+				end if;
+				
+				if (hcount_reg(9 downto 2) = playfield_display_end_cycle) then
+					playfield_display_active_next <= '0';
+				end if;	
 
-				when X"DD" =>
-					hblank_next <= '1';					
+				case hcount_reg(9 downto 2) is 		
+					when X"00" => -- missile DMA, if missile or player DMA enabled					
+						dma_fetch_request <= dmactl_delayed_reg(2) or dmactl_delayed_reg(3);
+						dma_fetch_destination_next <= dma_fetch_null;									
+						if (dmactl_delayed_reg(4) = '1') then -- single line resolution
+							dma_address_next <= pmbase_reg(7 downto 3)&"011"&vcount_reg(7 downto 0);
+						else
+							dma_address_next <= pmbase_reg(7 downto 2)&"011"&vcount_reg(7 downto 1);
+						end if;
+						
+					when X"02" => -- display list dma if enabled
+						first_line_of_instruction_next <= '0';
+						
+						if (instruction_type_reg = mode_jvb) then
+							-- suppress when waiting for vblank
+							first_line_of_instruction_next <= first_line_of_instruction_reg or vblank_reg;
+						else				
+							if (last_line_of_instruction_reg = '1') then -- set on previous line at cycle 108
+								dma_fetch_request <= dmactl_delayed_enabled;
+								dma_address_next <= display_list_address_reg;
+								dma_fetch_destination_next <= dma_fetch_instruction;									
+								
+								first_line_of_instruction_next <= '1';						
+								
+								vscrol_last_enabled_next <= vscrol_enabled_reg;
+							end if;
+						end if;					
 					
-				when X"E3" => -- Wrap hcount after 227 (i.e. 0 to 227)
-					hcount_reset <= '1';
-					allow_real_dma_next <= not(vblank_reg);
-				when others =>
-					-- nothing
-			end case;	
+					when X"05" =>				
+						update_row_count <= '1'; -- done after instruction fetch...
+						
+					when X"04"|X"06"|X"08"|X"0A" =>  -- player DMA, if enabled
+						dma_fetch_request <= dmactl_delayed_reg(3);
+						dma_fetch_destination_next <= dma_fetch_null;	
+						if (dmactl_delayed_reg(4) = '1') then -- single line resolution
+							dma_address_next <= pmbase_reg(7 downto 3)&std_logic_vector(unsigned(hcount_reg(5 downto 3))+2)&vcount_reg(7 downto 0);
+						else
+							dma_address_next <= pmbase_reg(7 downto 2)&std_logic_vector(unsigned(hcount_reg(5 downto 3))+2)&vcount_reg(7 downto 1);
+						end if;
+						
+					when X"0C" => -- lms lower byte dma if display list dma enabled?;
+						dma_fetch_request <= dmactl_delayed_enabled and first_line_of_instruction_reg and two_part_instruction_reg;
+						dma_address_next <= display_list_address_reg;				
+						dma_fetch_destination_next <= dma_fetch_list_low;
+					
+					when X"0E" => -- lms upper byte dma if display list dma enabled?
+						dma_fetch_request <= dmactl_delayed_enabled and first_line_of_instruction_reg and two_part_instruction_reg;
+						dma_address_next <= display_list_address_reg;				
+						dma_fetch_destination_next <= dma_fetch_list_high;
+						
+						if (instruction_type_reg = mode_jvb) then
+							-- turn off this extra dma for jvb mode, re-enabled by vblank_reg
+							first_line_of_instruction_next <= '0';
+						end if;
+						
+						dli_nmi_next <= dli_enabled_reg and last_line_of_instruction_live and not vblank_reg;
+						if (vcount_reg = '0'&X"F8") then
+							vbi_nmi_next <= '1';
+						end if;
+						
+					when X"12" =>
+						dli_nmi_next <= '0';
+						vbi_nmi_next <= '0';
+
+					when X"22" =>
+						hblank_next <= '0';					
+
+					when X"29" =>
+						hblank_ex_next <= '0';
+						
+					when X"31" => -- start refresh					
+						load_refresh_count <= '1';
+						refresh_count_next <= (others=>'0');
+					
+					when X"D2" => -- cycle 105 - reset wsync so we process from 105 on
+						wsync_reset <= '1';				
+				
+					when X"D4" => -- Force playfield DMA into virtual mode (cycle 105)
+						allow_real_dma_next <= '0';				
+						load_refresh_count <= '1';
+						refresh_count_next <= "1001";
+						
+					when X"D8" => -- vscrol value checked at cycle 108
+						last_line_of_instruction_next <= last_line_of_instruction_live;
+					
+					when X"DB" =>
+						hblank_ex_next <= '1';
+
+					when X"DE" => -- Increment vcount immediately before cycle 111 (again the 4 offset as seen in hscrol...)
+						vcount_increment <= '1';
+						hblank_next <= '1';					
+										
+
+						
+					when X"E3" => -- Wrap hcount after 227 (i.e. 0 to 227)
+						hcount_reset <= '1';
+						allow_real_dma_next <= not(vblank_reg);
+					when others =>
+						-- nothing
+				end case;	
+			end if;
 			
 			-- Playfield DMA
 			if (instruction_type_reg = mode_character and dma_clock_character_name = '1') then -- for character name
@@ -1119,13 +1111,13 @@ BEGIN
 	end process;
 	
 	-- refresh handling
-	process(hcount_reg,refresh_count_reg,colour_clock_1x,dma_fetch_next,refresh_pending_reg, refresh_fetch_reg, allow_real_dma_next)
+	process(cycle_latter,hcount_reg,refresh_count_reg,colour_clock_selected,dma_fetch_next,refresh_pending_reg, refresh_fetch_reg, allow_real_dma_next)
 	begin
 		increment_refresh_count <= '0';
 		refresh_pending_next <= refresh_pending_reg;
 		refresh_fetch_next <= refresh_fetch_reg;
 		
-		if (colour_clock_1x = '1' and hcount_reg(0) = '0') then
+		if (colour_clock_selected = '1' and cycle_latter= '1') then
 			refresh_fetch_next <= '0';
 		
 			-- do pending refresh once we have a spare cycle
@@ -1135,7 +1127,7 @@ BEGIN
 			end if;
 		
 			-- do scheduled refresh - if block, enable pending one
-			if (hcount_reg(2 downto 1) = "01" and unsigned(refresh_count_reg)<9) then
+			if (hcount_reg(4 downto 3) = "01" and unsigned(refresh_count_reg)<9) then
 				increment_refresh_count <= '1';
 				refresh_fetch_next <= not(dma_fetch_next);
 				refresh_pending_next <= dma_fetch_next;
@@ -1151,15 +1143,21 @@ BEGIN
 	-- edge senstive, single cycle is enough (unless cpu disabled or  clashes)
 	-- antic asserts for 2 old cycles - if we stick to that then in turbo mode it fixes most nmi bugs, in normal mode they still exist...	which is the goal.	
 
-	nmien_delay : wide_delay_line
-		generic map (COUNT=>cycle_length,WIDTH=>2)
-		port map (clk=>clk,sync_reset=>'0',data_in=>nmien_raw_reg(7 downto 6),enable=>'1',reset_n=>reset_n,data_out=>nmien_delayed_reg(7 downto 6));
+	nmien_delay : entity work.wide_delay_line
+		generic map (COUNT=>1,WIDTH=>2)
+		port map (clk=>clk,sync_reset=>'0',data_in=>nmien_raw_reg(7 downto 6),enable=>antic_enable_179,reset_n=>reset_n,data_out=>nmien_delayed_reg(7 downto 6));
 		
-	nmi_next <= not((dli_nmi_reg and nmien_delayed_reg(7)) or (vbi_nmi_reg and nmien_delayed_reg(6)));
+	process(antic_enable_179,nmi_reg,dli_nmi_reg,vbi_nmi_reg,nmien_delayed_reg,rnmi_n) --delay_line/latch
+	begin
+		nmi_next <= nmi_reg;
+		if (antic_enable_179 = '1') then
+			nmi_next <= not((dli_nmi_reg and nmien_delayed_reg(7)) or (vbi_nmi_reg and nmien_delayed_reg(6))) and rnmi_n;
+		end if;
+	end process;
 	
-	process(nmist_reg, vbi_nmi_reg, dli_nmi_reg, vbi_nmi_next, dli_nmi_next, nmist_reset)
+	process(nmist_reg, vbi_nmi_reg, dli_nmi_reg, vbi_nmi_next, dli_nmi_next, nmist_reset, rnmi_n)
 	begin	
-		nmist_next(5) <= '0';
+		nmist_next(5) <= ((nmist_reg(5) and not(nmist_reset))) or not(rnmi_n);
 		nmist_next(6) <= ((nmist_reg(6) and not(nmist_reset)) or vbi_nmi_reg or vbi_nmi_next) and not(dli_nmi_reg or dli_nmi_next); -- auto clear vbi flat on dli!
 		nmist_next(7) <= ((nmist_reg(7) and not(nmist_reset))or dli_nmi_reg or dli_nmi_next) and not(vbi_nmi_reg or vbi_nmi_next); -- auto clear dli flag on vbi!
 	end process;
@@ -1185,23 +1183,25 @@ BEGIN
 		end case;
 	end process;
 	
-	antic_dma_clock1 : antic_dma_clock
+	antic_dma_clock1 : antic_dma_clock_del
 		port map (clk=>clk, reset_n=>reset_n,enable_dma=>enable_dma, playfield_start=>playfield_dma_start,playfield_end=>playfield_dma_end,vblank=>vblank_reg,slow_dma=>slow_dma_s,medium_dma=>medium_dma_s,fast_dma=>fast_dma_s,dma_clock_out_0=>dma_clock_character_name,dma_clock_out_1=>dma_clock_character_inc,dma_clock_out_2=>dma_clock_bitmap_data,dma_clock_out_3=>dma_clock_character_data);
 
 	-- line buffer
-	reg_file1 : reg_file
-		generic map (BYTES=>48, WIDTH=>6) -- TODO:reset after 63, not 64?
-		port map (clk=>clk,addr=>line_buffer_address_reg(5 downto 0),data_in=>line_buffer_data_in,wr_en=>line_buffer_write, data_out=>line_buffer_data_out);		
+	reg_file1 : entity work.generic_ram_infer
+		--generic map (BYTES=>48, WIDTH=>6) -- TODO:reset after 63, not 64?
+		--port map (clk=>clk,addr=>line_buffer_address_reg(5 downto 0),data_in=>line_buffer_data_in,wr_en=>line_buffer_write, data_out=>line_buffer_data_out);		
 		--generic map (BYTES=>192, WIDTH=>8) -- TODO:reset after 63, not 64?
 		--port map (clk=>clk,addr=>line_buffer_address_reg,data_in=>line_buffer_data_in,wr_en=>line_buffer_write, data_out=>line_buffer_data_out);
-		
+		generic map (ADDRESS_WIDTH=>8, SPACE=>192) -- TODO:reset after 63, not 64?
+		port map (clock=>clk,reset_n=>reset_n,data=>line_buffer_data_in,address=>line_buffer_address_reg,we=>line_buffer_write,q=>line_buffer_data_out);
+
 	-- vertical scrolling
 	-- load row count from vscrol must be done at time of instruction load
 	-- vscrol adjustment to affect dli should be done by cycle 5 - i.e. dli 'last line'
 	-- vscrol adjustment to affect actual last line should be done by cycle 108 - because...
-	vscrol_delay : wide_delay_line
-		generic map (COUNT=>cycle_length,WIDTH=>4)
-		port map (clk=>clk,sync_reset=>'0',data_in=>vscrol_raw_reg(3 downto 0),enable=>'1',reset_n=>reset_n,data_out=>vscrol_delayed_reg(3 downto 0));		
+	vscrol_delay : entity work.wide_delay_line
+		generic map (COUNT=>1,WIDTH=>4)
+		port map (clk=>clk,sync_reset=>'0',data_in=>vscrol_raw_reg(3 downto 0),enable=>antic_enable_179,reset_n=>reset_n,data_out=>vscrol_delayed_reg(3 downto 0));		
 	
 	process(vblank_reg, vscrol_delayed_reg, vscrol_enabled_reg, vscrol_last_enabled_reg, first_line_of_instruction_reg, row_count_reg, instruction_final_row_reg, update_row_count, force_final_row)
 	begin								
@@ -1240,9 +1240,9 @@ BEGIN
 	end process;
 	
 	-- chbase 2 cycle delay
-	chbase_delay : wide_delay_line
-		generic map (COUNT=>cycle_length*2,WIDTH=>7)
-		port map (clk=>clk,sync_reset=>'0',data_in=>chbase_raw_reg(7 downto 1),enable=>'1',reset_n=>reset_n,data_out=>chbase_delayed_reg(7 downto 1));
+	chbase_delay : entity work.wide_delay_line
+		generic map (COUNT=>2,WIDTH=>7)
+		port map (clk=>clk,sync_reset=>'0',data_in=>chbase_raw_reg(7 downto 1),enable=>antic_enable_179,reset_n=>reset_n,data_out=>chbase_delayed_reg(7 downto 1));
 		
 	-- decode instruction	
 	process(instruction_reg)
@@ -1435,7 +1435,7 @@ BEGIN
 	-- dma fetching
 	-- dma fetch - cache response until needed
 	-- we allow two colour clocks for each fetch...
-	process(memory_data_in,memory_ready_both,hcount_reg,dma_fetch_reg,dma_address_reg,dma_fetch_destination_reg,dma_cache_ready_reg,dma_cache_reg,dma_fetch_request,vblank_reg, instruction_type_reg, instruction_reg, display_list_address_reg, memory_scan_address_reg, enable_dma, display_list_address_low_temp_reg)
+	process(memory_data_in,memory_ready_both,cycle_latter,dma_fetch_reg,dma_address_reg,dma_fetch_destination_reg,dma_cache_ready_reg,dma_cache_reg,dma_fetch_request,vblank_reg, instruction_type_reg, instruction_reg, display_list_address_reg, memory_scan_address_reg, enable_dma, display_list_address_low_temp_reg,allow_real_dma_reg,allow_real_dma_next)
 	begin	
 		instruction_next <= instruction_reg;
 		
@@ -1460,12 +1460,16 @@ BEGIN
 			dma_cache_ready_next <= '1';
 			dma_fetch_next <= '0';
 		end if;
+
+		if (allow_real_dma_reg='0' and allow_real_dma_next='1') then
+			dma_fetch_next <= '0';
+		end if;
 		
 		if (vblank_reg = '1' and instruction_type_reg = mode_jvb) then
 			instruction_next <= (others=>'0');
 		end if;
 	
-		if (dma_cache_ready_reg='1' and hcount_reg(0)='0') then
+		if (dma_cache_ready_reg='1' and cycle_latter='1') then
 		--if (dma_cache_ready_reg='1') then
 			case dma_fetch_destination_reg is 
 				when dma_fetch_line_buffer =>
@@ -1512,6 +1516,7 @@ BEGIN
 	-- shift reg clock
 	playfield_reset <= hblank_reg;
 	
+	playfield_load <= dma_clock_character_name;
 	process(colour_clock_selected, shift_rate_reg, shiftclock_reg, playfield_reset, playfield_load, hscrol_reg, hscrol_enabled_reg)
 	begin
 		shiftclock_next <= shiftclock_reg;
@@ -1591,12 +1596,12 @@ BEGIN
 	-- first process - AN with no blanking	
 	process(data_live,delay_display_shift_reg, shift_twobit_reg, twopixel_reg, instruction_blank_reg, playfield_display_active_reg, single_colour_character_reg, multi_colour_character_reg, chactl_reg, instruction_type_reg, map_background_reg, descenders_reg, row_count_reg)
 	begin
-		an_current <= (others=>'0');
+		an_current_raw <= (others=>'0');
 		data_live <= (others=>'0');
 		if (shift_twobit_reg = '1') then				
-			an_current(0) <= delay_display_shift_reg(0);
-			an_current(1) <= delay_display_shift_reg(1);
-			an_current(2) <= '1';
+			an_current_raw(0) <= delay_display_shift_reg(0);
+			an_current_raw(1) <= delay_display_shift_reg(1);
+			an_current_raw(2) <= '1';
 			
 			if (instruction_type_reg = mode_character) then							
 				data_live(0) <= delay_display_shift_reg(0);
@@ -1616,28 +1621,28 @@ BEGIN
 			
 				if (delay_display_shift_reg(4)='1') then -- inverse/hidden
 					if (chactl_reg(1)='1') then
-						an_current(0) <= not(data_live(0) and not(chactl_reg(0)));
-						an_current(1) <= not(data_live(1) and not(chactl_reg(0)));
+						an_current_raw(0) <= not(data_live(0) and not(chactl_reg(0)));
+						an_current_raw(1) <= not(data_live(1) and not(chactl_reg(0)));
 					else
-						an_current(0) <= data_live(0) and not(chactl_reg(0));
-						an_current(1) <= data_live(1) and not(chactl_reg(0));					
+						an_current_raw(0) <= data_live(0) and not(chactl_reg(0));
+						an_current_raw(1) <= data_live(1) and not(chactl_reg(0));					
 					end if;
 				else
-					an_current(0) <= data_live(0);
-					an_current(1) <= data_live(1);				
+					an_current_raw(0) <= data_live(0);
+					an_current_raw(1) <= data_live(1);				
 				end if;
 			end if;		
 
 			if (multi_colour_character_reg = '1') then
 				case delay_display_shift_reg(1 downto 0) is
 					when "00" =>
-						an_current <= "000";
+						an_current_raw <= "000";
 					when "01" =>
-						an_current <= "100";			
+						an_current_raw <= "100";			
 					when "10" =>
-						an_current <= "101";			
+						an_current_raw <= "101";			
 					when "11" =>
-						an_current <= "11"&delay_display_shift_reg(4);										
+						an_current_raw <= "11"&delay_display_shift_reg(4);										
 					when others =>
 						-- nop
 				end case;				
@@ -1646,13 +1651,13 @@ BEGIN
 			if (map_background_reg='1') then
 				case delay_display_shift_reg(1 downto 0) is
 					when "00" =>
-						an_current <= "000";
+						an_current_raw <= "000";
 					when "01" =>
-						an_current <= "100";			
+						an_current_raw <= "100";			
 					when "10" =>
-						an_current <= "101";			
+						an_current_raw <= "101";			
 					when "11" =>
-						an_current <= "110";										
+						an_current_raw <= "110";										
 					when others =>
 						-- nop
 				end case;
@@ -1661,95 +1666,67 @@ BEGIN
 			if (single_colour_character_reg = '1') then
 				-- i.e. antic 6,7
 				if (delay_display_shift_reg(1) = '1') then
-					an_current(0) <= delay_display_shift_reg(3);
-					an_current(1) <= delay_display_shift_reg(4);
-					an_current(2) <= '1';					
+					an_current_raw(0) <= delay_display_shift_reg(3);
+					an_current_raw(1) <= delay_display_shift_reg(4);
+					an_current_raw(2) <= '1';					
 				else
-					an_current(0) <= '0';
-					an_current(1) <= '0';
-					an_current(2) <= '0';
+					an_current_raw(0) <= '0';
+					an_current_raw(1) <= '0';
+					an_current_raw(2) <= '0';
 				end if;			
 			end if;
 			
 			if (map_background_reg='1') then
 				if (delay_display_shift_reg(1)='1') then
-					an_current <= "100";
+					an_current_raw <= "100";
 				else
-					an_current <= "000";										
+					an_current_raw <= "000";										
 				end if;
 			end if;				
 		end if;		
 	end process;
 	
-	process(colour_clock_selected, an_current, an_prev_reg)
+	process(colour_clock_selected, an_current_raw, an_current_reg)
 	begin
-		an_prev_next <= an_prev_reg;
+		an_current_next <= an_current_reg;
 		
 		if (colour_clock_selected = '1') then
-			an_prev_next <= an_current;
+			an_current_next(3 downto 1) <= an_current_reg(2 downto 0);
+			an_current_next(0) <= an_current_raw;
 		end if;
 	end process;
-	
-	process(colour_clock_selected, an_current, an_reg, an_prev_reg, hscrol_reg, hscrol_enabled_reg, vsync_reg, vblank_reg, hblank_reg, playfield_display_active_reg, instruction_blank_reg, twopixel_reg, playfield_dma_enabled)
+
+	process(colour_clock_selected, an_current, an_prev, hscrol_reg, hscrol_enabled_reg, vsync_reg, vblank_reg, hblank_reg, playfield_display_active_reg, instruction_blank_reg, twopixel_reg, playfield_dma_enabled)
 	begin
-		an_next <= an_reg;
-	
-		if (colour_clock_selected = '1') then	
-			an_next <= an_current;
-			
-			if (hscrol_reg(0)='1' and hscrol_enabled_reg='1') then
-				an_next <= an_prev_reg;
-			end if;
-			
-			if ((not(playfield_display_active_reg) or instruction_blank_reg or vblank_reg or not(playfield_dma_enabled)) = '1') then
-				an_next <= "000";
-			end if;
-			
-			if (vblank_reg = '1' or hblank_reg = '1') then				
-				an_next(0) <= vsync_reg or twopixel_reg;
-				an_next(1) <= not(vsync_reg);
-				an_next(2) <= not(hblank_reg) and twopixel_reg and playfield_dma_enabled;
-			end if;			
-
---			if (hblank_reg = '1') then
---				an_next(0)<=twopixel_reg;
---				an_next(1)<='1';
---				an_next(2)<='0';
---			end if;
---
---			if(vblank_reg = '1' and hblank_reg = '0') then
---				an_next(0)<=twopixel_reg;
---				an_next(1)<='1';
---				an_next(2)<=twopixel_reg and (dmactl_delayed_reg(1) or dmactl_delayed_reg(0)); --playfield_display_active_reg?
---			end if;
---
---			if(vsync_reg='1') then
---				an_next(0)<='1';
---				an_next(1)<='0';
---			end if;
-			
-			-- TODO this is too simplistic:
-			-- Antic should provide GTIA with the 'visible region using code 002 for vblank and hblank
-			-- + odd behaviour seen during high res bug
-
+		an_next <= an_current;
+		
+		if (hscrol_reg(0)='1' and hscrol_enabled_reg='1') then
+			an_next <= an_prev;
 		end if;
 		
+		if ((not(playfield_display_active_reg) or instruction_blank_reg or vblank_reg or not(playfield_dma_enabled)) = '1') then
+			an_next <= "000";
+		end if;
+		
+		if (vblank_reg = '1' or hblank_reg = '1') then				
+			an_next(0) <= vsync_reg or twopixel_reg;
+			an_next(1) <= not(vsync_reg);
+			an_next(2) <= not(hblank_reg) and twopixel_reg and playfield_dma_enabled;
+		end if;			
 	end process;
-	
+
 	-- decode address
 	decode_addr1 : complete_address_decoder
 		generic map(width=>4)
 		port map (addr_in=>addr, addr_decoded=>addr_decoded);
 
-	-- wsync write takes 1 cycle to assert rdy
-	-- TODO - revisit antic delays in terms of cpu cycles
-	wsync_delay : delay_line
-		generic map (COUNT=>cycle_length+cycle_length/2)
-		--generic map (COUNT=>cycle_length+cycle_length-2) -- TODO
-		port map (clk=>clk,sync_reset=>'0',data_in=>wsync_write,enable=>'1',reset_n=>reset_n,data_out=>wsync_delayed_write);
+	-- wsync write takes 1.5 cycles to assert rdy - i.e. next cycle runs as normal then it pauses
+	wsync_delay : entity work.latch_delay_line
+		generic map (COUNT=>1) 
+		port map (clk=>clk,sync_reset=>'0',data_in=>wsync_write,enable=>antic_enable_179,reset_n=>reset_n,data_out=>wsync_delayed_write);
 
 	-- dmactl takes 1 cycle to be applied - NO IT DOES NOT - TODO FIXME
-	--dmactl_delay : wide_delay_line
+	--dmactl_delay : entity work.wide_delay_line
 	--	generic map (COUNT=>cycle_length,WIDTH=>6)
 	--	port map (clk=>clk,sync_reset=>'0',data_in=>dmactl_raw_reg(5 downto 0),enable=>'1',reset_n=>reset_n,data_out=>dmactl_delayed_reg(5 downto 0));
 	dmactl_delayed_reg <= dmactl_raw_next;
@@ -1827,7 +1804,7 @@ BEGIN
 		data_out <= X"FF";
 
 		if (addr_decoded(8) = '1') then -- HCOUNT :-)
-			data_out <= hcount_reg; -- bonus points for the one who spots this in code:-)
+			data_out <= hcount_reg(9 downto 2); -- bonus points for the one who spots this in code:-)
 		end if;
 		
 		if(addr_decoded(11) = '1') then --VCOUNT
@@ -1848,9 +1825,6 @@ BEGIN
 		
 	end process;
 	
-	-- nmi delay
-	nmi_shiftreg_next <= nmi_reg&nmi_shiftreg_reg(15 downto 1);
-	
 	-- light pen
 	process(lightpen,hcount_reg,vcount_reg,penv_reg,penh_reg)
 	begin
@@ -1859,7 +1833,7 @@ BEGIN
 		
 		if (lightpen = '0') then
 			penv_next <= vcount_reg(8 downto 1);
-			penh_next <= hcount_reg;
+			penh_next <= hcount_reg(9 downto 2);
 		end if;
 	end process;
 	
@@ -1867,9 +1841,13 @@ BEGIN
 	MEMORY_READY_both <= MEMORY_READY_ANTIC when allow_real_dma_reg='1' else MEMORY_READY_CPU;
 	
 	-- output
-	nmi_n_out <= nmi_shiftreg_reg(0);
+	nmi_n_out <= nmi_reg;
 	
-	dma_clock_out<=dma_clock_character_name;
+	shift_out <= display_shift_reg;
+	dma_clock_out(3)<=dma_clock_character_name;
+	dma_clock_out(2)<=dma_clock_character_inc;
+	dma_clock_out(1)<=dma_clock_bitmap_data;
+	dma_clock_out(0)<=dma_clock_character_data;
 	
 	AN <= an_reg;
 	
@@ -1885,7 +1863,11 @@ BEGIN
 	HIGHRES_COLOUR_CLOCK_OUT <= colour_clock_selected_highres;
 
 	vcount_out <= vcount_reg;
-	hcount_out <= hcount_reg;
+	hcount_out <= hcount_reg(9 downto 2);
+
+	turbo_out <= dmactl_raw_reg(6);
+
+	next_cycle_type <= (others=>'X'); -- TODO! Need to know after prior colour clock, if next one will be dma...
 
 	HBLANK <= hblank_ex_reg;
 	VBLANK <= vblank_reg;

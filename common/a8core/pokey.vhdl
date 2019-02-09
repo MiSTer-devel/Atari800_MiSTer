@@ -12,6 +12,10 @@ use ieee.numeric_std.all;
 -- Problem - UART on the DE1 does not have all pins connected. Need to use...
 
 ENTITY pokey IS
+GENERIC
+(
+	CUSTOM_KEYBOARD_SCAN : integer := 0 -- drive from hsync-like if 0, otherwise custom increment signal
+);
 PORT 
 ( 
 	CLK : IN STD_LOGIC;
@@ -23,6 +27,7 @@ PORT
 	RESET_N : IN STD_LOGIC;
 	
 	-- keyboard interface
+	keyboard_scan_enable : in std_logic := '0';
 	keyboard_scan : out std_logic_vector(5 downto 0);
 	keyboard_response : in std_logic_vector(1 downto 0);
 	
@@ -47,7 +52,9 @@ PORT
 	SIO_OUT2 : OUT std_logic;
 	SIO_OUT3 : OUT std_logic;
 	
-	SIO_CLOCKIN : IN std_logic := '1';
+	SIO_CLOCKIN_IN : IN std_logic := '1';
+	SIO_CLOCKIN_OUT : OUT std_logic;
+	SIO_CLOCKIN_OE : OUT std_logic;
 	SIO_CLOCKOUT : OUT std_logic;
 	
 	POT_RESET : out std_logic
@@ -174,6 +181,20 @@ ARCHITECTURE vhdl OF pokey IS
 		DATA_OUT : OUT STD_LOGIC
 	);
 	END component;
+
+	component latch_delay_line IS
+	generic(COUNT : natural := 1);
+	PORT 
+	( 
+		CLK : IN STD_LOGIC;
+		SYNC_RESET : IN STD_LOGIC;
+		DATA_IN : IN STD_LOGIC;
+		ENABLE : IN STD_LOGIC;
+		RESET_N : IN STD_LOGIC;
+		
+		DATA_OUT : OUT STD_LOGIC
+	);
+	END component;
 	
 	component pokey_keyboard_scanner is
 	port
@@ -250,6 +271,11 @@ ARCHITECTURE vhdl OF pokey IS
 	signal chan1_output_reg : std_logic;
 	signal chan2_output_reg : std_logic;
 	signal chan3_output_reg : std_logic;
+
+	signal chan0_output_del_next : std_logic;
+	signal chan1_output_del_next : std_logic;
+	signal chan0_output_del_reg : std_logic;
+	signal chan1_output_del_reg : std_logic;
 	
 	signal highpass0_next : std_logic;
 	signal highpass1_next : std_logic;	
@@ -356,6 +382,7 @@ ARCHITECTURE vhdl OF pokey IS
 	signal serout_clock_last_reg : std_logic;
 	
 	signal twotone_reset : std_logic;
+	signal twotone_reset_delayed : std_logic;
 	signal twotone_next : std_logic;
 	signal twotone_reg : std_logic;
 	
@@ -433,7 +460,10 @@ BEGIN
 			chan1_output_reg <= '0';
 			chan2_output_reg <= '0';
 			chan3_output_reg <= '0';
-			
+
+			chan0_output_del_reg <= '0';
+			chan1_output_del_reg <= '0';
+
 			volume_channel_0_reg <= (others=>'0');
 			volume_channel_1_reg <= (others=>'0');
 			volume_channel_2_reg <= (others=>'0');
@@ -509,6 +539,9 @@ BEGIN
 			chan1_output_reg <= chan1_output_next;
 			chan2_output_reg <= chan2_output_next;
 			chan3_output_reg <= chan3_output_next;
+
+			chan0_output_del_reg <= chan0_output_del_next;
+			chan1_output_del_reg <= chan1_output_del_next;
 			
 			volume_channel_0_reg<= volume_channel_0_next;
 			volume_channel_1_reg<= volume_channel_1_next;
@@ -618,13 +651,18 @@ BEGIN
 		port map(clk=>clk,enable=>audf3_enable,enable_underflow=>enable_179,reset_n=>reset_n,wr_en=>audf3_reload,data_in=>audf3_next,DATA_OUT=>audf3_pulse);		
 		
 	-- Timer reloading
-	process (audctl_reg, audf0_pulse, audf1_pulse, audf2_pulse, audf3_pulse, stimer_write_delayed, async_serial_reset, twotone_reset)
+	process (audctl_reg, audf0_pulse, audf1_pulse, audf2_pulse, audf3_pulse, stimer_write_delayed, async_serial_reset, twotone_reset_delayed)
 	begin
-		audf0_reload <= ((not(audctl_reg(4)) and audf0_pulse)) or (audctl_reg(4) and audf1_pulse) or stimer_write_delayed or twotone_reset;
-		audf1_reload <= audf1_pulse or stimer_write_delayed or twotone_reset;
+		audf0_reload <= ((not(audctl_reg(4)) and audf0_pulse)) or (audctl_reg(4) and audf1_pulse) or stimer_write_delayed or twotone_reset_delayed;
+		audf1_reload <= audf1_pulse or stimer_write_delayed or twotone_reset_delayed;
 		audf2_reload <= ((not(audctl_reg(3)) and audf2_pulse)) or (audctl_reg(3) and audf3_pulse) or stimer_write_delayed or async_serial_reset;
 		audf3_reload <= audf3_pulse or stimer_write_delayed or async_serial_reset;
 	end process;
+
+	twotone_del : latch_delay_line
+		generic map (count=>2)
+		port map (clk=>clk, sync_reset=>'0',data_in=>twotone_reset, enable=>enable_179, reset_n=>reset_n, data_out=>twotone_reset_delayed);
+--	twotone_reset_delayed <= twotone_reset;
 	
 	-- Writes to registers
 	process(data_in,wr_en,addr_decoded,audf0_reg,audc0_reg,audf1_reg,audc1_reg,audf2_reg,audc2_reg,audf3_reg,audc3_reg,audf0_enable,audf1_enable,audf2_enable,audf3_enable,audctl_reg, irqen_reg, skctl_reg, serout_holding_reg)
@@ -830,7 +868,7 @@ BEGIN
 	end process;
 	
 	-- Instantiate delay for stimer reload_request
-	stimer_delay : delay_line
+	stimer_delay : latch_delay_line
 		generic map (count=>3)
 		port map (clk=>clk, sync_reset=>'0',data_in=>stimer_write, enable=>enable_179, reset_n=>reset_n, data_out=>stimer_write_delayed);
 		
@@ -876,6 +914,17 @@ BEGIN
 		end if;
 		
 	end process;
+
+	process(chan0_output_reg,chan1_output_reg,chan0_output_del_reg,chan1_output_del_reg,enable_179)
+	begin
+		chan0_output_del_next <= chan0_output_del_reg;
+		chan1_output_del_next <= chan1_output_del_reg;
+
+		if (enable_179 = '1') then
+			chan0_output_del_next <= chan0_output_reg;
+			chan1_output_del_next <= chan1_output_reg;
+		end if;
+	end process;
 	
 	-- Instantiate key pokey clocks
 	-- ~1.79MHz - from 25MHz/14
@@ -920,18 +969,18 @@ BEGIN
 	end process;
 	
 	--AUDIO_LEFT <= "000"&count_reg(15 downto 3);
-	process(chan0_output_reg, chan1_output_reg, chan2_output_reg, chan3_output_reg, audc0_reg, audc1_reg, audc2_reg, audc3_reg, highpass0_reg, highpass1_reg)
+	process(chan0_output_del_reg, chan1_output_del_reg, chan2_output_reg, chan3_output_reg, audc0_reg, audc1_reg, audc2_reg, audc3_reg, highpass0_reg, highpass1_reg)
 	begin
 		volume_channel_0_next <= "0000";
 		volume_channel_1_next <= "0000";
 		volume_channel_2_next <= "0000";
 		volume_channel_3_next <= "0000";
 			
-		if (((chan0_output_reg xor highpass0_reg) or audc0_reg(4)) = '1') then
+		if (((chan0_output_del_reg xor highpass0_reg) or audc0_reg(4)) = '1') then
 			volume_channel_0_next <= audc0_reg(3 downto 0);
 		end if;
 		
-		if (((chan1_output_reg xor highpass1_reg) or audc1_reg(4)) = '1') then
+		if (((chan1_output_del_reg xor highpass1_reg) or audc1_reg(4)) = '1') then
 			volume_channel_1_next <= audc1_reg(3 downto 0);
 		end if;
 		
@@ -1107,9 +1156,9 @@ BEGIN
 	end process;
 	
 	-- serial clocks
-	process(sio_clockin,skctl_reg,clock_reg,clock_sync_reg,audf1_pulse,audf2_pulse,audf3_pulse)
+	process(sio_clockin_in,skctl_reg,clock_reg,clock_sync_reg,audf1_pulse,audf2_pulse,audf3_pulse)
 	begin
-		clock_next <= sio_clockin;
+		clock_next <= sio_clockin_in;
 		clock_sync_next <= clock_reg;
 	
 		serout_enable <= '0';
@@ -1163,8 +1212,15 @@ BEGIN
 	end process;
 	
 	-- keyboard scan
+gen_custom_scan : if custom_keyboard_scan=1 generate
+	pokey_keyboard_scanner1 : pokey_keyboard_scanner
+		port map (clk=>clk, reset_n=>reset_n, enable=>keyboard_scan_enable, keyboard_response=>keyboard_response, debounce_disable=>not(skctl_reg(0)), scan_enable=>skctl_reg(1), keyboard_scan=>keyboard_scan, key_held=>key_held, shift_held=>shift_held, keycode=>kbcode, other_key_irq=>other_key_irq, break_irq=>break_irq);
+end generate;
+
+gen_normal_scan : if custom_keyboard_scan=0 generate
 	pokey_keyboard_scanner1 : pokey_keyboard_scanner
 		port map (clk=>clk, reset_n=>reset_n, enable=>enable_15, keyboard_response=>keyboard_response, debounce_disable=>not(skctl_reg(0)), scan_enable=>skctl_reg(1), keyboard_scan=>keyboard_scan, key_held=>key_held, shift_held=>shift_held, keycode=>kbcode, other_key_irq=>other_key_irq, break_irq=>break_irq);
+end generate;
 
 	-- POT scan
 	process(potgo_write, pot_reset_reg, pot_counter_reg, pot_in, enable_15, enable_179, skctl_reg, pot0_reg, pot1_reg, pot2_reg, pot3_reg, pot4_reg, pot5_reg, pot6_reg, pot7_reg, allpot_reg)
@@ -1240,7 +1296,9 @@ BEGIN
 	sio_out2 <= sio_out_reg;	
 	sio_out3 <= sio_out_reg;	
 	
-	sio_clockout <= audf3_pulse when clock_input='0' else 'Z';
+	sio_clockout <= serout_clock_reg;
+	sio_clockin_oe <= not(clock_input);
+	sio_clockin_out <= serin_clock_reg;
 	
 	pot_reset <= pot_reset_reg;
 		

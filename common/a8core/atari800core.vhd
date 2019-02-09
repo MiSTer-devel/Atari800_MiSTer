@@ -24,7 +24,7 @@ ENTITY atari800core IS
 		low_memory : integer := 0; -- 0:8MB memory map, 1:1MB memory map
 		stereo : integer := 1;
 		covox : integer := 1;
-		system : integer := 0 -- 0:atari800XL, 1:atari800
+		sdram_start_bank : integer := 0
 	);
 	PORT
 	(
@@ -43,16 +43,14 @@ ENTITY atari800core IS
 		VIDEO_BURST : out std_logic;
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
-		
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
-
-		POKEY_ENABLE : out std_logic;
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
 		AUDIO_R : OUT std_logic_vector(15 downto 0);
+		SIO_AUDIO : IN std_logic_vector(7 downto 0);
 
 		-- PIA
 		CA1_IN : IN STD_LOGIC; -- SIO Proceed
@@ -84,6 +82,7 @@ ENTITY atari800core IS
 		PBI_ADDR : out STD_LOGIC_VECTOR(15 DOWNTO 0);
 		PBI_WRITE_ENABLE : out STD_LOGIC; -- currently only for CART config...
 		PBI_SNOOP_DATA : out std_logic_vector(31 downto 0); -- snoop the bus (i.e. what gets feed to the CPU data in)
+		PBI_SNOOP_READY : out std_logic;
 		PBI_WRITE_DATA : out std_logic_vector(31 downto 0); -- we want to write this to external ram
 		PBI_WIDTH_8bit_ACCESS : out std_logic;
 		PBI_WIDTH_16bit_ACCESS : out std_logic;
@@ -93,25 +92,26 @@ ENTITY atari800core IS
 		-- Since this is intended for real carts, instead should use real timing, though perhaps that can be external...
 		PBI_ROM_DO : in STD_LOGIC_VECTOR(7 DOWNTO 0);
 		PBI_REQUEST : out STD_LOGIC;
+		PBI_TAKEOVER : in STD_LOGIC;
+		PBI_RELEASE : in STD_LOGIC := '0';
 		PBI_REQUEST_COMPLETE : in STD_LOGIC;
+		PBI_DISABLE : in STD_LOGIC;
 		-- TODO - also need to allow rest of PBI accesses, refresh handling etc. Can wait...
-		-- TODO MPD, IRQ, RDY, REFRESH, EXTSEL, RST
+		-- TODO MPD, RDY, REFRESH, EXTSEL, RST
 
-		-- CARTRIDGE ACCESS
-		-- (R/W/DO on PBI)
-		CART_RD4 : in STD_LOGIC;
-		CART_RD5 : in STD_LOGIC;
-		CART_S4_n : out STD_LOGIC;
-		CART_S5_N : out STD_LOGIC;
-		CART_CCTL_N : out std_logic;
+		CART_RD5 : in STD_LOGIC; -- just need it for trig3
+		PBI_MPD_N : in STD_LOGIC; 
+
+		PBI_IRQ_N : IN STD_LOGIC := '1';
 
 		-- SIO
 		SIO_RXD : in std_logic;
 		SIO_TXD : out std_logic;
-		SIO_CLOCKIN : in std_logic :='1';
+		SIO_CLOCKIN_IN : in std_logic :='1';
+		SIO_CLOCKIN_OUT : out std_logic;
+		SIO_CLOCKIN_OE : out std_logic;
 		SIO_CLOCKOUT : out std_logic;
 		-- SIO_COMMAND_TX - see PIA PB2
-		-- TODO CLOCK IN/CLOCK OUT (unused almost everywhere...)
 
 		-- GTIA consol
 		CONSOL_OPTION : IN STD_LOGIC;
@@ -122,6 +122,8 @@ ENTITY atari800core IS
 		-- ANTIC lightpen
 		ANTIC_LIGHTPEN : IN std_logic;
 		ANTIC_REFRESH : out STD_LOGIC; -- 1 'original' cycle high when antic doing refresh cycle...
+		ANTIC_TURBO : out STD_LOGIC; -- if we are in high colour clock modes
+		ANTIC_RNMI_N : IN std_logic := '1';
 		
 		-----------------------
 		-- After here all FPGA implementation specific
@@ -166,6 +168,7 @@ ENTITY atari800core IS
 		ROM_DO : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 		ROM_REQUEST : OUT STD_LOGIC;
 		ROM_REQUEST_COMPLETE : IN STD_LOGIC;
+		ROM_WRITE_ENABLE : OUT STD_LOGIC;
 
 		-- DMA memory map differs
 		-- e.g. some special addresses to read behind hardware registers
@@ -184,17 +187,28 @@ ENTITY atari800core IS
 		MEMORY_READY_DMA : out std_logic; -- op complete
 
 		-- Special config params
-   		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
+   		RAM_SELECT : in std_logic_vector(2 downto 0); 
+			-- XL/XE mode  : 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
+			-- 400/800 mode: 16K,32K,48K,52K,...? 
 		CART_EMULATION_SELECT : in std_logic_vector(5 downto 0);
 		PAL :  in STD_LOGIC;
-		USE_SDRAM :  in STD_LOGIC;
 		ROM_IN_RAM : in std_logic;
 		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0);
 		HALT : in std_logic;
 		freezer_enable: in std_logic;
 		freezer_activate: in std_logic;
+		ATARI800MODE : in std_logic := '0';
+
+		-- debugging
 		freezer_state_out: out std_logic_vector(2 downto 0);
-		pbi_enable: in std_logic := '0'
+		state_reg_out :  OUT  STD_LOGIC_VECTOR(1 downto 0);
+		memory_ready_antic_out :  OUT  STD_LOGIC;
+		memory_ready_cpu_out :  OUT  STD_LOGIC;
+		shared_enable_out :  OUT  STD_LOGIC;
+		nmi_n_out :  OUT  STD_LOGIC;
+		irq_n_out :  OUT  STD_LOGIC;
+		rdy_out :  OUT  STD_LOGIC;
+		AN_out : OUT STD_LOGIC_VECTOR(2 DOWNTO 0)
 	);
 END atari800core;
 
@@ -305,6 +319,7 @@ PBI_WIDTH_16bit_ACCESS <= WIDTH_16bit_access;
 PBI_WIDTH_32bit_ACCESS <= WIDTH_32bit_access;
 PBI_WRITE_DATA <= WRITE_DATA;
 PBI_SNOOP_DATA <= MEMORY_DATA;
+PBI_SNOOP_READY <= MEMORY_READY_CPU or MEMORY_READY_ANTIC;
 
 enables : entity work.shared_enable
 GENERIC MAP(cycle_length => cycle_length)
@@ -340,6 +355,7 @@ GENERIC MAP(cycle_length => cycle_length)
 PORT MAP(CLK => CLK,
 		 WR_EN => ANTIC_WRITE_ENABLE,
 		 RESET_N => RESET_N,
+		 RNMI_N => ANTIC_RNMI_N,
 		 MEMORY_READY_ANTIC => MEMORY_READY_ANTIC,
 		 MEMORY_READY_CPU => MEMORY_READY_CPU,
 		 ANTIC_ENABLE_179 => ANTIC_ENABLE_179,
@@ -357,13 +373,16 @@ PORT MAP(CLK => CLK,
 		 HBLANK => HBLANK,
 		 VBLANK => VBLANK,
 		 refresh_out => ANTIC_REFRESH_CYCLE,
+		 turbo_out => ANTIC_TURBO,
 		 AN => ANTIC_AN,
 		 DATA_OUT => ANTIC_DO,
 		 dma_address_out => ANTIC_ADDR);
 
 pokey_mixer_both : entity work.pokey_mixer_mux
 PORT MAP(CLK => CLK,
+		 ENABLE_179 => ANTIC_ENABLE_179,
 		 GTIA_SOUND => GTIA_SOUND,
+		 SIO_AUDIO => SIO_AUDIO,
 		 CHANNEL_L_0 => POKEY1_CHANNEL0,
 		 CHANNEL_L_1 => POKEY1_CHANNEL1,
 		 CHANNEL_L_2 => POKEY1_CHANNEL2,
@@ -383,7 +402,7 @@ PORT MAP(CLK => CLK,
 gen_stereo : if stereo=1 generate
 pokey2 : entity work.pokey
 PORT MAP(CLK => CLK,
-		 ENABLE_179 => ENABLE_179_MEMWAIT,
+		 ENABLE_179 => ANTIC_ENABLE_179,
 		 WR_EN => POKEY2_WRITE_ENABLE,
 		 RESET_N => RESET_N,
 		 ADDR => PBI_ADDR_INT(3 DOWNTO 0),
@@ -433,7 +452,7 @@ PORT MAP(CLK => CLK,
 		 PORTB_OUT => PORTB_OUT_INT);
 
 mmu1 : entity work.address_decoder
-GENERIC MAP(low_memory => low_memory, stereo => stereo, system => system)
+GENERIC MAP(low_memory => low_memory, stereo => stereo, sdram_start_bank => sdram_start_bank)
 PORT MAP(CLK => CLK,
 		 CPU_FETCH => CPU_FETCH,
 		 CPU_WRITE_N => R_W_N,
@@ -445,16 +464,20 @@ PORT MAP(CLK => CLK,
 		 DMA_8BIT_WRITE_ENABLE => DMA_8BIT_WRITE_ENABLE,
 		 RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
 		 ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
-		 CART_REQUEST_COMPLETE => PBI_REQUEST_COMPLETE,
-		 reset_n => RESET_N,
-		 CART_RD4 => CART_RD4,
+		 PBI_REQUEST_COMPLETE => PBI_REQUEST_COMPLETE,
+		 PBI_TAKEOVER => PBI_TAKEOVER,
+		 PBI_RELEASE => PBI_RELEASE,
+		 --PBI_DISABLE => PBI_DISABLE,
+		 --PBI_TAKEOVER => '0',
+		 --PBI_RELEASE => '0',
 		 CART_RD5 => CART_RD5,
-		 use_sdram => USE_SDRAM,
+		 PBI_MPD_N => PBI_MPD_N,
+		 reset_n => RESET_N,
 		 SDRAM_REQUEST_COMPLETE => SDRAM_REQUEST_COMPLETE,
 		 ANTIC_ADDR => ANTIC_ADDR,
 		 ANTIC_DATA => ANTIC_DO,
 		 CACHE_ANTIC_DATA => CACHE_ANTIC_DO,
-		 CART_ROM_DATA => PBI_ROM_DO,
+		 PBI_DATA => PBI_ROM_DO,
 		 CPU_ADDR => CPU_ADDR,
 		 CPU_WRITE_DATA => CPU_DO,
 		 GTIA_DATA => GTIA_DO,
@@ -467,6 +490,7 @@ PORT MAP(CLK => CLK,
 		 PORTB => PORTB_OPTIONS,
 		 RAM_DATA => RAM_DO,
 		 ram_select => RAM_SELECT(2 downto 0),
+		 ATARI800MODE => ATARI800MODE,
 		 ROM_DATA => ROM_DO,
 		 SDRAM_DATA => SDRAM_DO,
 		 DMA_ADDR => DMA_ADDR,
@@ -481,13 +505,11 @@ PORT MAP(CLK => CLK,
 		 PIA_WR_ENABLE => PIA_WRITE_ENABLE,
 		 PIA_RD_ENABLE => PIA_READ_ENABLE,
 		 RAM_WR_ENABLE => RAM_WRITE_ENABLE,
+		 ROM_WR_ENABLE => ROM_WRITE_ENABLE,
 		 PBI_WR_ENABLE => PBI_WRITE_ENABLE,
 		 RAM_REQUEST => RAM_REQUEST,
 		 ROM_REQUEST => ROM_REQUEST,
-		 CART_REQUEST => PBI_REQUEST,
-		 CART_S4_n => CART_S4_n,
-		 CART_S5_n => CART_S5_N,
-		 CART_CCTL_n => CART_CCTL_N,
+		 PBI_REQUEST => PBI_REQUEST,
 		 CART_TRIG3_OUT => cart_trig3_out,
 		 WIDTH_8bit_ACCESS => WIDTH_8BIT_ACCESS,
 		 WIDTH_16bit_ACCESS => WIDTH_16BIT_ACCESS,
@@ -507,27 +529,34 @@ PORT MAP(CLK => CLK,
 		 freezer_enable => freezer_enable,
 		 freezer_activate => freezer_activate,
 		 freezer_state_out => freezer_state_out,
-		 pbi_enable => pbi_enable);
+		 state_reg_out => state_reg_out);
 
 
-gen_a800 : if system=1 generate
-	PORTB_OPTIONS <= (others=>'0');
-	GTIA_TRIG_MERGED <= GTIA_TRIG(3 downto 0);
-end generate;
-gen_xl : if system=0 generate
-	PORTB_OPTIONS <= PORTB_OUT_INT;
-	GTIA_TRIG_MERGED <= cart_trig3_out & GTIA_TRIG(2 downto 0); -- NOTE, inputs ignored, careful when adding 4 joystick support
-end generate;
+	process(ATARI800MODE,GTIA_TRIG,PORTB_OUT_INT,CART_TRIG3_OUT)
+	begin
+		PORTB_OPTIONS <= (others=>'0');
+		GTIA_TRIG_MERGED <= (others=>'0');
+
+		if (ATARI800MODE='0') then
+			PORTB_OPTIONS <= PORTB_OUT_INT;
+			GTIA_TRIG_MERGED <= (cart_trig3_out and GTIA_TRIG(3)) & GTIA_TRIG(2 downto 0); -- NOTE, inputs ignored, careful when adding 4 joystick support
+		else
+			PORTB_OPTIONS <= (others=>'0');
+			GTIA_TRIG_MERGED <= GTIA_TRIG(3 downto 0);
+		end if;
+	end process;
 
 pokey1 : entity work.pokey
 PORT MAP(CLK => CLK,
-		 ENABLE_179 => ENABLE_179_MEMWAIT,
+		 ENABLE_179 => ANTIC_ENABLE_179,
 		 WR_EN => POKEY_WRITE_ENABLE,
 		 RESET_N => RESET_N,
 		 SIO_IN1 => SIO_RXD,
 		 SIO_IN2 => '1',
 		 SIO_IN3 => '1',
-		 SIO_CLOCKIN => SIO_CLOCKIN,
+		 SIO_CLOCKIN_IN => SIO_CLOCKIN_IN,
+		 SIO_CLOCKIN_OUT => SIO_CLOCKIN_OUT,
+		 SIO_CLOCKIN_OE => SIO_CLOCKIN_OE,
 		 ADDR => PBI_ADDR_INT(3 DOWNTO 0),
 		 DATA_IN => WRITE_DATA(7 DOWNTO 0),
 		 keyboard_response => KEYBOARD_RESPONSE,
@@ -554,6 +583,7 @@ PORT MAP(CLK => CLK,
 		 CPU_ENABLE_ORIGINAL => ENABLE_179_MEMWAIT, -- for subsequent pmg fetches
 		 RESET_N => RESET_N,
 		 PAL => PAL,
+		 ENABLE_179 => ANTIC_ENABLE_179,
 		 COLOUR_CLOCK_ORIGINAL => ANTIC_ORIGINAL_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK => ANTIC_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK_HIGHRES => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
@@ -597,6 +627,7 @@ irq_glue1 : entity work.irq_glue
 PORT MAP(pokey_irq => POKEY_IRQ,
 		 pia_irqa => PIA_IRQA,
 		 pia_irqb => PIA_IRQB,
+		 pbi_irq => PBI_IRQ_N,
 		 combined_irq => IRQ_n);
 		 
 -- TODO - generic ram infer?
@@ -668,6 +699,14 @@ ENABLE_179_EARLY <= ANTIC_ENABLE_179;
 PORTB_OUT <= PORTB_OUT_INT;
 ANTIC_REFRESH <= ANTIC_REFRESH_CYCLE;
 VIDEO_PIXCE <= ANTIC_HIGHRES_COLOUR_CLOCK_OUT;
-POKEY_ENABLE <= ENABLE_179_MEMWAIT;
+
+
+memory_ready_antic_out <= memory_ready_antic;
+memory_ready_cpu_out <= memory_ready_cpu;
+shared_enable_out <= cpu_shared_enable;
+nmi_n_out <= nmi_n;
+irq_n_out <= irq_n;
+rdy_out <= antic_rdy;
+an_out <= antic_an;
 
 END bdf_type;

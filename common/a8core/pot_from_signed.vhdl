@@ -74,8 +74,6 @@ pot_clock_div : entity work.enable_divider
 		variable pos2 : signed(7 downto 0);
 	begin
 		pos2 := pos;
-		if pos2 > x"7E" then pos2 := x"7E"; end if;
-
 		if (abs(pos2) < 16 and force_low='1') then
 			pos2 := -force_to;
 		end if;

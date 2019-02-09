@@ -15,6 +15,8 @@ PORT
 ( 
 	CLK : IN STD_LOGIC;
 
+	ENABLE_179 : IN STD_LOGIC;
+
 	CHANNEL_L_0 : IN STD_LOGIC_VECTOR(3 downto 0);
 	CHANNEL_L_1 : IN STD_LOGIC_VECTOR(3 downto 0);
 	CHANNEL_L_2 : IN STD_LOGIC_VECTOR(3 downto 0);
@@ -30,6 +32,7 @@ PORT
 	COVOX_CHANNEL_R_1 : IN STD_LOGIC_VECTOR(7 downto 0);
 	
 	GTIA_SOUND : IN STD_LOGIC;
+	SIO_AUDIO : IN STD_LOGIC_VECTOR(7 downto 0);
 	
 	VOLUME_OUT_L : OUT STD_LOGIC_vector(15 downto 0);
 	VOLUME_OUT_R : OUT STD_LOGIC_vector(15 downto 0)
@@ -53,6 +56,9 @@ ARCHITECTURE vhdl OF pokey_mixer_mux IS
 	signal VOLUME_OUT_L_REG : STD_LOGIC_VECTOR(15 downto 0);
 	signal VOLUME_OUT_R_NEXT : STD_LOGIC_VECTOR(15 downto 0);
 	signal VOLUME_OUT_R_REG : STD_LOGIC_VECTOR(15 downto 0);
+
+	signal VOLUME_POSTLOWPASS_L_REG : STD_LOGIC_VECTOR(15 downto 0);
+	signal VOLUME_POSTLOWPASS_R_REG : STD_LOGIC_VECTOR(15 downto 0);
 BEGIN
 
 process(clk)
@@ -115,6 +121,7 @@ shared_pokey_mixer : entity work.pokey_mixer
 		COVOX_CHANNEL_1 => COVOX_CHANNEL_1_SEL,
 
 		GTIA_SOUND => GTIA_SOUND,
+		SIO_AUDIO => SIO_AUDIO,
 
 		VOLUME_OUT_NEXT => VOLUME_OUT_NEXT
 	);
@@ -136,9 +143,28 @@ BEGIN
 	end if;
 END PROCESS;
 
+
+-- low pass filter output
+filter_left : entity work.simple_low_pass_filter
+	port map
+	(
+		CLK => CLK,
+		AUDIO_IN => VOLUME_OUT_L_REG,
+		SAMPLE_IN => ENABLE_179,
+		AUDIO_OUT => VOLUME_POSTLOWPASS_L_REG
+	);
+filter_right : entity work.simple_low_pass_filter
+	port map
+	(
+		CLK => CLK,
+		AUDIO_IN => VOLUME_OUT_R_REG,
+		SAMPLE_IN => ENABLE_179,
+		AUDIO_OUT => VOLUME_POSTLOWPASS_R_REG
+	);
+
 -- output
-	VOLUME_OUT_L <= VOLUME_OUT_L_REG;
-	VOLUME_OUT_R <= VOLUME_OUT_R_REG;
+	VOLUME_OUT_L <= VOLUME_POSTLOWPASS_L_REG;
+	VOLUME_OUT_R <= VOLUME_POSTLOWPASS_R_REG;
 
 END vhdl;
 

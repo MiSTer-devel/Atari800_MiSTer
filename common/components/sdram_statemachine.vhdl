@@ -12,7 +12,7 @@ use ieee.numeric_std.all;
 ENTITY sdram_statemachine IS
 generic
 (
-	ADDRESS_WIDTH : natural := 22; -- = ROW_WIDTH+COLUMN_WIDTH+2
+	ADDRESS_WIDTH : natural := 22;
 	ROW_WIDTH : natural := 12;
 	AP_BIT : natural := 10;
 	COLUMN_WIDTH : natural := 8
@@ -165,6 +165,7 @@ ARCHITECTURE vhdl OF sdram_statemachine IS
 	signal dq_out_next : std_logic_vector(15 downto 0);
 	signal dq_output_next : std_logic;
 	signal dq_in_next  : std_logic_vector(15 downto 0);	
+	signal dq_in_reg  : std_logic_vector(15 downto 0);	
 	signal ba_next : std_logic_vector(1 downto 0);
 	signal cs_n_next : std_logic;
 	signal ras_n_next : std_logic;
@@ -197,6 +198,7 @@ BEGIN
 	process(CLK_SDRAM,reset_n)
 	begin
 		if (reset_N = '0') then
+			dq_in_reg <= (others=>'0');
 			sdram_state_reg <= sdram_state_init;
 			delay_reg <= (others=>'0');
 			refresh_pending_reg <= (others=>'0');
@@ -218,6 +220,7 @@ BEGIN
 			
 			--bank_row_reg <= (others=>(others=>'0'));
 		elsif (CLK_SDRAM'event and CLK_SDRAM='1') then
+			dq_in_reg <= dq_in_next;
 			sdram_state_reg <= sdram_state_next;
 			delay_reg <= delay_next;
 			refresh_pending_reg <= refresh_pending_next;
@@ -342,7 +345,7 @@ BEGIN
 	end process;
 	
 	--
-	process(reset_client_n_reg,sdram_state_reg,delay_reg, idle_priority, data_out_reg, read_en_sreg, write_en_sreg, address_in_sreg, data_in_sreg, reply_reg, require_refresh, dq_in_next, dqm_mask_sreg, request_sreg)
+	process(reset_client_n_reg,sdram_state_reg,delay_reg, idle_priority, data_out_reg, read_en_sreg, write_en_sreg, address_in_sreg, data_in_sreg, reply_reg, require_refresh, dq_in_reg, dqm_mask_sreg, request_sreg)
 	begin
 		idle_priority <= (others=>'0');
 		refreshing_now <= '0';
@@ -440,13 +443,13 @@ BEGIN
 			when X"5" =>  -- dqm for 1st read is sent
 				ldqm_next <= dqm_mask_sreg(2); -- for 2nd read
 				udqm_next <= dqm_mask_sreg(3);				
-			when X"7" => 
-				data_out_next(7 downto 0) <= (dq_in_next(7 downto 0) and not(repeat(8,dqm_mask_sreg(0)))) or (dq_in_next(15 downto 8) and repeat(8,dqm_mask_sreg(0)));
-				data_out_next(15 downto 8) <= dq_in_next(15 downto 8);				
 			when X"8" => -- auto-precharge starts here after cas cycles (at this speed issi can do 2, psc can do 3 -> use slowest)
-				data_out_next(15 downto 8) <= (dq_in_next(7 downto 0) and repeat(8,dqm_mask_sreg(0))) or (data_out_reg(15 downto 8) and not(repeat(8,dqm_mask_sreg(0))));
-				data_out_next(31 downto 16) <= dq_in_next(15 downto 0);
-				
+				data_out_next(7 downto 0) <= (dq_in_reg(7 downto 0) and not(repeat(8,dqm_mask_sreg(0)))) or (dq_in_reg(15 downto 8) and repeat(8,dqm_mask_sreg(0)));
+				data_out_next(15 downto 8) <= dq_in_reg(15 downto 8);				
+			when X"9" => 
+				data_out_next(15 downto 8) <= (dq_in_reg(7 downto 0) and repeat(8,dqm_mask_sreg(0))) or (data_out_reg(15 downto 8) and not(repeat(8,dqm_mask_sreg(0))));
+				data_out_next(31 downto 16) <= dq_in_reg(15 downto 0);
+				delay_next <= (others=>'0');						
 				reply_next <= request_sreg;
 				sdram_state_next <= sdram_state_idle;
 				-- after 3 cycles we can do the next ACT (21 ns psc)

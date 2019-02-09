@@ -21,6 +21,7 @@ PORT
 	ANTIC_FETCH : in std_logic;
 	
 	CPU_ENABLE_ORIGINAL : in std_logic; -- on cycle data is ready
+	ENABLE_179 : in std_logic := '0'; -- one cycle before new cycle, snap registers
 	
 	RESET_N : IN STD_LOGIC;
 	
@@ -168,6 +169,14 @@ ARCHITECTURE vhdl OF gtia IS
 	signal hposp1_delayed_reg : std_logic_vector(7 downto 0);
 	signal hposp2_delayed_reg : std_logic_vector(7 downto 0);
 	signal hposp3_delayed_reg : std_logic_vector(7 downto 0);
+	signal hposp0_snap_next : std_logic_vector(7 downto 0);
+	signal hposp1_snap_next : std_logic_vector(7 downto 0);
+	signal hposp2_snap_next : std_logic_vector(7 downto 0);
+	signal hposp3_snap_next : std_logic_vector(7 downto 0);
+	signal hposp0_snap_reg : std_logic_vector(7 downto 0);
+	signal hposp1_snap_reg : std_logic_vector(7 downto 0);
+	signal hposp2_snap_reg : std_logic_vector(7 downto 0);
+	signal hposp3_snap_reg : std_logic_vector(7 downto 0);
 	
 	signal hposm0_raw_next : std_logic_vector(7 downto 0);
 	signal hposm0_raw_reg : std_logic_vector(7 downto 0);
@@ -181,6 +190,14 @@ ARCHITECTURE vhdl OF gtia IS
 	signal hposm1_delayed_reg : std_logic_vector(7 downto 0);
 	signal hposm2_delayed_reg : std_logic_vector(7 downto 0);
 	signal hposm3_delayed_reg : std_logic_vector(7 downto 0);	
+	signal hposm0_snap_next : std_logic_vector(7 downto 0);
+	signal hposm1_snap_next : std_logic_vector(7 downto 0);
+	signal hposm2_snap_next : std_logic_vector(7 downto 0);
+	signal hposm3_snap_next : std_logic_vector(7 downto 0);	
+	signal hposm0_snap_reg : std_logic_vector(7 downto 0);
+	signal hposm1_snap_reg : std_logic_vector(7 downto 0);
+	signal hposm2_snap_reg : std_logic_vector(7 downto 0);
+	signal hposm3_snap_reg : std_logic_vector(7 downto 0);	
 	
 	signal sizep0_raw_next : std_logic_vector(1 downto 0);
 	signal sizep0_raw_reg : std_logic_vector(1 downto 0);
@@ -199,6 +216,16 @@ ARCHITECTURE vhdl OF gtia IS
 	signal sizep2_delayed_reg : std_logic_vector(1 downto 0);
 	signal sizep3_delayed_reg : std_logic_vector(1 downto 0);
 	signal sizem_delayed_reg : std_logic_vector(7 downto 0);
+	signal sizep0_snap_next : std_logic_vector(1 downto 0);
+	signal sizep1_snap_next : std_logic_vector(1 downto 0);
+	signal sizep2_snap_next : std_logic_vector(1 downto 0);
+	signal sizep3_snap_next : std_logic_vector(1 downto 0);
+	signal sizem_snap_next: std_logic_vector(7 downto 0);
+	signal sizep0_snap_reg : std_logic_vector(1 downto 0);
+	signal sizep1_snap_reg : std_logic_vector(1 downto 0);
+	signal sizep2_snap_reg : std_logic_vector(1 downto 0);
+	signal sizep3_snap_reg : std_logic_vector(1 downto 0);
+	signal sizem_snap_reg : std_logic_vector(7 downto 0);
 	
 	signal grafp0_next : std_logic_vector(7 downto 0);
 	signal grafp0_reg : std_logic_vector(7 downto 0);
@@ -229,6 +256,14 @@ ARCHITECTURE vhdl OF gtia IS
 	signal colpm1_delayed_reg : std_logic_vector(7 downto 1);
 	signal colpm2_delayed_reg : std_logic_vector(7 downto 1);
 	signal colpm3_delayed_reg : std_logic_vector(7 downto 1);
+	signal colpm0_snap_next : std_logic_vector(7 downto 1);
+	signal colpm1_snap_next : std_logic_vector(7 downto 1);
+	signal colpm2_snap_next : std_logic_vector(7 downto 1);
+	signal colpm3_snap_next : std_logic_vector(7 downto 1);
+	signal colpm0_snap_reg : std_logic_vector(7 downto 1);
+	signal colpm1_snap_reg : std_logic_vector(7 downto 1);
+	signal colpm2_snap_reg : std_logic_vector(7 downto 1);
+	signal colpm3_snap_reg : std_logic_vector(7 downto 1);
 	
 	signal colpf0_raw_next : std_logic_vector(7 downto 1);
 	signal colpf0_raw_reg : std_logic_vector(7 downto 1);
@@ -242,21 +277,33 @@ ARCHITECTURE vhdl OF gtia IS
 	signal colpf1_delayed_reg : std_logic_vector(7 downto 1);
 	signal colpf2_delayed_reg : std_logic_vector(7 downto 1);
 	signal colpf3_delayed_reg : std_logic_vector(7 downto 1);
+	signal colpf0_snap_next : std_logic_vector(7 downto 1);
+	signal colpf1_snap_next : std_logic_vector(7 downto 1);
+	signal colpf2_snap_next : std_logic_vector(7 downto 1);
+	signal colpf3_snap_next : std_logic_vector(7 downto 1);
+	signal colpf0_snap_reg : std_logic_vector(7 downto 1);
+	signal colpf1_snap_reg : std_logic_vector(7 downto 1);
+	signal colpf2_snap_reg : std_logic_vector(7 downto 1);
+	signal colpf3_snap_reg : std_logic_vector(7 downto 1);
 	
 	signal colbk_raw_next : std_logic_vector(7 downto 1);
 	signal colbk_raw_reg : std_logic_vector(7 downto 1);
 	signal colbk_delayed_reg : std_logic_vector(7 downto 1);	
+	signal colbk_snap_next : std_logic_vector(7 downto 1);	
+	signal colbk_snap_reg : std_logic_vector(7 downto 1);	
 	
 	signal prior_raw_next : std_logic_vector(7 downto 0);
 	signal prior_raw_reg : std_logic_vector(7 downto 0);
 	signal prior_delayed_reg : std_logic_vector(7 downto 0);
 	signal prior_delayed2_reg : std_logic_vector(7 downto 6);
+	signal prior_snap_next : std_logic_vector(7 downto 0);	
+	signal prior_snap_reg : std_logic_vector(7 downto 0);	
 	
 	signal vdelay_next : std_logic_vector(7 downto 0);
 	signal vdelay_reg : std_logic_vector(7 downto 0);
 
-	signal gractl_next : std_logic_vector(2 downto 0);
-	signal gractl_reg : std_logic_vector(2 downto 0);
+	signal gractl_next : std_logic_vector(4 downto 0);
+	signal gractl_reg : std_logic_vector(4 downto 0);
 	
 	signal consol_output_next : std_logic_vector(3 downto 0);
 	signal consol_output_reg : std_logic_vector(3 downto 0);
@@ -343,7 +390,7 @@ ARCHITECTURE vhdl OF gtia IS
 	
 	signal hblank_next : std_logic;
 	signal hblank_reg : std_logic;
-
+	
 	-- visible region (no collision detection outside this)
 	signal visible_live : std_logic;
 	
@@ -416,6 +463,10 @@ ARCHITECTURE vhdl OF gtia IS
 	constant pmg_dma_player3 : std_logic_vector(2 downto 0) := "100";
 	constant pmg_dma_done    : std_logic_vector(2 downto 0) := "101";	
 	constant pmg_dma_instruction : std_logic_vector(2 downto 0) := "110";	
+
+	-- work out which an section we are in for gtia modes
+	signal hpos_alt_reg : std_logic;
+	signal hpos_alt_next : std_logic;
 	
 begin
 	-- register
@@ -508,6 +559,32 @@ begin
 			
 			active_bk_modify_reg <= (others=>'0');
 			active_bk_valid_reg <= (others=>'0');
+
+			hposp0_snap_reg <= (others=>'0');
+			hposp1_snap_reg <= (others=>'0');
+			hposp2_snap_reg <= (others=>'0');
+			hposp3_snap_reg <= (others=>'0');
+			hposm0_snap_reg <= (others=>'0');
+			hposm1_snap_reg <= (others=>'0');
+			hposm2_snap_reg <= (others=>'0');
+			hposm3_snap_reg <= (others=>'0');
+			sizep0_snap_reg <= (others=>'0');
+			sizep1_snap_reg <= (others=>'0');
+			sizep2_snap_reg <= (others=>'0');
+			sizep3_snap_reg <= (others=>'0');
+			 sizem_snap_reg <= (others=>'0');
+			colpm0_snap_reg <= (others=>'0');
+			colpm1_snap_reg <= (others=>'0');
+			colpm2_snap_reg <= (others=>'0');
+			colpm3_snap_reg <= (others=>'0');
+			colpf0_snap_reg <= (others=>'0');
+			colpf1_snap_reg <= (others=>'0');
+			colpf2_snap_reg <= (others=>'0');
+			colpf3_snap_reg <= (others=>'0');
+			 colbk_snap_reg <= (others=>'0');
+			 prior_snap_reg <= (others=>'0');
+
+			hpos_alt_reg <= '0';
 			
 		elsif (clk'event and clk='1') then										
 			hposp0_raw_reg <= hposp0_raw_next;
@@ -596,6 +673,32 @@ begin
 			
 			active_bk_modify_reg <= active_bk_modify_next;
 			active_bk_valid_reg <= active_bk_valid_next;
+
+			hposp0_snap_reg <= hposp0_snap_next;
+			hposp1_snap_reg <= hposp1_snap_next;
+			hposp2_snap_reg <= hposp2_snap_next;
+			hposp3_snap_reg <= hposp3_snap_next;
+			hposm0_snap_reg <= hposm0_snap_next;
+			hposm1_snap_reg <= hposm1_snap_next;
+			hposm2_snap_reg <= hposm2_snap_next;
+			hposm3_snap_reg <= hposm3_snap_next;
+			sizep0_snap_reg <= sizep0_snap_next;
+			sizep1_snap_reg <= sizep1_snap_next;
+			sizep2_snap_reg <= sizep2_snap_next;
+			sizep3_snap_reg <= sizep3_snap_next;
+			 sizem_snap_reg <=  sizem_snap_next;
+			colpm0_snap_reg <= colpm0_snap_next;
+			colpm1_snap_reg <= colpm1_snap_next;
+			colpm2_snap_reg <= colpm2_snap_next;
+			colpm3_snap_reg <= colpm3_snap_next;
+			colpf0_snap_reg <= colpf0_snap_next;
+			colpf1_snap_reg <= colpf1_snap_next;
+			colpf2_snap_reg <= colpf2_snap_next;
+			colpf3_snap_reg <= colpf3_snap_next;
+			 colbk_snap_reg <=  colbk_snap_next;
+			 prior_snap_reg <=  prior_snap_next;
+
+			hpos_alt_reg <= hpos_alt_next;
 		end if;
 	end process;
 	
@@ -603,9 +706,23 @@ begin
 	decode_addr1 : complete_address_decoder
 		generic map(width=>5)
 		port map (addr_in=>addr, addr_decoded=>addr_decoded);
+
+	-- odd/even hpos - for gtia modes
+	process(hpos_alt_reg, colour_clock, reset_counter)
+	begin
+		hpos_alt_next <= hpos_alt_reg;
+		if (colour_clock='1') then
+			hpos_alt_next <= not(hpos_alt_reg);
+		end if;
+
+		if (reset_counter='1') then
+			hpos_alt_next <= '0';
+		end if;
+	end process;
+	
 		
 	-- decode antic input
-	process (AN, COLOUR_CLOCK, COLOUR_CLOCK_ORIGINAL, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, hpos_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live)
+	process (AN, COLOUR_CLOCK, COLOUR_CLOCK_ORIGINAL, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, hpos_reg)
 	begin	
 		hblank_next <= hblank_reg;
 		reset_counter <= '0';
@@ -670,7 +787,7 @@ begin
 			-- 1ZY (giving signal ZYXV for 4 bit colour reg/luminance - unfortunately we only have 9 colour regs!)
 			-- 1XV
 			
-			if (highres_reg = '1') then
+			if (highres_reg = '1' and prior_delayed_reg(7 downto 6)="00") then
 				if (an(2) = '1') then
 					active_hr_next <= AN(1 downto 0);				
 				end if;
@@ -703,7 +820,7 @@ begin
 						active_pf3_collision_live <= '0';						
 						active_bk_live <= '1';
 						
-						if (hpos_reg(0) = '1') then
+						if (hpos_alt_reg = '1') then
 							active_bk_modify_next(3 downto 0) <= an_prev_reg(1 downto 0)&an(1 downto 0);
 						else
 							active_bk_modify_next(3 downto 0) <= active_bk_modify_reg(3 downto 0);
@@ -713,7 +830,7 @@ begin
 						-- playfield collisions
 						-- no missile/player collisions from 'playfield' data though		
 						-- offset by 1 colour clock...
-						if (hpos_reg(0) = '1') then
+						if (hpos_alt_reg = '1') then
 							active_bk_live <= '0';
 							active_pf0_live <= '0';
 							active_pf1_live <= '0';
@@ -791,7 +908,7 @@ begin
 						active_pf2_live <= '0';
 						active_pf2_collision_live <= '0';
 						active_pf3_collision_live <= '0';	
-						if (hpos_reg(0) = '1') then
+						if (hpos_alt_reg = '1') then
 							active_bk_modify_next(7 downto 4) <= an_prev_reg(1 downto 0)&an(1 downto 0);
 						else
 							active_bk_modify_next(7 downto 4) <= active_bk_modify_reg(7 downto 4);
@@ -828,12 +945,10 @@ begin
 				active_pf3_collision_live <= '0';
 				highres_next <= an_prev_reg(0);
 			
-				if (COLOUR_CLOCK_ORIGINAL='1') then				
-					if (hblank_reg = '0' and vsync_reg = '0') then
-						reset_counter <= '1';
-						counter_load_value <= X"E0"; -- 2 lower than antic
-						odd_scanline_next <= not(odd_scanline_reg);
-					end if;
+				if (hblank_reg = '0' and vsync_reg = '0') then
+					reset_counter <= '1';
+					counter_load_value <= X"E0"; -- 2 lower than antic
+					odd_scanline_next <= not(odd_scanline_reg);
 				end if;
 			end if;
 			if (an(2 downto 1) = "01") then
@@ -1063,7 +1178,7 @@ begin
 		port map(clk=>clk, colour_enable=>colour_clock, prior=>prior_delayed_reg,p0=>active_pm0_live,p1=>active_pm1_live,p2=>active_pm2_live,p3=>active_pm3_live,pf0=>active_pf0_live,pf1=>active_pf1_live,pf2=>active_pf2_live,pf3=>active_pf3_live,bk=>active_bk_live,p0_out=>set_p0,p1_out=>set_p1,p2_out=>set_p2,p3_out=>set_p3,pf0_out=>set_pf0,pf1_out=>set_pf1,pf2_out=>set_pf2,pf3_out=>set_pf3,bk_out=>set_bk);	
 
 	trigger_secondhalf <= colour_clock_HIGHRES and not colour_clock;
-	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,highres_reg, active_hr_reg, colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg, trigger_secondhalf, colour_clock, COLOUR_REG, hrcolour_reg, visible_live, active_bk_modify_next, active_bk_valid_next)
+	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,highres_reg, active_hr_reg, colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg, trigger_secondhalf, colour_clock, COLOUR_REG, hrcolour_reg, visible_live, active_bk_modify_next, active_bk_valid_next, gractl_reg)
 	begin
 		colour_next <= colour_reg;
 		hrcolour_next <= hrcolour_reg;
@@ -1109,6 +1224,14 @@ begin
 				
 				if (active_hr_reg(0) = '1') then						
 					hrcolour_next(3 downto 0) <= colpf1_delayed_reg(3 downto 1)&'0';
+				end if;
+
+				if (active_hr_reg(1) = '1' and gractl_reg(4) = '1') then
+					colour_next(7 downto 4) <= colpf1_delayed_reg(7 downto 4);						
+				end if;
+				
+				if (active_hr_reg(0) = '1' and gractl_reg(4) = '1') then						
+					hrcolour_next(7 downto 4) <= colpf1_delayed_reg(7 downto 4);
 				end if;
 			end if;				
 			
@@ -1371,7 +1494,7 @@ begin
 			end if;	
 
 			if(addr_decoded(29) = '1') then
-				gractl_next <= cpu_data_in(2 downto 0);
+				gractl_next <= cpu_data_in(4 downto 0);
 			end if;		
 			
 			if(addr_decoded(30) = '1') then
@@ -1387,92 +1510,202 @@ begin
 	end process;
 	
 	-- delays...
+	process(enable_179,
+		hposp0_snap_reg,
+		hposp1_snap_reg,
+		hposp2_snap_reg,
+		hposp3_snap_reg,
+		hposm0_snap_reg,
+		hposm1_snap_reg,
+		hposm2_snap_reg,
+		hposm3_snap_reg,
+		sizep0_snap_reg,
+		sizep1_snap_reg,
+		sizep2_snap_reg,
+		sizep3_snap_reg,
+		 sizem_snap_reg,
+		colpm0_snap_reg,
+		colpm1_snap_reg,
+		colpm2_snap_reg,
+		colpm3_snap_reg,
+		colpf0_snap_reg,
+		colpf1_snap_reg,
+		colpf2_snap_reg,
+		colpf3_snap_reg,
+	 	 colbk_snap_reg,
+		 prior_snap_reg,
+		hposp0_raw_reg,
+		hposp1_raw_reg,
+		hposp2_raw_reg,
+		hposp3_raw_reg,
+		hposm0_raw_reg,
+		hposm1_raw_reg,
+		hposm2_raw_reg,
+		hposm3_raw_reg,
+		sizep0_raw_reg,
+		sizep1_raw_reg,
+		sizep2_raw_reg,
+		sizep3_raw_reg,
+		sizem_raw_reg,
+		colpm0_raw_reg,
+		colpm1_raw_reg,
+		colpm2_raw_reg,
+		colpm3_raw_reg,
+		colpf0_raw_reg,
+		colpf1_raw_reg,
+		colpf2_raw_reg,
+		colpf3_raw_reg,
+		colbk_raw_reg,
+		prior_raw_reg
+	)
+	begin
+		hposp0_snap_next <= hposp0_snap_reg;
+		hposp1_snap_next <= hposp1_snap_reg;
+		hposp2_snap_next <= hposp2_snap_reg;
+		hposp3_snap_next <= hposp3_snap_reg;
+		hposm0_snap_next <= hposm0_snap_reg;
+		hposm1_snap_next <= hposm1_snap_reg;
+		hposm2_snap_next <= hposm2_snap_reg;
+		hposm3_snap_next <= hposm3_snap_reg;
+		sizep0_snap_next <= sizep0_snap_reg;
+		sizep1_snap_next <= sizep1_snap_reg;
+		sizep2_snap_next <= sizep2_snap_reg;
+		sizep3_snap_next <= sizep3_snap_reg;
+		sizem_snap_next <= sizem_snap_reg;
+		colpm0_snap_next <= colpm0_snap_reg;
+		colpm1_snap_next <= colpm1_snap_reg;
+		colpm2_snap_next <= colpm2_snap_reg;
+		colpm3_snap_next <= colpm3_snap_reg;
+		colpf0_snap_next <= colpf0_snap_reg;
+		colpf1_snap_next <= colpf1_snap_reg;
+		colpf2_snap_next <= colpf2_snap_reg;
+		colpf3_snap_next <= colpf3_snap_reg;
+		colbk_snap_next <= colbk_snap_reg;
+		prior_snap_next <= prior_snap_reg;
+
+		if enable_179 = '1' then
+			hposp0_snap_next <= hposp0_raw_reg;
+			hposp1_snap_next <= hposp1_raw_reg;
+			hposp2_snap_next <= hposp2_raw_reg;
+			hposp3_snap_next <= hposp3_raw_reg;
+			hposm0_snap_next <= hposm0_raw_reg;
+			hposm1_snap_next <= hposm1_raw_reg;
+			hposm2_snap_next <= hposm2_raw_reg;
+			hposm3_snap_next <= hposm3_raw_reg;
+			sizep0_snap_next <= sizep0_raw_reg;
+			sizep1_snap_next <= sizep1_raw_reg;
+			sizep2_snap_next <= sizep2_raw_reg;
+			sizep3_snap_next <= sizep3_raw_reg;
+			sizem_snap_next <= sizem_raw_reg;
+			colpm0_snap_next <= colpm0_raw_reg;
+			colpm1_snap_next <= colpm1_raw_reg;
+			colpm2_snap_next <= colpm2_raw_reg;
+			colpm3_snap_next <= colpm3_raw_reg;
+			colpf0_snap_next <= colpf0_raw_reg;
+			colpf1_snap_next <= colpf1_raw_reg;
+			colpf2_snap_next <= colpf2_raw_reg;
+			colpf3_snap_next <= colpf3_raw_reg;
+			colbk_snap_next <= colbk_raw_reg;
+			prior_snap_next <= prior_raw_reg;
+		end if;
+	end process;
+
 		-- TODO - needs more attention ... 
 		-- The prior behaviour here in real hardware is all over the place...
 		-- THESE CAN TAKE MUCH LESS SPACE - only need to store per CPU cycle, not per colour clock original
-	prior_short_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>6)
-		port map(clk=>clk,sync_reset=>'0',data_in=>prior_raw_reg(5 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed_reg(5 downto 0));
+--	prior_short_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>6)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(5 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed_reg(5 downto 0));
+	prior_delayed_reg(5 downto 0) <= prior_snap_reg(5 downto 0);
 
 	prior_long_delay : wide_delay_line
-		generic map (COUNT=>3, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>prior_raw_reg(7 downto 6),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed_reg(7 downto 6));
+		generic map (COUNT=>1, WIDTH=>2)
+		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(7 downto 6),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed_reg(7 downto 6));
 
 	prior_longer_delay : wide_delay_line
-		generic map (COUNT=>4, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>prior_raw_reg(7 downto 6),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed2_reg(7 downto 6));		
+		generic map (COUNT=>2, WIDTH=>2)
+		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(7 downto 6),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed2_reg(7 downto 6));		
 		
-	colbk_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colbk_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colbk_delayed_reg(7 downto 1));	
+--	colbk_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colbk_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colbk_delayed_reg(7 downto 1));	
+	colbk_delayed_reg <= colbk_snap_reg;
 
-	colpm0_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm0_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm0_delayed_reg(7 downto 1));		
-	colpm1_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm1_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm1_delayed_reg(7 downto 1));		
-	colpm2_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm2_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm2_delayed_reg(7 downto 1));		
-	colpm3_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm3_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm3_delayed_reg(7 downto 1));		
+--	colpm0_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpm0_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm0_delayed_reg(7 downto 1));		
+--	colpm1_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpm1_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm1_delayed_reg(7 downto 1));		
+--	colpm2_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpm2_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm2_delayed_reg(7 downto 1));		
+--	colpm3_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpm3_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm3_delayed_reg(7 downto 1));		
+	colpm0_delayed_reg <= colpm0_snap_reg;
+	colpm1_delayed_reg <= colpm1_snap_reg;
+	colpm2_delayed_reg <= colpm2_snap_reg;
+	colpm3_delayed_reg <= colpm3_snap_reg;
 
-	colpf0_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf0_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf0_delayed_reg(7 downto 1));		
-	colpf1_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf1_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf1_delayed_reg(7 downto 1));		
-	colpf2_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf2_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf2_delayed_reg(7 downto 1));		
-	colpf3_delay : wide_delay_line
-		generic map (COUNT=>2, WIDTH=>7)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf3_raw_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf3_delayed_reg(7 downto 1));				
+--	colpf0_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpf0_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf0_delayed_reg(7 downto 1));		
+--	colpf1_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpf1_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf1_delayed_reg(7 downto 1));		
+--	colpf2_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpf2_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf2_delayed_reg(7 downto 1));		
+--	colpf3_delay : wide_delay_line
+--		generic map (COUNT=>2, WIDTH=>7)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>colpf3_snap_reg(7 downto 1),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf3_delayed_reg(7 downto 1));				
+	colpf0_delayed_reg <= colpf0_snap_reg;
+	colpf1_delayed_reg <= colpf1_snap_reg;
+	colpf2_delayed_reg <= colpf2_snap_reg;
+	colpf3_delayed_reg <= colpf3_snap_reg;
 
 	hposp0_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp0_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp0_delayed_reg(7 downto 0));		
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp0_delayed_reg(7 downto 0));		
 	hposp1_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp1_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp1_delayed_reg(7 downto 0));		
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp1_delayed_reg(7 downto 0));		
 	hposp2_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp2_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp2_delayed_reg(7 downto 0));		
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp2_delayed_reg(7 downto 0));		
 	hposp3_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp3_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp3_delayed_reg(7 downto 0));				
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp3_delayed_reg(7 downto 0));				
 
 	hposm0_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm0_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm0_delayed_reg(7 downto 0));		
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm0_delayed_reg(7 downto 0));		
 	hposm1_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm1_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm1_delayed_reg(7 downto 0));		
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm1_delayed_reg(7 downto 0));		
 	hposm2_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm2_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm2_delayed_reg(7 downto 0));		
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm2_delayed_reg(7 downto 0));		
 	hposm3_delay : wide_delay_line
-		generic map (COUNT=>5, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm3_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm3_delayed_reg(7 downto 0));				
+		generic map (COUNT=>3, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm3_delayed_reg(7 downto 0));				
 		
 	sizep0_delay : wide_delay_line
-		generic map (COUNT=>4, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep0_raw_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep0_delayed_reg(1 downto 0));		
+		generic map (COUNT=>2, WIDTH=>2)
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep0_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep0_delayed_reg(1 downto 0));		
 	sizep1_delay : wide_delay_line
-		generic map (COUNT=>4, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep1_raw_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep1_delayed_reg(1 downto 0));		
+		generic map (COUNT=>2, WIDTH=>2)
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep1_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep1_delayed_reg(1 downto 0));		
 	sizep2_delay : wide_delay_line
-		generic map (COUNT=>4, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep2_raw_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep2_delayed_reg(1 downto 0));		
+		generic map (COUNT=>2, WIDTH=>2)
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep2_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep2_delayed_reg(1 downto 0));		
 	sizep3_delay : wide_delay_line
-		generic map (COUNT=>4, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep3_raw_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep3_delayed_reg(1 downto 0));		
+		generic map (COUNT=>2, WIDTH=>2)
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep3_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep3_delayed_reg(1 downto 0));		
 	sizem_delay : wide_delay_line
-		generic map (COUNT=>4, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizem_raw_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizem_delayed_reg(7 downto 0));				
+		generic map (COUNT=>2, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizem_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizem_delayed_reg(7 downto 0));				
 		
 	-- joystick
 	process(trig_reg, trig, gractl_reg)
@@ -1592,5 +1825,3 @@ begin
 	consol_out <= consol_output_reg;
 
 end vhdl;
-
-

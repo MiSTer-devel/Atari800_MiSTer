@@ -57,11 +57,9 @@ ENTITY atari800core_simple_sdram is
 		VIDEO_BURST : out std_logic;
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
-		
+
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
-
-		POKEY_ENABLE : out std_logic;
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
@@ -144,7 +142,7 @@ ENTITY atari800core_simple_sdram is
 		DMA_MEMORY_DATA : out std_logic_vector(31 downto 0);
 
 		-- Special config params
-   	RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
+		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
@@ -177,17 +175,9 @@ ARCHITECTURE vhdl OF atari800core_simple_sdram IS
 	-- ANTIC
 	signal ANTIC_LIGHTPEN : std_logic;
 	
-	-- CARTRIDGE ACCESS
-	SIGNAL	CART_RD4 :  STD_LOGIC;
-	SIGNAL	CART_RD5 :  STD_LOGIC;
-	
 	-- PBI
 	SIGNAL PBI_WRITE_DATA : std_logic_vector(31 downto 0);
 	
-	-- CONFIG
-	SIGNAL USE_SDRAM : STD_LOGIC;
-	SIGNAL ROM_IN_RAM : STD_LOGIC;
-
 	-- POTS
 	SIGNAL POT_RESET : STD_LOGIC;
 	SIGNAL POT_IN : STD_LOGIC_VECTOR(7 downto 0);
@@ -208,10 +198,6 @@ ANTIC_LIGHTPEN <= JOY2_n(4) and JOY1_n(4);
 
 -- GTIA triggers
 GTIA_TRIG <= "11"&JOY2_n(4)&JOY1_n(4);
-
--- Cartridge not inserted
-CART_RD4 <= '0';
-CART_RD5 <= '0';
 
 -- Since we're not exposing PBI, expose a few key parts needed for SDRAM
 SDRAM_DI <= PBI_WRITE_DATA;
@@ -290,7 +276,8 @@ GENERIC MAP
 	palette => palette,
 	low_memory => low_memory,
 	stereo => stereo,
-	covox => covox
+	covox => covox,
+	sdram_start_bank => 0
 )
 PORT MAP
 (
@@ -311,10 +298,10 @@ PORT MAP
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
-	POKEY_ENABLE => POKEY_ENABLE,
 
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
+	SIO_AUDIO => "00000000",
 
 	CA1_IN => CA1_IN,
 	CB1_IN => CB1_IN,
@@ -347,14 +334,14 @@ PORT MAP
 	PBI_WIDTH_32bit_ACCESS => SDRAM_32BIT_WRITE_ENABLE,
 
 	PBI_ROM_DO => "11111111",
-	PBI_REQUEST => open,
-	PBI_REQUEST_COMPLETE => '1',
+	PBI_TAKEOVER => '0',
+	PBI_RELEASE => '0',
+	PBI_REQUEST_COMPLETE => '0',
+	PBI_DISABLE => '1',
 
-	CART_RD4 => CART_RD4,
-	CART_RD5 => CART_RD5,
-	CART_S4_n => open,
-	CART_S5_N => open,
-	CART_CCTL_N => open,
+	CART_RD5 => '0',
+	PBI_MPD_N => '1',
+	PBI_IRQ_N => '1',
 
 	SIO_RXD => SIO_RXD,
 	SIO_TXD => SIO_TXD,
@@ -391,7 +378,6 @@ PORT MAP
 	RAM_SELECT => RAM_SELECT,
 	CART_EMULATION_SELECT => emulated_cartridge_select,
 	PAL => PAL,
-	USE_SDRAM => '1',
 	ROM_IN_RAM => '1',
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT,

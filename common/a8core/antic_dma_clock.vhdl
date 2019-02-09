@@ -9,7 +9,7 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-ENTITY antic_dma_clock IS
+ENTITY antic_dma_clock_del IS
 PORT 
 ( 
 	CLK : IN STD_LOGIC;
@@ -29,9 +29,9 @@ PORT
 	dma_clock_out_2 : out std_logic;
 	dma_clock_out_3 : out std_logic
 );
-END antic_dma_clock;
+END antic_dma_clock_del;
 
-ARCHITECTURE vhdl OF antic_dma_clock IS
+ARCHITECTURE vhdl OF antic_dma_clock_del IS
 	signal dma_shiftreg_next : std_logic_vector(7 downto 0);
 	signal dma_shiftreg_reg : std_logic_vector(7 downto 0);
 	
@@ -55,13 +55,12 @@ BEGIN
 
 		if (enable_dma = '1') then			
 			dma_shiftreg_next <= 
-				not((playfield_start nor tick)
-				or playfield_end or vblank)				
-				&dma_shiftreg_reg(7 downto 1);
-		end if;
-		
-		if (playfield_start = '1') then
-			dma_shiftreg_next(7) <= not((playfield_start nor tick) or playfield_end or vblank);
+				not(('0' nor tick)
+				or playfield_end or vblank)
+				&				
+				not((playfield_start nor dma_shiftreg_reg(7))
+				or vblank)				
+				&dma_shiftreg_reg(6 downto 1);
 		end if;
 	end process;
 	

@@ -73,12 +73,17 @@ ARCHITECTURE vhdl OF shared_enable IS
 	signal speed_shift_next : std_logic_vector(cycle_length-1 downto 0);
 	signal speed_shift_reg : std_logic_vector(cycle_length-1 downto 0);	
 	
-	-- TODO - clean up
-	signal oldcpu_pending_next : std_logic;
-	signal oldcpu_pending_reg : std_logic;
-	signal oldcpu_go : std_logic;
+	signal oldcycle_go : std_logic;
+	signal oldcycle_state_next : std_logic_vector(2 downto 0);
+	signal oldcycle_state_reg : std_logic_vector(2 downto 0);
+	constant oldcycle_state_idle : std_logic_vector(2 downto 0) := "000";
+	constant oldcycle_state_first_cycle_in_progress : std_logic_vector(2 downto 0) := "001";
+	constant oldcycle_state_cycle_in_progress : std_logic_vector(2 downto 0) := "010";
+	constant oldcycle_state_will_start_when_memory_free : std_logic_vector(2 downto 0) := "011";
+	constant oldcycle_state_delayed : std_logic_vector(2 downto 0) := "100";
 	
 	signal memory_ready : std_logic;
+	signal skip_cycle : std_logic;
 
 	constant cycle_length_bits: integer := integer(ceil(log2(real(cycle_length))));
 begin
@@ -119,25 +124,84 @@ begin
 	begin
 		if (reset_n = '0') then
 			cpu_extra_enable_reg <= '0';
-			oldcpu_pending_reg <= '0';
+			oldcycle_state_reg <= oldcycle_state_idle;
 			speed_shift_reg <= (others=>'0');
 		elsif (clk'event and clk='1') then										
 			cpu_extra_enable_reg <= cpu_extra_enable_next;
-			oldcpu_pending_reg <= oldcpu_pending_next;
+			oldcycle_state_reg <= oldcycle_state_next;
 			speed_shift_reg <= speed_shift_next;
 		end if;
 	end process;
 	
 	-- next state
 	memory_ready <= memory_ready_cpu or memory_ready_antic;
-	cpu_enable <= (speed_shift_reg(0) or cpu_extra_enable_reg or enable_179) and not(pause_6502 or antic_refresh);
+	skip_cycle <= pause_6502 or antic_refresh;
+
+	cpu_enable <= (speed_shift_reg(0) or cpu_extra_enable_reg or enable_179) and not(skip_cycle);
 	cpu_extra_enable_next <= cpu_enable and not(memory_ready);
-	
-	oldcpu_pending_next <= (oldcpu_pending_reg or enable_179) and not(memory_ready or antic_refresh or pause_6502);
-	oldcpu_go <= (oldcpu_pending_reg or enable_179) and (memory_ready or antic_refresh or pause_6502);
+
+	process(oldcycle_state_reg,enable_179,memory_ready,skip_cycle,cpu_enable)
+	begin
+		oldcycle_go <= '0';
+		oldcycle_state_next <= oldcycle_state_reg;
+
+		case (oldcycle_state_reg) is
+		when oldcycle_state_idle =>
+			if (enable_179 = '1') then
+				if (skip_cycle = '1') then
+					oldcycle_go <= '1';
+				else
+					if (memory_ready = '1') then
+						oldcycle_go <= '1';
+					else
+						oldcycle_state_next <= oldcycle_state_first_cycle_in_progress;
+					end if;
+				end if;
+			else
+				if (cpu_enable = '1' and memory_ready='0') then
+					oldcycle_state_next <= oldcycle_state_cycle_in_progress;
+				end if;
+			end if;
+		when oldcycle_state_first_cycle_in_progress =>
+			if (memory_ready = '1') then
+				oldcycle_go <= '1';
+				oldcycle_state_next <= oldcycle_state_idle;
+			end if;
+		when oldcycle_state_cycle_in_progress =>
+			if (enable_179 = '1') then
+				if (memory_ready = '1') then
+					oldcycle_state_next <= oldcycle_state_delayed;
+				else
+					oldcycle_state_next <= oldcycle_state_will_start_when_memory_free;
+				end if;
+			else
+				if (memory_ready = '1') then
+					oldcycle_state_next <= oldcycle_state_idle;
+				end if;
+			end if;
+		when oldcycle_state_will_start_when_memory_free =>
+			if (memory_ready = '1') then
+				oldcycle_state_next <= oldcycle_state_delayed;
+			end if;
+		when oldcycle_state_delayed =>
+			oldcycle_state_next <= oldcycle_state_idle;
+			if (skip_cycle = '1') then
+				oldcycle_go <= '1';
+			else
+				if (memory_ready = '1') then
+					oldcycle_go <= '1';
+				else
+					oldcycle_state_next <= oldcycle_state_first_cycle_in_progress;
+				end if;
+			end if;
+		when others=>
+			oldcycle_state_next <= oldcycle_state_idle;
+		end case;
+
+	end process;
 	
 	-- output
-	oldcpu_enable <= oldcpu_go;
+	oldcpu_enable <= oldcycle_go;
 	ANTIC_ENABLE_179 <= enable_179_early;
 	
 	CPU_ENABLE_OUT <= cpu_enable; -- run at 25MHz
