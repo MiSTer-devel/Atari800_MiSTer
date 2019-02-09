@@ -20,15 +20,14 @@ DIR = a800
 MINSTARTUP_SRC = mycrt0.s
 MINSTARTUP_OBJ = $(patsubst $(STARTUP_DIR)/%.s,$(BUILD_DIR)/%.o,$(MINSTARTUP_SRC))
 
-CORE_SRC = cartridge.c uart.c file.c
-COMMON_SRC = ${CORE_SRC}
+COMMON_SRC = uart.c file.c printf.c 
 
 PRJ = zpu_rom_800
-SRC = $(COMMON_SRC) main800.c atari_drive_emulator.c libgcc_divmod.c
+SRC = $(COMMON_SRC) main800.c atari_drive_emulator.c libgcc_divmod.c joystick800.c freeze800.c
 OBJ = $(patsubst %.c,$(800_BUILD_DIR)/%.o,$(SRC))
 
 5200_PRJ = zpu_rom_5200
-5200_SRC = $(COMMON_SRC) main5200.c printf.c joystick.c freeze.c
+5200_SRC = $(COMMON_SRC) main5200.c joystick5200.c freeze5200.c
 5200_OBJ = $(patsubst %.c,$(5200_BUILD_DIR)/%.o,$(5200_SRC))
 
 LINKMAP  = ./standalone_simple.ld

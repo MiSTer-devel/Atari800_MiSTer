@@ -3,24 +3,19 @@
 #include "integer.h"
 #include "regs.h"
 #include "pause.h"
-
-#include "file.h"
-#include "cartridge.h"
-
 #include "memory.h"
+#include "file.h"
+#include "printf.h"
+#include "joystick.h" 
+#include "freeze.h"
 
-void mainmenu();
-
-// TODO - needs serious cleanup!
+void mainloop();
 
 // FUNCTIONS in here
-// i) pff init - NOT USED EVERYWHERE
-// ii) file selector - kind of crap, no fine scrolling - NOT USED EVERYWHERE
-// iii) cold reset atari (clears base ram...)
-// iv) start atari (begins paused)
-// v) freeze/resume atari - NOT USED EVERYWHERE!
-// vi) menu for various options - NOT USED EVERYWHERE!
-// vii) pause - TODO - base this on pokey clock...
+//   cold reset atari (clears base ram...)
+//   start atari (begins paused)
+//   freeze/resume atari - NOT USED EVERYWHERE!
+//   pause - TODO - base this on pokey clock...
 
 // standard ZPU IN/OUT use...
 // OUT1 - 6502 settings (pause,reset,speed)
@@ -102,23 +97,84 @@ wait_us(int unsigned num)
 	// pause counter runs at pokey frequency - should be 1.79MHz
 	int unsigned cycles = (num*230)>>7;
 	*zpu_pause = cycles;
-#ifdef LINUX_BUILD
-	usleep(num);
-#endif
-#ifdef SOCKIT
-	usleep(num);
-#endif
 }
 
-void memset8(void * address, int value, int length)
+int debug_pos;
+int debug_adjust;
+unsigned char volatile * baseaddr;
+
+unsigned char toatarichar(int val)
 {
-	char * mem = address;
+	int inv = val>=128;
+	if (inv)
+	{
+		val-=128;
+	}
+	if (val>='A' && val<='Z')
+	{
+		val+=-'A'+33;
+	}
+	else if (val>='a' && val<='z')
+	{
+		val+=-'a'+33+64;
+	}
+	else if (val>='0' && val<='9')
+	{
+		val+=-'0'+16;	
+	}
+	else if (val>=32 && val<=47)
+	{
+		val+=-32;
+	}
+	else if (val == ':')
+	{
+		val = 26;
+	}
+	else if (val == '<')
+	{
+		val = 28;
+	}
+	else if (val == '>')
+	{
+		val = 30;
+	}
+	else
+	{
+		val = 0;
+	}
+	if (inv)
+	{
+		val+=128;
+	}
+	return val;
+} 
+
+void clearscreen()
+{
+	unsigned volatile char * screen;
+	for (screen=(unsigned volatile char *)(screen_address+atari_regbase); screen!=(unsigned volatile char *)(atari_regbase+screen_address+1024); ++screen)
+		*screen = 0x00;
+}
+
+void char_out (void* p, char c)
+{
+	unsigned char val = toatarichar(c);
+	if (debug_pos>=0)
+	{
+		*(baseaddr+debug_pos) = val|debug_adjust;
+		++debug_pos;
+	}
+}
+
+void memset8(void *address, int value, int length)
+{
+	char *mem = address;
 	while (length--) *mem++=value;
 }
 
-void memset32(void * address, int value, int length)
+void memset32(void *address, int value, int length)
 {
-	int * mem = address;
+	int *mem = address;
 	while (length--) *mem++=value;
 }
 
@@ -144,23 +200,18 @@ reboot(int cold)
 }
 
 #define NUM_FILES 8
-struct SimpleFile * files[NUM_FILES];
+struct SimpleFile files[NUM_FILES];
 
-#ifdef LINUX_BUILD
-int zpu_main(void)
-#else
+int last_mount;
+
 int main(void)
-#endif
 {
 	INIT_MEM
 
 	int i;
-	for (i=0; i!=NUM_FILES; ++i)
-	{
-		files[i] = (struct SimpleFile *)alloca(sizeof(struct SimpleFile));
-		file_init(files[i], i);
-	}
-
+	for (i=0; i!=NUM_FILES; ++i) file_init(&files[i], i);
+	file_reset();
+	
 	set_pause_6502(1);
 	set_reset_6502(1);
 	set_reset_6502(0);
@@ -172,6 +223,14 @@ int main(void)
 	set_cart_select(0);
 	set_freezer_enable(0);
 
-	mainmenu();
+	freeze_init((void*)FREEZE_MEM); // 128k
+
+	debug_pos = -1;
+	debug_adjust = 0;
+	baseaddr = (unsigned char volatile *)(screen_address + atari_regbase);
+	init_printf(0, char_out);
+
+	last_mount = 0;
+	mainloop();
 	return 0;
 }

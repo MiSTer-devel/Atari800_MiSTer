@@ -2,21 +2,6 @@
 
 #include "regs.h"
 
-//#include <stdio.h>
-//#include <printf.h>
-//extern int debug_pos;
-
-#ifdef USB
-#include "usb.h"
-#endif
-
-#ifdef USB
-extern struct usb_host usb_porta;
-#endif
-#ifdef USB2
-extern struct usb_host usb_portb;
-#endif
-
 unsigned char pot0;
 unsigned char pot1;
 unsigned char pot2;
@@ -27,13 +12,6 @@ void joystick_poll(struct joystick_status * status)
 	status->y_ = 0;
 	status->fire_ = 0;
 	status->escape_ = 0;
-
-#ifdef USB
-	usb_poll(&usb_porta);
-#endif
-#ifdef USB2
-	usb_poll(&usb_portb);
-#endif
 
 	int controls = get_controls();
 
@@ -81,31 +59,6 @@ void joystick_poll(struct joystick_status * status)
 		status->fire_ = !!(controls&0x10);
 		status->escape_ = !!(controls&0x20);
 	}
-
-	//if (porta != 0xff)
-	//printf("%02x %x %x %x\n",porta,status->x_,status->y_,status->fire_);
-/*
-	if (0==(porta&0x2)) // down
-	{
-		status->y_ =1;
-	}
-	else if (0==(porta&0x1)) // up
-	{
-		status->y_ =-1;
-	}
-	if (0==(porta&0x8)) // right
-	{
-		status->x_ = 1;
-	}
-	else if (0==(porta&0x4)) // left
-	{
-		status->x_ = -1;
-	}
-	if (0==(1&*atari_trig0)) // fire
-	{
-		status->fire_ = 1;
-	}
-*/
 }
 
 void joystick_wait(struct joystick_status * status, enum JoyWait waitFor)

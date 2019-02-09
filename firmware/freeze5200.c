@@ -4,11 +4,11 @@
 #include "memory.h"
 
 unsigned char store_portb;
-unsigned volatile char * store_mem;
-unsigned volatile char * custom_mirror;
-unsigned volatile char * atari_base;
+unsigned volatile char *store_mem;
+unsigned volatile char *custom_mirror;
+unsigned volatile char *atari_base;
 
-void freeze_init(void * memory)
+void freeze_init(void *memory)
 {
 	store_mem = (unsigned volatile char *)memory;
 
