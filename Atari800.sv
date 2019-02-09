@@ -132,7 +132,7 @@ localparam CONF_STR = {
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",
 	"OAC,Drive Speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"-;",
-	"ODF,RAM,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB;",
+	"ODF,RAM,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
 	"-;",
 	"O5,Video mode,PAL,NTSC;",
 	"O6,Aspect ratio,4:3,16:9;",
