@@ -396,6 +396,8 @@ set_global_assignment -name VHDL_FILE common/components/mult_infer.vhdl
 set_global_assignment -name VHDL_FILE common/components/ps2_keyboard.vhdl
 set_global_assignment -name VHDL_FILE common/components/sdram_statemachine.vhdl
 set_global_assignment -name VHDL_FILE common/components/synchronizer.vhdl
+set_global_assignment -name VHDL_FILE common/components/latch_delay_line.vhdl
+set_global_assignment -name VHDL_FILE common/components/simple_low_pass_filter.vhdl
 set_global_assignment -name VHDL_FILE common/zpu/zpu_core.vhd
 set_global_assignment -name VHDL_FILE common/zpu/zpucore.vhd
 set_global_assignment -name VHDL_FILE common/zpu/zpupkg.vhd
