@@ -52,8 +52,6 @@ ENTITY atari5200core_simplesdram is
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
 
-		POKEY_ENABLE : out std_logic;
-
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
@@ -105,10 +103,6 @@ ARCHITECTURE vhdl OF atari5200core_simplesdram IS
 
 -- PBI
 SIGNAL PBI_WRITE_DATA : std_logic_vector(31 downto 0);
-
--- CONFIG
-SIGNAL USE_SDRAM : STD_LOGIC;
-SIGNAL ROM_IN_RAM : STD_LOGIC;
 
 -- TRIG
 SIGNAL TRIG : STD_LOGIC_VECTOR(1 downto 0);
@@ -233,7 +227,6 @@ PORT MAP
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
-	POKEY_ENABLE => POKEY_ENABLE,
 
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
@@ -298,7 +291,6 @@ PORT MAP
 	MEMORY_READY_DMA => MEMORY_READY_DMA,
 
 	-- Special config params
-	USE_SDRAM => '1',
 	ROM_IN_RAM => '1',
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT
