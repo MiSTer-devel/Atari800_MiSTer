@@ -232,7 +232,7 @@ begin
 		zpu_16bit_write_enable_next <= zpu_16bit_write_enable_reg;
 		zpu_32bit_write_enable_next <= zpu_32bit_write_enable_reg;	
 		
-		request_type <= config_mem&block_mem&zpu_addr_unsigned(15)&memory_access&zpu_memory_fetch_pending_reg;
+		request_type <= config_mem&block_mem&(zpu_addr_unsigned(14) and zpu_addr_unsigned(15))&memory_access&zpu_memory_fetch_pending_reg;
 		case request_type is
 			when "00010"|"00110" =>
 				zpu_memory_fetch_pending_next <= '1';

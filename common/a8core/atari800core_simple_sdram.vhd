@@ -83,6 +83,7 @@ ENTITY atari800core_simple_sdram is
 		SIO_COMMAND : out std_logic;
 		SIO_RXD : in std_logic;
 		SIO_TXD : out std_logic;
+		SIO_CLOCK : out std_logic;
 
 		-- GTIA consol
 		CONSOL_OPTION : IN STD_LOGIC;
@@ -345,6 +346,7 @@ PORT MAP
 
 	SIO_RXD => SIO_RXD,
 	SIO_TXD => SIO_TXD,
+	SIO_CLOCKOUT => SIO_CLOCK,
 
 	CONSOL_OPTION => CONSOL_OPTION,
 	CONSOL_SELECT => CONSOL_SELECT,

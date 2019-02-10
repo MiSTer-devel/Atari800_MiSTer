@@ -300,6 +300,7 @@ PORT MAP
 	ZPU_SIO_TXD => open,
 	ZPU_SIO_RXD => '1',
 	ZPU_SIO_COMMAND => '1',
+	ZPU_SIO_CLK => '0',
 
 	-- external control
 	-- switches etc. sector DMA blah blah.

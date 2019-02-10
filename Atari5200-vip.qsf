@@ -387,7 +387,6 @@ set_global_assignment -name VHDL_FILE common/a8core/reg_file.vhdl
 set_global_assignment -name VHDL_FILE common/a8core/shared_enable.vhdl
 set_global_assignment -name VHDL_FILE common/a8core/simple_counter.vhdl
 set_global_assignment -name VHDL_FILE common/a8core/wide_delay_line.vhdl
-set_global_assignment -name VHDL_FILE common/components/sio_device.vhdl
 set_global_assignment -name VHDL_FILE common/components/syncreset_enable_divider.vhd
 set_global_assignment -name VHDL_FILE common/components/complete_address_decoder.vhdl
 set_global_assignment -name VHDL_FILE common/components/delay_line.vhdl
@@ -403,6 +402,9 @@ set_global_assignment -name VHDL_FILE common/zpu/zpucore.vhd
 set_global_assignment -name VHDL_FILE common/zpu/zpupkg.vhd
 set_global_assignment -name VHDL_FILE common/zpu/zpu_config_regs.vhdl
 set_global_assignment -name VHDL_FILE common/zpu/zpu_glue.vhdl
+set_global_assignment -name VHDL_FILE common/zpu/sio_handler.vhdl
+set_global_assignment -name VHDL_FILE common/zpu/fifo_transmit.vhd
+set_global_assignment -name VHDL_FILE common/zpu/fifo_receive.vhd
 set_global_assignment -name VHDL_FILE bram.vhd
 set_global_assignment -name VHDL_FILE atari5200top.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE Atari5200.sv

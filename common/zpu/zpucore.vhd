@@ -49,6 +49,7 @@ ENTITY zpucore IS
 		ZPU_SIO_TXD : out std_logic;
 		ZPU_SIO_RXD : in std_logic;
 		ZPU_SIO_COMMAND : in std_logic;
+		ZPU_SIO_CLK : in std_logic;
 
 		-- external control
 		-- switches etc. sector DMA blah blah.
@@ -134,7 +135,7 @@ PORT MAP (
 	IN3 => ZPU_IN3,
 	IN4 => ZPU_IN4,
 	IN_RD => ZPU_RD,
-
+	
 	OUT1 => ZPU_OUT1,
 	OUT2 => ZPU_OUT2,
 	OUT3 => ZPU_OUT3,
@@ -146,6 +147,7 @@ PORT MAP (
 	SIO_DATA_IN => ZPU_SIO_TXD,
 	SIO_DATA_OUT => ZPU_SIO_RXD,
 	SIO_COMMAND => ZPU_SIO_COMMAND,
+	SIO_CLK_OUT => ZPU_SIO_CLK,
 
 	DATA_OUT => ZPU_CONFIG_DO,
 	PAUSE_ZPU => ZPU_PAUSE

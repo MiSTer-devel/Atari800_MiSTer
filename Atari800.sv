@@ -125,8 +125,8 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
-	"S0,ATRXEXXFD,Mount Drive 1;",
-	"S1,ATRXEXXFD,Mount Drive 2;",
+	"S0,ATRXEXXFDATX,Mount D1;",
+	"S1,ATRXEXXFDATX,Mount D2;",
 	"S2,CARROMBIN,Load Cart;",
 	"-;",
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",

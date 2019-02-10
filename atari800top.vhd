@@ -135,6 +135,7 @@ signal zpu_pokey_enable : std_logic;
 signal zpu_sio_txd : std_logic;
 signal zpu_sio_rxd : std_logic;
 signal zpu_sio_command : std_logic;
+signal zpu_sio_clk : std_logic;
 
 signal OLD_OUT : STD_LOGIC_VECTOR(7 DOWNTO 0);
 signal old_command : std_logic;
@@ -276,6 +277,7 @@ PORT MAP
 	SIO_COMMAND => zpu_sio_command,
 	SIO_RXD => zpu_sio_txd,
 	SIO_TXD => zpu_sio_rxd,
+	SIO_CLOCK => zpu_sio_clk,
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
@@ -420,6 +422,7 @@ PORT MAP
 	ZPU_SIO_TXD => zpu_sio_txd,
 	ZPU_SIO_RXD => zpu_sio_rxd,
 	ZPU_SIO_COMMAND => zpu_sio_command,
+	ZPU_SIO_CLK => zpu_sio_clk,
 
 	-- external control
 	-- switches etc. sector DMA blah blah.
