@@ -23,7 +23,7 @@ MINSTARTUP_OBJ = $(patsubst $(STARTUP_DIR)/%.s,$(BUILD_DIR)/%.o,$(MINSTARTUP_SRC
 COMMON_SRC = uart.c file.c printf.c 
 
 PRJ = zpu_rom_800
-SRC = $(COMMON_SRC) main800.c atari_drive_emulator.c libgcc_divmod.c joystick800.c freeze800.c
+SRC = $(COMMON_SRC) main800.c atari_drive_emulator.c atx.c atx_eclaire.c libgcc_divmod.c joystick800.c freeze800.c
 OBJ = $(patsubst %.c,$(800_BUILD_DIR)/%.o,$(SRC))
 
 5200_PRJ = zpu_rom_5200

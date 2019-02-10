@@ -4,6 +4,8 @@
 #include "uart.h"
 #include "regs.h"
 #include "pause.h"
+#include "atx_eclaire.h"
+#include "atx.h"
 //#include "hexdump.h"
 
 //#include "printf.h"
@@ -63,16 +65,13 @@ struct ATRHeader
 } __attribute__((packed));
 struct ATRHeader atr_header;
 int offset;
-int xex_loader;
+char custom_loader;
 int xex_size;
 
-int speed;
+char speed;
+char opendrive;
 
-int badcommandcount;
-int commandcount;
-int opendrive;
-
-int readonly;
+unsigned char atari_sector_status;
 
 unsigned char atari_sector_buffer[256];
 
@@ -81,7 +80,7 @@ unsigned char get_checksum(unsigned char* buffer, int len);
 #define    TWOBYTESTOWORD(ptr,val)           (*((u08*)(ptr)) = val&0xff);(*(1+(u08*)(ptr)) = (val>>8)&0xff);
 
 void processCommand();
-void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len);
+void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len, int success);
 void clearAtariSectorBuffer()
 {
 	int i=256;
@@ -126,15 +125,9 @@ struct command
 
 static void switch_speed()
 {
-	if (speed == speedslow)
-	{
-		speed = speedfast;
-	}
-	else
-	{
-		speed = speedslow;
-	}
-	USART_Init(speed+6);
+
+	int tmp = *zpu_uart_divisor;
+	*zpu_uart_divisor = tmp-1;
 }
 
 void getCommand(struct command * cmd)
@@ -142,34 +135,41 @@ void getCommand(struct command * cmd)
 	int expchk;
 	int i;
 	unsigned char cmdstat;
+	int prob;
+	prob = 0;
 	while (1)
 	{
-		while (0 == USART_Command_Line())
-		{
-			actions();
-			wait_us(3);
-		}
-		USART_Init(speed+6);
-		*zpu_siocommand_ready = 1; // clear
-
-		do {
-			actions();
-			wait_us(3);
-			cmdstat = *zpu_siocommand_ready;
-		} while (0 == cmdstat);
-
-		if (cmdstat & 0x40) {
-			// state machine is stopped, just (re-)start it
-			continue;
-		}
-		if ((cmdstat & 0x80) || USART_Framing_Error()) {
-			// state machine reported error or we got a framing error:
-			// switch speed and retry
-			switch_speed();
-			continue;
-		}
 		for (i=0;i!=5;++i)
-			((unsigned char *)cmd)[i] = zpu_siocommand_data[i<<2];
+		{
+			u32 data = USART_Receive_Byte(); // Timeout?
+			*zpu_uart_debug = i;
+			*zpu_uart_debug = 1&(data>>8);
+			*zpu_uart_debug = data&0xff;
+			if (USART_Framing_Error() | ((data>>8)!=(i+1)))
+			{
+				prob = 1;
+				break;
+			}
+			((unsigned char *)cmd)[i] = data&0xff;
+			//*zpu_uart_debug = (data&0xff);
+			//*zpu_uart_debug3 = i;
+		}
+
+
+		if (prob) // command malformed, try again!
+		{
+			prob = 0;
+
+			*zpu_uart_debug2 = 0xf0;
+			// error
+			continue;
+		}
+
+		*zpu_uart_debug = 0xba;
+		USART_Receive_Byte();
+		*zpu_uart_debug = 0xda;
+
+		*zpu_uart_debug = *zpu_uart_divisor;
 
 		atari_sector_buffer[0] = cmd->deviceId;
 		atari_sector_buffer[1] = cmd->command;
@@ -177,12 +177,18 @@ void getCommand(struct command * cmd)
 		atari_sector_buffer[3] = cmd->aux2;
 		expchk = get_checksum(&atari_sector_buffer[0],4);
 
+		//*zpu_uart_debug2 = expchk;
+		//*zpu_uart_debug2 = cmd->chksum;
+
 		if (expchk==cmd->chksum) {
+			*zpu_uart_debug2 = 0x44;
 			// got a command frame
+			//
+			switch_speed();
 			break;
 		} else {
+			*zpu_uart_debug2 = 0xff;
 			// just an invalid checksum, switch speed anyways
-			switch_speed();
 		}
 	}
 
@@ -193,25 +199,35 @@ void getCommand(struct command * cmd)
 void set_drive_status(int driveNumber, struct SimpleFile * file)
 {
 	int read = 0;
+	int xfd = 0;
+	int atx = 0;
 	unsigned char info = 0;
 
 	drives[driveNumber] = 0;
 	drive_info[driveNumber] = 0;
 
+	*zpu_uart_debug2 = 0x11;
+
 	if (!file) return;
+
+	*zpu_uart_debug2 = 0x12;
 
 	//printf("WTF:%d %x\n",driveNumber, file);
 
 	// Read header
 	read = 0;
 	file_seek(file,0);
+	*zpu_uart_debug2 = 0x23;
 	file_read(file,(unsigned char *)&atr_header, 16, &read);
-
+	*zpu_uart_debug2 = 0x33;
 	if (read!=16)
 	{
 		//printf("Could not read header\n");
 		return; //while(1);
 	}
+
+	*zpu_uart_debug2 = 0x13;
+
 	byteswap(&atr_header.wMagic);
 	byteswap(&atr_header.wPars);
 	byteswap(&atr_header.wSecSize);
@@ -227,8 +243,9 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	printf("%d",atr_header.dwCRC);
 	printf("\n");
 	*/
-	
-	xex_loader = 0;
+
+	custom_loader = 0;
+	atari_sector_status = 0xff;
 
 	if (file_type(file) == 2)
 	{
@@ -240,12 +257,30 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		atr_header.wSecSize = 0x80;
 		atr_header.btFlags |= file_readonly(file);
 	}
+	if (file_type(file) == 3)
+	{
+		int i;
+		unsigned char j;
+		int k;
+		int orig;
+		u16 sectorSize;
+		offset = -256;
+		custom_loader = 2;
+		atr_header.wMagic = 0xffff;
+		xex_size = file_size(file);
+		atr_header.wPars = xex_size/16;
+		atr_header.wSecSize = XEX_SECTOR_SIZE;
+		atr_header.btFlags = 1;
+
+		gAtxFile = file;
+		sectorSize = loadAtxFile(0);
+	}
 	else if (atr_header.wMagic == 0xFFFF) // XEX
 	{
 		int i;
 		//printf("XEX ");
 		offset = -256;
-		xex_loader = 1;
+		custom_loader = 1;
 		atr_header.wMagic = 0xffff;
 		xex_size = file_size(file);
 		atr_header.wPars = xex_size/16;
@@ -263,6 +298,8 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		//printf("Unknown file type");
 		return;
 	}
+
+	*zpu_uart_debug2 = 0x14;
 
 	if (atr_header.btFlags&1)
 	{
@@ -291,6 +328,8 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	}	
 	//printf("%d",atr_header.wPars);
 	//printf("0\n");
+	//
+	*zpu_uart_debug2 = 0x15;
 
 	drives[driveNumber] = file;
 	drive_info[driveNumber] = info;
@@ -306,14 +345,6 @@ void init_drive_emulator()
 {
 	int i;
 
-	if(!init_done)
-	{
-		init_done = 1;
-		set_turbo_drive(7);
-	}
-
-	commandcount = 0;
-	badcommandcount = 0;
 	opendrive = -1;
 	speed = speedslow;
 	USART_Init(speed+6);
@@ -333,410 +364,484 @@ void run_drive_emulator()
 
 /////////////////////////
 
+struct sio_action
+{
+	int bytes;
+	int success;
+	int speed;
+	int respond;
+};
+
+typedef void (*CommandHandler)(struct command, struct SimpleFile *, struct sio_action *);
+CommandHandler  getCommandHandler(struct command);
+
 void processCommand()
 {
 	struct command command;
 
 	getCommand(&command);
 
-	++commandcount;
-	/*FIXME if (commandcount==4 && (4==(4&(*zpu_switches))))
-	{
-		//printf("Paused\n");
-		pause_6502(1);
-		while(1);
-	}*/
-	/*if (badcommandcount==8)
-	{
-		//printf("Stuck?\n");
-		pause_6502(1);
-		while(1);
-	}*/
-
 	if (command.deviceId >= 0x31 && command.deviceId <= 0x34)
 	{
-		int sent = 0;
 		int drive = 0;
 		struct SimpleFile * file = 0;
 
 		drive = (command.deviceId&0xf) -1;
 	//	printf("Drive:");
 	//	printf("%x %d",command.deviceId,drive);
-		if (drive!=opendrive)
-		{
-			if (drive<MAX_DRIVES && drive>=0)
-			{
-				opendrive = drive;
-				set_drive_status(drive, drives[drive]);
-				//printf("HERE!:%d\n",drive);
-			}
-		}
 
 		if (drive<0 || !drives[drive])
 		{
-			//USART_Transmit_Mode();
 			//send_NACK();
-			//USART_Wait_Transmit_Complete();
 			//wait_us(100); // Wait for transmission to complete - Pokey bug, gets stuck active...
-			//USART_Receive_Mode();
 
 			//printf("Drive not present:%d %x", drive, drives[drive]);
+			//
+			//
+			*zpu_uart_debug2 = 0x16;
 			return;
 		}
 
+		*zpu_uart_debug3 = command.command;
+
 		file = drives[opendrive];
 
-		switch (command.command)
+		CommandHandler handleCommand = getCommandHandler(command);
+		DELAY_T2_MIN;
+		if (handleCommand)
 		{
-		case 0x3f:
+			struct sio_action action;
+			action.bytes = 0;
+			action.success = 1;
+			action.speed = -1;
+			action.respond = 1;
+
+			send_ACK();
+			clearAtariSectorBuffer();
+
+
+			if (drive!=opendrive)
 			{
-				//printf("Speed:");
-				int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
-				USART_Transmit_Mode();
-				send_ACK();
-				clearAtariSectorBuffer();
-				atari_sector_buffer[0] = speedfast;
-				//hexdump_pure(atari_sector_buffer,1);
-				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(1);
-				sent = 1;
-				if (sector == 0)
+				*zpu_uart_debug3 = drive;
+				if (drive<MAX_DRIVES && drive>=0)
 				{
-					speed = speedfast;
-					//printf("SPDF");
-					//printf("%d",speed);
-				}
-				else
-				{
-					speed = speedslow;
-					//printf("SPDS");
-					//printf("%d",speed);
+					opendrive = drive;
+					set_drive_status(drive, drives[drive]);
+					//printf("HERE!:%d\n",drive);
 				}
 			}
-		case 0x53:
-			{
-				unsigned char status;
-				//printf("Stat:");
-				USART_Transmit_Mode();
-				send_ACK();
-				clearAtariSectorBuffer();
 
-				status = 0x10; // Motor on;
-				if (atr_header.btFlags&1)
-				{
-					status |= 0x08; // write protected; // no write support yet...
-				}
-				if (atr_header.wSecSize == 0x80) // normal sector size
-				{
-					if (atr_header.wPars>(720*128/16))
-					{
-						status |= 0x80; // medium density - or a strange one...
-					}
-				}
-				else
-				{
-					status |= 0x20; // 256 byte sectors
-				}
-				atari_sector_buffer[0] = status;
-				atari_sector_buffer[1] = 0xff;
-				atari_sector_buffer[2] = 0xe0;
-				atari_sector_buffer[3] = 0x0;
-				//hexdump_pure(atari_sector_buffer,4); // Somehow with this...
-				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(4);
-				sent = 1;
-				//printf("%d",atari_sector_buffer[0]); // and this... The wrong checksum is sent!!
-				//printf(":done\n");
-			}
-			break;
-		default:
-			// TODO
-			//USART_Transmit_Mode();
-			//send_NACK();
-			//USART_Wait_Transmit_Complete();
-			//USART_Receive_Mode();
-			break;
-		case 0x50: // write
-		case 0x57: // write with verify
-			{
-				//debug_pos = 0;
+			handleCommand(command, drives[drive], &action); //TODO -> this should respond with more stuff and we handle result in a common way...
 
-				int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
-				int sectorSize = 0;
-				int location =0;
-
-				USART_Transmit_Mode();
-				if (file_readonly(file))
-				{
-					send_NACK();
-					USART_Wait_Transmit_Complete();
-					USART_Receive_Mode();
-					return;
-				}
-				//printf("%f:WACK\n",when());
-				send_ACK();
-				USART_Wait_Transmit_Complete();
-				USART_Receive_Mode();
-		
-				location = offset;
-				if (sector>3)
-				{
-					sector-=4;
-					location += 128*3;
-					location += sector*atr_header.wSecSize;
-					sectorSize = atr_header.wSecSize;
-				}
-				else
-				{
-					location += 128*(sector-1);
-					sectorSize = 128;
-				}
-
-				// Receive the data
-				//printf("%f:Getting data\n",when());
-				int i;
-				for (i=0;i!=sectorSize;++i)
-				{
-					unsigned char temp = USART_Receive_Byte();
-					atari_sector_buffer[i] = temp;
-					//printf("%02x",temp);
-				}
-				unsigned char checksum = USART_Receive_Byte();
-				//hexdump_pure(atari_sector_buffer,sectorSize); // Somehow with this...
-				unsigned char expchk = get_checksum(&atari_sector_buffer[0],sectorSize);
-				//printf("DATA:%d:",sectorSize);
-				//printf("%f:CHK:%02x EXP:%02x %s\n", when(), checksum, expchk, checksum!=expchk ? "BAD" : "");
-				//printf(" %d",atari_sector_buffer[0]); // and this... The wrong checksum is sent!!
-				//printf(":done\n");
-				if (checksum==expchk)
-				{
-					//DELAY_T2_MIN
-					wait_us(20);
-					USART_Transmit_Mode();
-					//printf("%f:WACK data\n",when());
-					send_ACK();
-					USART_Wait_Transmit_Complete();
-
-					//printf("%d",location);
-					//printf("\n");
-					file_seek(file,location);
-					int written = 0;
-					file_write(file,&atari_sector_buffer[0], sectorSize, &written);
-
-					int ok = 0;
-
-					if (command.command == 0x57)
-					{
-						unsigned char buffer[256];
-						int read;
-						file_seek(file,location);
-						file_read(file,buffer,sectorSize,&read);
-
-						ok = 1;
-						for (i=0;i!=sectorSize;++i)
-						{
-							if (buffer[i] != atari_sector_buffer[i]) ok = 0;
-						}
-					}
-					else
-						ok = 1;
-
-					DELAY_T5_MIN;
-					if (ok)
-					{
-						//printf("%f:CMPL\n",when());
-						send_CMPL();
-					}
-					else
-					{
-						//printf("%f:NACK(verify failed)\n",when());
-						send_NACK();
-					}
-
-					USART_Wait_Transmit_Complete();
-					USART_Receive_Mode();
-				}
-				else
-				{
-					//printf("%f:NACK(bad checksum)\n",when());
-					send_NACK();
-
-					USART_Wait_Transmit_Complete();
-					USART_Receive_Mode();
-				}
-
-				//debug_pos = -1;
-			}
-
-			break;
-		case 0x52: // read
-			{
-				int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
-
-				int sectorSize = 0;
-				int read = 0;
-				int location =0;
-
-				DELAY_T2_MIN
-				USART_Transmit_Mode();
-				//printf("%f:ACK\n",when());
-				if (sector == 0)
-				{
-					send_NACK();
-					break;
-				}
-				send_ACK();
-				//printf("Sector:");
-				//printf("%d",sector);
-				//printf(":");
-				if(xex_loader)         //n_sector>0 && //==0 se overuje hned na zacatku
-				{
-					//sektory xex bootloaderu, tj. 1 nebo 2
-					u08 i,b;
-					u08 *spt, *dpt;
-					int file_sectors;
-
-					//file_sectors se pouzije pro sektory $168 i $169 (optimalizace)
-					//zarovnano nahoru, tj. =(size+124)/125
-					file_sectors = ((xex_size+(u32)(XEX_SECTOR_SIZE-3-1))/((u32)XEX_SECTOR_SIZE-3));
-
-					//printf("XEX ");
-
-					if (sector<=2)
-					{
-						//printf("boot ");
-
-						spt= &boot_xex_loader[(u16)(sector-1)*((u16)XEX_SECTOR_SIZE)];
-						dpt= atari_sector_buffer;
-						i=XEX_SECTOR_SIZE;
-						do
-						{
-							b=*spt++;
-							//relokace bootloaderu z $0700 na jine misto
-							//TODO if (b==0x07) b+=bootloader_relocation;
-							*dpt++=b;
-							i--;
-						} while(i);
-					}
-					else
-					if(sector==0x168)
-					{
-						//printf("numtobuffer ");
-						//vrati pocet sektoru diskety
-						//byty 1,2
-						goto set_number_of_sectors_to_buffer_1_2;
-					}
-					else
-					if(sector==0x169)
-					{
-						//printf("name ");
-						//fatGetDirEntry(FileInfo.vDisk.file_index,5,0);
-						//fatGetDirEntry(FileInfo.vDisk.file_index,0); //ale musi to posunout o 5 bajtu doprava
-			
-						{
-							u08 i,j;
-							for(i=j=0;i<8+3;i++)
-							{
-								/*if( ((xex_name[i]>='A' && xex_name[i]<='Z') ||
-									(xex_name[i]>='0' && xex_name[i]<='9')) )
-								{
-								  //znak je pouzitelny na Atari
-								  atari_sector_buffer[j]=xex_name[i];
-								  j++;
-								}*/
-								if ( (i==7) || (i==8+2) )
-								{
-									for(;j<=i;j++) atari_sector_buffer[j]=' ';
-								}
-							}
-							//posune nazev z 0-10 na 5-15 (0-4 budou systemova adresarova data)
-							//musi pozpatku
-							for(i=15;i>=5;i--) atari_sector_buffer[i]=atari_sector_buffer[i-5];
-							//a pak uklidi cely zbytek tohoto sektoru
-							for(i=5+8+3;i<XEX_SECTOR_SIZE;i++)
-								atari_sector_buffer[i]=0x00;
-						}
-
-						//teprve ted muze pridat prvnich 5 bytu na zacatek nulte adresarove polozky (pred nazev)
-						//atari_sector_buffer[0]=0x42;							//0
-						//jestlize soubor zasahuje do sektoru cislo 1024 a vic,
-						//status souboru je $46 misto standardniho $42
-						atari_sector_buffer[0]=(file_sectors>(0x400-0x171))? 0x46 : 0x42; //0
-
-						TWOBYTESTOWORD(atari_sector_buffer+3,0x0171);			//3,4
-						set_number_of_sectors_to_buffer_1_2:
-						TWOBYTESTOWORD(atari_sector_buffer+1,file_sectors);		//1,2
-					}
-					else
-					if(sector>=0x171)
-					{
-						//printf("data ");
-						file_seek(file,((u32)sector-0x171)*((u32)XEX_SECTOR_SIZE-3));
-						file_read(file,&atari_sector_buffer[0], XEX_SECTOR_SIZE-3, &read);
-
-						if(read<(XEX_SECTOR_SIZE-3))
-							sector=0; //je to posledni sektor
-						else
-							sector++; //ukazatel na dalsi
-
-						atari_sector_buffer[XEX_SECTOR_SIZE-3]=((sector)>>8); //nejdriv HB !!!
-						atari_sector_buffer[XEX_SECTOR_SIZE-2]=((sector)&0xff); //pak DB!!! (je to HB,DB)
-						atari_sector_buffer[XEX_SECTOR_SIZE-1]=read;
-					}
-					//printf(" sending\n");
-
-					sectorSize = XEX_SECTOR_SIZE;
-				}
-				else
-				{
-					location = offset;
-					if (sector>3)
-					{
-						sector-=4;
-						location += 128*3;
-						location += sector*atr_header.wSecSize;
-						sectorSize = atr_header.wSecSize;
-					}
-					else
-					{
-						location += 128*(sector-1);
-						sectorSize = 128;
-					}
-					//printf("%d",location);
-					//printf("\n");
-					//printf("%f:Read\n",when());
-					file_seek(file,location);
-					file_read(file,&atari_sector_buffer[0], sectorSize, &read);
-					//printf("%f:Read done\n",when());
-				}
-
-				//topofscreen();
-				//hexdump_pure(atari_sector_buffer,sectorSize);
-				//printf("Sending\n");
-				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(sectorSize);
-				sent = 1;
-
-				//pause_6502(1);
-				//hexdump_pure(0x10000+0x400,128);
-				unsigned char chksumreceive = 0; //get_checksum(0x10000+0x400, sectorSize);
-				//printf(" receive:");
-				//printf("%d",chksumreceive);
-				//printf("\n");
-				//pause_6502(1);
-				//while(1);
-			}
-			
-			break;
+			if (action.respond)
+				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(action.bytes, action.success);
+			if (action.speed>=0)
+				USART_Init(action.speed); // Wait until fifo is empty - then set speed!
 		}
+		else
+		{
+			send_NACK();
+		}
+	}
+}
 
-		//wait_us(100); // Wait for transmission to complete - Pokey bug, gets stuck active...
+void handleSpeed(struct command command, struct SimpleFile * file, struct sio_action * action)
+{
+	//printf("Speed:");
+	int sector = ((int)command.aux2)<<8;
+	atari_sector_buffer[0] = speedfast;
+	//hexdump_pure(atari_sector_buffer,1);
+	action->bytes = 1;
 
-		if (sent)
-			USART_Wait_Transmit_Complete();
-		USART_Receive_Mode();
+	if (sector == 0)
+	{
+		speed = speedfast;
+		//printf("SPDF");
+		//printf("%d",speed);
 	}
 	else
 	{
-		++badcommandcount;
+		speed = speedslow;
+		//printf("SPDS");
+		//printf("%d",speed);
 	}
+
+	action->speed = speed +6;
+}
+
+void handleFormat(struct command command,struct  SimpleFile * file, struct sio_action * action)
+{
+	if (atr_header.btFlags&1)
+	{
+		// fail, write protected
+		action->success = 0;
+	}
+	else
+	{
+		int i;
+		int pos = offset;
+
+		// fill image with zeros
+		int written = 0;
+		for (i=0; i!=(atr_header.wPars>>3); ++i)
+		{
+			file_seek(file,pos);
+			file_write(file,&atari_sector_buffer[0], 128, &written);
+			pos+=128;
+		}
+		file_write_flush();
+
+		// return done
+		atari_sector_buffer[0] = 0xff;
+		atari_sector_buffer[1] = 0xff;
+		for(i=2;i!=atr_header.wSecSize; ++i)
+		{
+			atari_sector_buffer[i] = 0;
+		}
+
+		action->bytes=atr_header.wSecSize;
+	}
+}
+
+void handleReadPercomBlock(struct command command, struct SimpleFile * file, struct sio_action * action)
+{
+	unsigned totalSectors = (atr_header.wPars<<4)/atr_header.wSecSize;
+	//printf("Stat:");
+
+	atari_sector_buffer[0] = 1;
+	atari_sector_buffer[1] = 11;
+	atari_sector_buffer[2] = totalSectors>>8;
+	atari_sector_buffer[3] = totalSectors&0xff;
+	atari_sector_buffer[5] = (atr_header.wSecSize==256) ? 4 : 0;
+	atari_sector_buffer[6] = atr_header.wSecSize>>8;
+	atari_sector_buffer[7] = atr_header.wSecSize&0xff;
+	atari_sector_buffer[8] = 0x0ff;
+	//hexdump_pure(atari_sector_buffer,12); // Somehow with this...
+	
+	action->bytes = 12;
+	//printf("%d",atari_sector_buffer[0]); // and this... The wrong checksum is sent!!
+	//printf(":done\n");
+}
+
+void handleGetStatus(struct command command, struct SimpleFile * file, struct sio_action * action)
+{
+	unsigned char status;
+	//printf("Stat:");
+
+	status = 0x10; // Motor on;
+	if (atr_header.btFlags&1)
+	{
+		status |= 0x08; // write protected; // no write support yet...
+	}
+	if (atr_header.wSecSize == 0x80) // normal sector size
+	{
+		if (atr_header.wPars>(720*128/16))
+		{
+			status |= 0x80; // medium density - or a strange one...
+		}
+	}
+	else
+	{
+		status |= 0x20; // 256 byte sectors
+	}
+	atari_sector_buffer[0] = status;
+	atari_sector_buffer[1] = atari_sector_status;
+	atari_sector_buffer[2] = 0xe0;
+	atari_sector_buffer[3] = 0x0;
+	//hexdump_pure(atari_sector_buffer,4); // Somehow with this...
+	
+	action->bytes = 4;
+	//printf("%d",atari_sector_buffer[0]); // and this... The wrong checksum is sent!!
+	//printf(":done\n");
+}
+
+void handleWrite(struct command command, struct SimpleFile * file, struct sio_action * action)
+{
+	//debug_pos = 0;
+
+	int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
+	int sectorSize = 0;
+	int location =0;
+
+	if (file_readonly(file))
+	{
+		action->success = 0;
+		return;
+	}
+	//printf("%f:WACK\n",when());
+	//
+	action->respond = 0;
+
+	location = offset;
+	if (sector>3)
+	{
+		sector-=4;
+		location += 128*3;
+		location += sector*atr_header.wSecSize;
+		sectorSize = atr_header.wSecSize;
+	}
+	else
+	{
+		location += 128*(sector-1);
+		sectorSize = 128;
+	}
+
+	// Receive the data
+	//printf("%f:Getting data\n",when());
+	int i;
+	for (i=0;i!=sectorSize;++i)
+	{
+		unsigned char temp = USART_Receive_Byte();
+		atari_sector_buffer[i] = temp;
+		//printf("%02x",temp);
+	}
+	unsigned char checksum = USART_Receive_Byte();
+	//hexdump_pure(atari_sector_buffer,sectorSize); // Somehow with this...
+	unsigned char expchk = get_checksum(&atari_sector_buffer[0],sectorSize);
+	//printf("DATA:%d:",sectorSize);
+	//printf("%f:CHK:%02x EXP:%02x %s\n", when(), checksum, expchk, checksum!=expchk ? "BAD" : "");
+	//printf(" %d",atari_sector_buffer[0]); // and this... The wrong checksum is sent!!
+	//printf(":done\n");
+	if (checksum==expchk)
+	{
+		send_ACK();
+
+		DELAY_T2_MIN
+		//printf("%f:WACK data\n",when());
+		//printf("%d",location);
+		//printf("\n");
+		file_seek(file,location);
+		int written = 0;
+		file_write(file,&atari_sector_buffer[0], sectorSize, &written);
+
+		int ok = 0;
+
+		if (command.command == 0x57)
+		{
+			unsigned char buffer[256];
+			int read;
+			file_seek(file,location);
+			file_read(file,buffer,sectorSize,&read);
+
+			ok = 1;
+			for (i=0;i!=sectorSize;++i)
+			{
+				if (buffer[i] != atari_sector_buffer[i]) ok = 0;
+			}
+		}
+		else
+			ok = 1;
+
+		DELAY_T5_MIN;
+
+		if (ok)
+		{
+			//printf("%f:CMPL\n",when());
+			send_CMPL();
+		}
+		else
+		{
+			//printf("%f:NACK(verify failed)\n",when());
+			send_ERR();
+		}
+	}
+	else
+	{
+		//printf("%f:NACK(bad checksum)\n",when());
+		send_NACK();
+	}
+}
+
+void handleRead(struct command command, struct SimpleFile * file, struct sio_action * action)
+{
+	int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
+
+	int read = 0;
+	int location =0;
+
+
+	//printf("Sector:");
+	//printf("%d",sector);
+	//printf(":");
+	if(custom_loader==1)         //n_sector>0 && //==0 se overuje hned na zacatku
+	{
+		//sektory xex bootloaderu, tj. 1 nebo 2
+		u08 i,b;
+		u08 *spt, *dpt;
+		int file_sectors;
+
+		//file_sectors se pouzije pro sektory $168 i $169 (optimalizace)
+		//zarovnano nahoru, tj. =(size+124)/125
+		file_sectors = ((xex_size+(u32)(XEX_SECTOR_SIZE-3-1))/((u32)XEX_SECTOR_SIZE-3));
+
+		//printf("XEX ");
+
+		if (sector<=2)
+		{
+			//printf("boot ");
+
+			spt= &boot_xex_loader[(u16)(sector-1)*((u16)XEX_SECTOR_SIZE)];
+			dpt= atari_sector_buffer;
+			i=XEX_SECTOR_SIZE;
+			do
+			{
+				b=*spt++;
+				//relokace bootloaderu z $0700 na jine misto
+				//TODO if (b==0x07) b+=bootloader_relocation;
+				*dpt++=b;
+				i--;
+			} while(i);
+		}
+		else
+		if(sector==0x168)
+		{
+			//printf("numtobuffer ");
+			//vrati pocet sektoru diskety
+			//byty 1,2
+			goto set_number_of_sectors_to_buffer_1_2;
+		}
+		else
+		if(sector==0x169)
+		{
+			//printf("name ");
+			//fatGetDirEntry(FileInfo.vDisk.file_index,5,0);
+			//fatGetDirEntry(FileInfo.vDisk.file_index,0); //ale musi to posunout o 5 bajtu doprava
+
+			{
+				u08 i,j;
+				for(i=j=0;i<8+3;i++)
+				{
+					/*if( ((xex_name[i]>='A' && xex_name[i]<='Z') ||
+						(xex_name[i]>='0' && xex_name[i]<='9')) )
+					{
+					  //znak je pouzitelny na Atari
+					  atari_sector_buffer[j]=xex_name[i];
+					  j++;
+					}*/
+					if ( (i==7) || (i==8+2) )
+					{
+						for(;j<=i;j++) atari_sector_buffer[j]=' ';
+					}
+				}
+				//posune nazev z 0-10 na 5-15 (0-4 budou systemova adresarova data)
+				//musi pozpatku
+				for(i=15;i>=5;i--) atari_sector_buffer[i]=atari_sector_buffer[i-5];
+				//a pak uklidi cely zbytek tohoto sektoru
+				for(i=5+8+3;i<XEX_SECTOR_SIZE;i++)
+					atari_sector_buffer[i]=0x00;
+			}
+
+			//teprve ted muze pridat prvnich 5 bytu na zacatek nulte adresarove polozky (pred nazev)
+			//atari_sector_buffer[0]=0x42;							//0
+			//jestlize soubor zasahuje do sektoru cislo 1024 a vic,
+			//status souboru je $46 misto standardniho $42
+			atari_sector_buffer[0]=(file_sectors>(0x400-0x171))? 0x46 : 0x42; //0
+
+			TWOBYTESTOWORD(atari_sector_buffer+3,0x0171);			//3,4
+set_number_of_sectors_to_buffer_1_2:
+			TWOBYTESTOWORD(atari_sector_buffer+1,file_sectors);		//1,2
+		}
+		else
+		if(sector>=0x171)
+		{
+			//printf("data ");
+			file_seek(file,((u32)sector-0x171)*((u32)XEX_SECTOR_SIZE-3));
+			file_read(file,&atari_sector_buffer[0], XEX_SECTOR_SIZE-3, &read);
+
+			if(read<(XEX_SECTOR_SIZE-3))
+				sector=0; //je to posledni sektor
+			else
+				sector++; //ukazatel na dalsi
+
+			atari_sector_buffer[XEX_SECTOR_SIZE-3]=((sector)>>8); //nejdriv HB !!!
+			atari_sector_buffer[XEX_SECTOR_SIZE-2]=((sector)&0xff); //pak DB!!! (je to HB,DB)
+			atari_sector_buffer[XEX_SECTOR_SIZE-1]=read;
+		}
+		//printf(" sending\n");
+
+		action->bytes = XEX_SECTOR_SIZE;
+	}
+	else if (custom_loader==2)
+	{
+		gAtxFile = file;
+		unsigned short ss;
+		int res = loadAtxSector(0,sector, &ss, &atari_sector_status);
+
+		action->bytes = ss;
+		action->success = res;
+
+		// Are existing default delays workable or do they need removing?
+		// What if put into drive 3/4? Boom?
+	}
+	else
+	{
+		location = offset;
+		if (sector>3)
+		{
+			sector-=4;
+			location += 128*3;
+			location += sector*atr_header.wSecSize;
+			action->bytes = atr_header.wSecSize;
+		}
+		else
+		{
+			location += 128*(sector-1);
+			action->bytes = 128;
+		}
+		//printf("%d",location);
+		//printf("\n");
+		//printf("%f:Read\n",when());
+		file_seek(file,location);
+		file_read(file,&atari_sector_buffer[0], action->bytes, &read);
+		//printf("%f:Read done\n",when());
+	}
+
+	//topofscreen();
+	//hexdump_pure(atari_sector_buffer,sectorSize);
+	//printf("Sending\n");
+
+	//pause_6502(1);
+	//hexdump_pure(0x10000+0x400,128);
+	//get_checksum(0x10000+0x400, sectorSize);
+	//printf(" receive:");
+	//printf("%d",chksumreceive);
+	//printf("\n");
+	//pause_6502(1);
+	//while(1);
+}
+
+CommandHandler getCommandHandler(struct command command)
+{
+	CommandHandler res = 0;
+	int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
+
+	switch (command.command)
+	{
+	case 0x3f:
+		res = &handleSpeed;
+		break;
+	case 0x21: // format single
+	case 0x22: // format enhanced
+		res = &handleFormat;
+		break;
+	case 0x4e: // read percom block
+		res = &handleReadPercomBlock;
+		break;
+	case 0x53: // get status
+		res = &handleGetStatus;
+		break;
+	case 0x50: // write
+	case 0x57: // write with verify
+		if (sector!=0)
+			res = &handleWrite;
+		break;
+	case 0x52: // read
+		if (sector!=0)
+			res = &handleRead;
+		break;
+	}
+
+	return res;
 }
 	
 unsigned char get_checksum(unsigned char* buffer, int len)
@@ -760,7 +865,7 @@ void USART_Send_Buffer(unsigned char *buff, u16 len)
 	while(len>0) { USART_Transmit_Byte(*buff++); len--; }
 }
 
-void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len)
+void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len, int success)
 {
 	u08 check_sum;
 	//printf("(send:");
@@ -768,7 +873,14 @@ void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len)
 
 	DELAY_T5_MIN;
 	//printf("%f:CMPL\n",when());
-	send_CMPL();
+	if (success)
+	{
+		send_CMPL();
+	}
+	else
+	{
+		send_ERR();
+	}
 
 	// Hias: changed to 100us so that Qmeg3 works again with the
 	// new bit-banging transmission code

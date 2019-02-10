@@ -28,24 +28,23 @@ static const int screen_address = 11328;
 
 #define zpu_spi_dma ((int volatile *)(13*4+zpu_regbase))
 
-#define zpu_pokey_audf0 ((unsigned char volatile *)(0x0*4+pokey_regbase))
-#define zpu_pokey_audc0 ((unsigned char volatile *)(0x1*4+pokey_regbase))
-#define zpu_pokey_audf1 ((unsigned char volatile *)(0x2*4+pokey_regbase))
-#define zpu_pokey_audc1 ((unsigned char volatile *)(0x3*4+pokey_regbase))
-#define zpu_pokey_audf2 ((unsigned char volatile *)(0x4*4+pokey_regbase))
-#define zpu_pokey_audc2 ((unsigned char volatile *)(0x5*4+pokey_regbase))
-#define zpu_pokey_audf3 ((unsigned char volatile *)(0x6*4+pokey_regbase))
-#define zpu_pokey_audc3 ((unsigned char volatile *)(0x7*4+pokey_regbase))
+// read number of us
+#define zpu_timer2 ((int volatile *)(18*4+zpu_regbase))
+// reset timer if > this many us (stored)
+#define zpu_timer2_threshold ((int volatile *)(18*4+zpu_regbase))
 
-#define zpu_pokey_audctl ((unsigned char volatile *)(0x8*4+pokey_regbase))
+// 8-bit random number lsfr
+#define zpu_rand ((int volatile *)(19*4+zpu_regbase))
 
-#define zpu_pokey_skrest ((unsigned char volatile *)(0xa*4+pokey_regbase))
-#define zpu_pokey_serout ((unsigned char volatile *)(0xd*4+pokey_regbase))
-#define zpu_pokey_irqen ((unsigned char volatile *)(0xe*4+pokey_regbase))
-#define zpu_pokey_skctl ((unsigned char volatile *)(0xf*4+pokey_regbase))
-
-#define zpu_siocommand_ready ((unsigned char volatile *)(0x15*4+pokey_regbase))
-#define zpu_siocommand_data ((unsigned char volatile *)(0x10*4+pokey_regbase))
+#define zpu_uart_tx ((u32 volatile *)(0x0*4+pokey_regbase))
+#define zpu_uart_tx_fifo ((u32 volatile *)(0x1*4+pokey_regbase))
+#define zpu_uart_rx ((u32 volatile *)(0x2*4+pokey_regbase))
+#define zpu_uart_rx_fifo ((u32 volatile *)(0x3*4+pokey_regbase))
+#define zpu_uart_divisor ((u32 volatile *)(0x4*4+pokey_regbase))
+#define zpu_uart_framing_error ((u32 volatile *)(0x5*4+pokey_regbase))
+#define zpu_uart_debug ((u32 volatile *)(0x7*4+pokey_regbase))
+#define zpu_uart_debug2 ((u32 volatile *)(0x8*4+pokey_regbase))
+#define zpu_uart_debug3 ((u32 volatile *)(0x9*4+pokey_regbase))
 
 #define atari_nmien ((unsigned char volatile *)(0xd40e + atari_regbase))
 #define atari_dlistl ((unsigned char volatile *)(0xd402 + atari_regbase))
@@ -56,6 +55,8 @@ static const int screen_address = 11328;
 #define atari_chbase ((unsigned char volatile *)(0xd409 + atari_regbase))
 #define atari_chactl ((unsigned char volatile *)(0xd401 + atari_regbase))
 #define atari_dmactl ((unsigned char volatile *)(0xd400 + atari_regbase))
+
+#define atari_cartswitch ((unsigned char volatile *)(0xd500 + atari_regbase))
 
 #ifdef FIRMWARE_5200
 // 5200: GTIA and POKEY are on different addresses
