@@ -39,6 +39,23 @@ BYTE cache_read(DWORD offset, int file)
 	return sect_buffer[offset & 0x1FF];
 }
 
+void cache_write()
+{
+	int i;
+
+	set_sd_data_mode(0);
+	for(i=0; i<512; i++) *zpu_out3 = sect_buffer[i];
+
+	set_sd_data_mode(1);
+	*zpu_out3 = cur_offset >> 9;
+
+	set_sd_num(cur_file);
+	set_sd_write(0);
+	set_sd_write(1);
+	while(!get_sd_done()) {};
+	set_sd_write(0);
+}
+
 void file_reset()
 {
 	cur_file = -1;
@@ -85,8 +102,29 @@ enum SimpleFileStatus file_seek(struct SimpleFile * file, int offsetFromStart)
 	return SimpleFile_FAIL;
 }
 
-enum SimpleFileStatus file_write(struct SimpleFile * file, unsigned char* buffer, int bytes, int * byteswritten)
+enum SimpleFileStatus file_write(struct SimpleFile *file, unsigned char *buffer, int bytes, int *byteswritten)
 {
+	if((file->offset >= 0) && (file->size > file->offset) && (bytes > 0))
+	{
+		if((file->offset + bytes) > file->size) bytes = file->size - file->offset;
+		*byteswritten = bytes;
+
+		while(bytes>0)
+		{
+			cache_read(file->offset, file->num);
+			do
+			{
+				sect_buffer[file->offset & 0x1FF] = *buffer;
+				bytes--;
+				file->offset++;
+				buffer++;
+			}
+			while((file->offset & 0x1FF) && (bytes>0));
+			cache_write();
+		}
+		return SimpleFile_OK;
+	}	
+	
 	return SimpleFile_FAIL;
 }
 
