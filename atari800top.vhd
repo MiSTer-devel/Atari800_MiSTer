@@ -17,6 +17,7 @@ PORT
 	CLK        : IN  STD_LOGIC;
 	CLK_SDRAM  : IN  STD_LOGIC;
 	RESET_N    : IN  STD_LOGIC;
+	ARESET     : OUT STD_LOGIC;
 
 	PAL        : IN  STD_LOGIC;
 	VGA_VS     : OUT STD_LOGIC;
@@ -60,13 +61,8 @@ PORT
 	JOY1       : IN  STD_LOGIC_VECTOR(8 DOWNTO 0);
 	JOY2       : IN  STD_LOGIC_VECTOR(8 DOWNTO 0);
 
-	OSROM_ADDR : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
-	OSROM_DATA : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	OSROM_WR   : IN  STD_LOGIC;
-	
-	BASROM_ADDR: IN  STD_LOGIC_VECTOR(12 DOWNTO 0);
-	BASROM_DATA: IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	BASROM_WR  : IN  STD_LOGIC;
+	ROM_ADDR   : OUT STD_LOGIC_VECTOR(14 DOWNTO 0);
+	ROM_DO     : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
 
 	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
 	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
@@ -160,17 +156,13 @@ signal paddle_2 : std_logic_vector(2 downto 0);
 signal areset_n   : std_logic;
 signal option_tmp : std_logic;
 
-
-signal BIOS_OFF   : unsigned(13 downto 0);
-signal BIOS_DATA  : std_logic_vector(7 downto 0);
-signal BASIC_DATA : std_logic_vector(7 downto 0);
-
 signal RAM_DATA : std_logic_vector(31 downto 0);
 
 
 BEGIN
 
 areset_n <= RESET_N and SDRAM_RESET_N and not reset_atari;
+areset <= not areset_n;
 
 process(clk)
 	variable cnt : integer := 0;
@@ -354,37 +346,9 @@ PORT MAP
 
 joy <= joy1 or joy2;
 
-bios: work.dpram generic map(14,8, "rom/ATARIXL.mif")
-port map
-(
-	clock => clk,
-
-	address_a => OSROM_ADDR,
-	data_a => OSROM_DATA,
-	wren_a => OSROM_WR,
-
-	address_b => std_logic_vector(unsigned(SDRAM_ADDR(13 downto 0)) - BIOS_OFF),
-	q_b => BIOS_DATA
-);
-
-basic: work.dpram generic map(13,8, "rom/ATARIBAS.mif")
-port map
-(
-	clock => clk,
-
-	address_a => BASROM_ADDR,
-	data_a => BASROM_DATA,
-	wren_a => BASROM_WR,
-
-	address_b => SDRAM_ADDR(12 downto 0),
-	q_b => BASIC_DATA
-);
-
-BIOS_OFF <= ("00"& x"000") - unsigned(OSROM_ADDR);
-
-RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001" and unsigned(SDRAM_ADDR(13 downto 0)) >= BIOS_OFF else
-            x"FFFFFF"&BASIC_DATA when SDRAM_ADDR(22 downto 13) = "1110000000" else
-            (others=>'1')        when SDRAM_ADDR(22 downto 20) = "111" else
+ROM_ADDR <= SDRAM_ADDR(14 downto 0);
+RAM_DATA <= x"FFFFFF"&ROM_DO when SDRAM_ADDR(22 downto 15) = "11100000" else
+            (others=>'1')    when SDRAM_ADDR(22 downto 20) = "111" else
             SDRAM_DO;
 
 zpu: entity work.zpucore

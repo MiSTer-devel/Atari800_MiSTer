@@ -132,6 +132,7 @@ localparam CONF_STR = {
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",
 	"OAC,Drive Speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"-;",
+	"O12,BIOS,XL+Basic,XL,OS-A,OS-B;",
 	"ODF,RAM,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
 	"-;",
 	"O5,Video mode,PAL,NTSC;",
@@ -270,11 +271,14 @@ wire [31:0]	ZPU_OUT3;
 wire [15:0]	ZPU_RD;
 wire [15:0]	ZPU_WR;
 
+wire areset;
+
 atari800top atari800top
 (
 	.CLK(clk_sys),
 	.CLK_SDRAM(clk_mem),
 	.RESET_N(~reset),
+	.ARESET(areset),
 
 	.SDRAM_BA(SDRAM_BA),
 	.SDRAM_nCS(SDRAM_nCS),
@@ -316,13 +320,8 @@ atari800top atari800top
 	.PS2_CLK(PS2_CLK),
 	.PS2_DAT(PS2_DAT),
 
-	.OSROM_ADDR(osrom_addr),
-	.OSROM_DATA(ioctl_dout),
-	.OSROM_WR(osrom_wr),
-
-	.BASROM_ADDR(ioctl_addr[12:0]),
-	.BASROM_DATA(ioctl_dout),
-	.BASROM_WR(ioctl_wr && ioctl_index[7:6] == 1),
+	.ROM_ADDR(rom_addr),
+	.ROM_DO(rom_do),
 
 	.JOY1X(ax),
 	.JOY1Y(ay),
@@ -349,18 +348,59 @@ video_mixer video_mixer
 	.mono(0)
 );
 
-reg [13:0] osrom_addr;
-reg        osrom_wr;
-always @(posedge clk_sys) begin
-	osrom_wr <= 0;
-	if(osrom_wr) osrom_addr <= osrom_addr + 1'd1;
-	if(ioctl_wr) begin
-		if(ioctl_index[7:6] == 0) begin
-			osrom_addr <= ioctl_addr;
-			osrom_wr <= ioctl_wr;
-		end
-	end
-end
+////////////////   ROM   ////////////////////
+
+wire [14:0] rom_addr;
+wire  [7:0] xl_do, bas_do, osa_do, osb_do;
+
+dpram #(14,8, "rom/ATARIXL.mif") romxl
+(
+	.clock(clk_sys),
+
+	.address_a(ioctl_addr[13:0]),
+	.data_a(ioctl_dout),
+	.wren_a(ioctl_wr && ioctl_index[7:6] == 0),
+
+	.address_b(rom_addr[13:0] - osrom_off),
+	.q_b(xl_do)
+);
+
+reg [13:0] osrom_off = 0;
+always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 0) osrom_off <= 14'h3FFF - ioctl_addr;
+
+dpram #(13,8, "rom/ATARIBAS.mif") basic
+(
+	.clock(clk_sys),
+
+	.address_a(ioctl_addr[12:0]),
+	.data_a(ioctl_dout),
+	.wren_a(ioctl_wr && ioctl_index[7:6] == 1),
+
+	.address_b(rom_addr[12:0]),
+	.q_b(bas_do)
+);
+
+spram #(14,8, "rom/ATARIOSA.mif") osa
+(
+	.clock(clk_sys),
+	.address(rom_addr[13:0]),
+	.q(osa_do)
+);
+
+spram #(14,8, "rom/ATARIOSB.mif") osb
+(
+	.clock(clk_sys),
+	.address(rom_addr[13:0]),
+	.q(osb_do)
+);
+
+reg [1:0] rom_sel = 0;
+always @(posedge clk_sys) if(areset) rom_sel <= status[2:1];
+
+wire [7:0] rom_do = (!rom_addr[14:13] && !rom_sel[1:0]) ? bas_do :
+                    (rom_addr[14] && !rom_sel[1]) ? ((rom_addr[13:0] >= osrom_off) ? xl_do : 8'hFF) :
+                    rom_addr[14] ? (rom_sel[0] ? osb_do : osa_do) :
+						  8'hFF;
 
 //////////////////   SD   ///////////////////
 
@@ -448,6 +488,8 @@ always @(posedge clk_sys) begin
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end
+	
+	if(reset) zpu_mounted <= 0;
 end
 
 
