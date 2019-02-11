@@ -190,14 +190,14 @@ begin
 		porta_control_next(5 downto 0) <= porta_control_reg(5 downto 0);
 		portb_control_next(5 downto 0) <= portb_control_reg(5 downto 0);
 		
-		write_ora <= '0';
+		--write_ora <= '0';
 		write_orb <= '0';
 		
 		if (wr_en = '1') then
 			if(addr_decoded(0) = '1') then
 				if (porta_control_reg(2) = '1') then
 					porta_output_next <= cpu_data_in;
-					write_ora <= '1';
+					--write_ora <= '1';
 				else
 					porta_direction_next <= cpu_data_in;
 				end if;

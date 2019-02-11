@@ -34,17 +34,10 @@ architecture vhdl of internalromram is
 	signal ram_request_reg : std_logic;
 	signal ram_request_next : std_logic;
 	
-	signal ROM16_DATA : std_logic_vector(7 downto 0);
-	signal ROM8_DATA : std_logic_vector(7 downto 0);
-	signal ROM2_DATA : std_logic_vector(7 downto 0);
-	signal BASIC_DATA : std_logic_vector(7 downto 0);	
-	
+	signal RAM1_DATA,RAM2_DATA : std_logic_vector(7 downto 0);
+	signal ram1_sel, ram2_sel : std_logic;
 	signal ramwe_temp : std_logic;
 
-	signal romwe_temp : std_logic;
-	signal os_romwe_temp : std_logic;
-	signal basic_romwe_temp : std_logic;
-	
 	constant ADDRESS_WIDTH : integer := integer(log2(real(internal_ram)));
 begin
 
@@ -60,7 +53,7 @@ end process;
 ROM_DATA <= (others=>'1');
 ROM_REQUEST_COMPLETE <= '1';
 
-gen_internal_ram: if internal_ram>0 generate
+gen_internal_ram: if internal_ram > 0 and internal_ram <= 131072 generate
 	ramwe_temp <= RAM_WR_ENABLE and ram_request;
 	ramint1 : entity work.generic_ram_infer
 	generic map	(
@@ -77,6 +70,44 @@ gen_internal_ram: if internal_ram>0 generate
 	);
 	ram_request_next <= ram_request and not(RAM_WR_ENABLE);
 	ram_request_complete <= ramwe_temp or ram_request_reg;
+end generate;
+
+gen_internal320_ram: if internal_ram = 524288 generate
+	ramwe_temp <= RAM_WR_ENABLE and ram_request;
+
+	ram1_sel <= not ram_addr(18) and not ram_addr(17) and not ram_addr(16);
+	ramint1 : entity work.generic_ram_infer
+	generic map	(
+		ADDRESS_WIDTH => 16,
+		SPACE => 65536,
+		DATA_WIDTH =>8
+	)
+	PORT MAP (
+		clock => clock,
+		address => ram_addr(15 downto 0),
+		data => ram_data_in,
+		we => ramwe_temp and ram1_sel,
+		q => ram1_data
+	);
+
+	ram2_sel <= ram_addr(18) or (not ram_addr(18) and not ram_addr(17) and ram_addr(16));
+	ramint2 : entity work.generic_ram_infer
+	generic map	(
+		ADDRESS_WIDTH => 18,
+		SPACE => 262144,
+		DATA_WIDTH =>8
+	)
+	PORT MAP (
+		clock => clock,
+		address => ram_addr(17 downto 0),
+		data => ram_data_in,
+		we => ramwe_temp and ram2_sel,
+		q => ram2_data
+	);
+	
+	ram_data <= ram1_data when ram1_sel = '1' else ram2_data;
+	ram_request_next <= ram_request and not(RAM_WR_ENABLE);
+	ram_request_complete <= (ramwe_temp and (ram1_sel or ram2_sel)) or ram_request_reg;
 end generate;
 
 gen_no_internal_ram : if internal_ram=0 generate

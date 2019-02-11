@@ -318,6 +318,7 @@ PORT MAP (
 	RAM_DATA => RAM_DO(7 downto 0)
 );
 
+RAM_DO(15 downto 8) <= (others => '0');
 ROM_IN_RAM <= '1' when internal_rom=0 else '0';
 
 atari800xl : entity work.atari800core

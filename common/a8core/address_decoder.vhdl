@@ -313,8 +313,8 @@ BEGIN
 		rw => emu_cart_rw,
 		s4_n => emu_cart_s4_n,
 		s5_n => emu_cart_s5_n,
-		s4_n_out => emu_cart_s4_n_out,
-		s5_n_out => emu_cart_s5_n_out,
+		--s4_n_out => emu_cart_s4_n_out,
+		--s5_n_out => emu_cart_s5_n_out,
 		rd4 => emu_cart_rd4,
 		rd5 => emu_cart_rd5,
 		cart_address => emu_cart_address,
@@ -572,8 +572,7 @@ BEGIN
 					end if;
 				when "110" => -- 1088k rambo
 					if (extended_access_either='1') then
-						extended_bank(5 downto 0) <= portb(7 downto 5)&portb(3 downto 1);
-						extended_bank(6) <= not(or_reduce(portb(7 downto 5)&portb(3)));
+						extended_bank(6 downto 0) <= '1'&portb(7 downto 5)&portb(3 downto 1);
 						extended_self_test <= '0';
 					end if;
 				when "111" => -- 4MB!	
