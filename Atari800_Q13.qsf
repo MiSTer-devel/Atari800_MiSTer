@@ -371,6 +371,7 @@ set_global_assignment -name VHDL_FILE common/a8core/internalromram.vhd
 set_global_assignment -name VHDL_FILE common/a8core/cart_logic.vhd
 set_global_assignment -name VHDL_FILE common/a8core/covox.vhd
 set_global_assignment -name VHDL_FILE common/a8core/cpu.vhd
+set_global_assignment -name VHDL_FILE common/a8core/cpu_65xx.vhd
 set_global_assignment -name VHDL_FILE common/a8core/freezer_logic.vhd
 set_global_assignment -name VHDL_FILE common/a8core/address_decoder.vhdl
 set_global_assignment -name VHDL_FILE common/a8core/antic.vhdl
