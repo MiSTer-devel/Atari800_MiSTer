@@ -17,7 +17,7 @@ GENERIC
 	low_memory : integer := 0; -- if 0, we assume 8MB SDRAM, if 1, we assume 1MB 'SDRAM', if 2 we assume 512KB 'SDRAM'.
 	stereo : integer := 1; 
 	system : integer := 0; -- 0=Atari XL/XE, 10=Atari5200 (space left for more systems)
-	sdram_start_bank : integer := 0 -- 0=sdram only, 5=512k ram. (2^n*16)
+	sdram_start_bank : integer := 0 -- 0=sdram only. Number of banks in SRAM (SRAM_SIZE/16384)
 );
 PORT 
 ( 
@@ -213,8 +213,6 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal SDRAM_FREEZER_RAM_ADDR   : std_logic_vector(22 downto 0);
 	signal SDRAM_FREEZER_ROM_ADDR   : std_logic_vector(22 downto 0);
 	
-	signal sdram_only_bank : std_logic;
-
 	signal emu_cart_enable: std_logic;
 
 	signal emu_cart_cctl_n: std_logic;
@@ -517,7 +515,6 @@ BEGIN
 	extended_access_antic <= (extended_access_addr and antic_fetch_real_next and not(portb(5)));
 	extended_access_cpu <= (extended_access_addr and cpu_fetch_real_next and not(portb(4)));
 	extended_access_either <= extended_access_addr and not(portb(4));
-	sdram_only_bank <= or_reduce(extended_bank(8 downto sdram_start_bank));
 	
 	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode)
 	begin	
@@ -550,35 +547,34 @@ BEGIN
 					-- default
 				when "001" => -- 128k			
 					if (extended_access_cpu_or_antic='1') then
-						extended_bank(2 downto 0) <= '1'&portb(3 downto 2);
+						extended_bank <= std_logic_vector("000000100" + unsigned("0000000"&portb(3 downto 2)));
 					end if;
 				when "010" => -- 320k compy shop
 					if (extended_access_cpu_or_antic='1') then
-						extended_bank(4 downto 0) <= '1'&portb(7 downto 6)&portb(3 downto 2);
+						extended_bank <= std_logic_vector("000000100" + unsigned("00000"&portb(7 downto 6)&portb(3 downto 2)));
 						extended_self_test <= '0';
 					end if;
 				when "011" => -- 320k rambo
 					if (extended_access_either='1')then
-						extended_bank(4 downto 0) <= '1'&portb(6 downto 5)&portb(3 downto 2);
+						extended_bank <= std_logic_vector("000000100" + unsigned("00000"&portb(6 downto 5)&portb(3 downto 2)));
 					end if;
 				when "100" => -- 576k compy shop
 					if (extended_access_cpu_or_antic='1') then
-						extended_bank(5 downto 0) <= '1'&portb(7 downto 6)&portb(3 downto 1);
+						extended_bank <= std_logic_vector("000000100" + unsigned("0000"&portb(7 downto 6)&portb(3 downto 1)));
 						extended_self_test <= '0';
 					end if;
 				when "101" => -- 576k rambo
 					if (extended_access_either='1') then
-						extended_bank(5 downto 0) <= '1'&portb(6 downto 5)&portb(3 downto 1);
+						extended_bank <= std_logic_vector("000000100" + unsigned("0000"&portb(6 downto 5)&portb(3 downto 1)));
 					end if;
 				when "110" => -- 1088k rambo
 					if (extended_access_either='1') then
-						extended_bank(6 downto 0) <= '1'&portb(7 downto 5)&portb(3 downto 1);
+						extended_bank <= std_logic_vector("000000100" + unsigned("000"&portb(7 downto 5)&portb(3 downto 1)));
 						extended_self_test <= '0';
 					end if;
 				when "111" => -- 4MB!	
 					if (extended_access_addr='1') then
-						extended_bank(7 downto 0) <= portb(7 downto 0);				
-						extended_bank(8) <= not(or_reduce(portb(7 downto 2)));
+						extended_bank <= std_logic_vector("000000100" + unsigned('0'&portb(7 downto 0)));
 						extended_self_test <= and_reduce(portb(6 downto 4));	 -- which means self-test is in the middle of half the banks - euuugh, oh well!						
 					end if;
 				when others =>
@@ -606,7 +602,7 @@ gen_normal_memory : if low_memory=0 generate
 	--SDRAM_CART_ADDR      <= "101"&cart_select& "0000000000000";
 	SDRAM_CART_ADDR	<= "1" & emu_cart_address(20) & (not emu_cart_address(20)) & emu_cart_address(19 downto 0);
 	-- BASIC/OS ROM  -              "111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K				
-	SDRAM_BASIC_ROM_ADDR <= "111"&"000000"   &"00000000000000";
+	SDRAM_BASIC_ROM_ADDR <= "111"&"000000" &"00000000000000";
 	SDRAM_OS_ROM_ADDR    <= "111"&"000001" &"00000000000000";
 	-- SYSTEM        -              "111 1000 0000 0000 0000 0000" (BOT) - LAST 512K
 
@@ -678,7 +674,7 @@ end generate;
 		rom_in_ram,
 		
 		-- SDRAM base addresses
-		extended_self_test,extended_bank,sdram_only_bank,
+		extended_self_test,extended_bank,
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
@@ -737,7 +733,7 @@ end generate;
 		RAM_ADDR(18 downto 14) <= extended_bank(4 downto 0);
 					
 		if (has_ram='1') then
-			if (sdram_only_bank='1') then
+			if (extended_bank>=std_logic_vector(to_unsigned(sdram_start_bank,9))) then
 				MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
 				sdram_chip_select <= start_request;
 				request_complete <= sdram_request_COMPLETE;

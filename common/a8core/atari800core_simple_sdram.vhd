@@ -34,8 +34,8 @@ ENTITY atari800core_simple_sdram is
 		palette : integer :=1; -- 0:gtia colour on VIDEO_B, 1:altirra, 2:laoo
 	
 		-- For initial port may help to have no
-		internal_rom : integer := 1;  -- if 0 expects it in sdram,is 1:16k os+basic, is 2:... TODO
-		internal_ram : integer := 16384;  -- at start of memory map
+		internal_rom : integer := 0;  -- if 0 expects it in sdram,is 1:16k os+basic, is 2:... TODO
+		internal_ram : integer := 0;  -- at start of memory map
 	
 		-- Use 1MB memory map if low memory set (for Aeon lite)
 		low_memory : integer := 0;
@@ -330,7 +330,7 @@ GENERIC MAP
 	low_memory => low_memory,
 	stereo => stereo,
 	covox => covox,
-	sdram_start_bank => integer(realmax(0.0,ceil(log2(real(internal_ram))-14.0)))
+	sdram_start_bank => internal_ram/16384
 )
 PORT MAP
 (
