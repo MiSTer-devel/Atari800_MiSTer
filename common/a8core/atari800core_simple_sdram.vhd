@@ -10,6 +10,9 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.all; 
 use IEEE.STD_LOGIC_MISC.all;
 use ieee.numeric_std.all;
+USE ieee.math_real.log2;
+USE ieee.math_real.ceil;
+USE ieee.math_real.realmax;
 
 LIBRARY work;
 -- Simple version that:
@@ -29,6 +32,10 @@ ENTITY atari800core_simple_sdram is
 		-- how many bits for video
 		video_bits : integer := 8;
 		palette : integer :=1; -- 0:gtia colour on VIDEO_B, 1:altirra, 2:laoo
+	
+		-- For initial port may help to have no
+		internal_rom : integer := 1;  -- if 0 expects it in sdram,is 1:16k os+basic, is 2:... TODO
+		internal_ram : integer := 16384;  -- at start of memory map
 	
 		-- Use 1MB memory map if low memory set (for Aeon lite)
 		low_memory : integer := 0;
@@ -178,6 +185,22 @@ ARCHITECTURE vhdl OF atari800core_simple_sdram IS
 	
 	-- PBI
 	SIGNAL PBI_WRITE_DATA : std_logic_vector(31 downto 0);
+
+	-- INTERNAL ROM/RAM
+	SIGNAL	RAM_ADDR :  STD_LOGIC_VECTOR(18 DOWNTO 0);
+	SIGNAL	RAM_DO :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+	SIGNAL	RAM_REQUEST :  STD_LOGIC;
+	SIGNAL	RAM_REQUEST_COMPLETE :  STD_LOGIC;
+	SIGNAL	RAM_WRITE_ENABLE :  STD_LOGIC;
+	
+	SIGNAL	ROM_ADDR :  STD_LOGIC_VECTOR(21 DOWNTO 0);
+	SIGNAL	ROM_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
+	SIGNAL	ROM_REQUEST :  STD_LOGIC;
+	SIGNAL	ROM_REQUEST_COMPLETE :  STD_LOGIC;
+	SIGNAL	ROM_WRITE_ENABLE :  STD_LOGIC;
+	
+	-- CONFIG
+	SIGNAL ROM_IN_RAM : STD_LOGIC;
 	
 	-- POTS
 	SIGNAL POT_RESET : STD_LOGIC;
@@ -269,6 +292,34 @@ PORT MAP
 );
 POT_IN(7 downto 4) <= (others=>'0');
 
+-- Internal rom/ram
+internalromram1 : entity work.internalromram
+GENERIC MAP
+(
+	internal_rom => internal_rom,
+	internal_ram => internal_ram 
+)
+PORT MAP (
+	clock   => CLK,
+	reset_n => RESET_N,
+
+	ROM_ADDR => ROM_ADDR,
+	ROM_WR_ENABLE => ROM_WRITE_ENABLE,
+	ROM_DATA_IN => PBI_WRITE_DATA(7 downto 0),
+	ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
+	ROM_REQUEST => ROM_REQUEST,
+	ROM_DATA => ROM_DO,
+	
+	RAM_ADDR => RAM_ADDR,
+	RAM_WR_ENABLE => RAM_WRITE_ENABLE,
+	RAM_DATA_IN => PBI_WRITE_DATA(7 downto 0),
+	RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
+	RAM_REQUEST => RAM_REQUEST,
+	RAM_DATA => RAM_DO(7 downto 0)
+);
+
+ROM_IN_RAM <= '1' when internal_rom=0 else '0';
+
 atari800xl : entity work.atari800core
 GENERIC MAP
 (
@@ -278,7 +329,7 @@ GENERIC MAP
 	low_memory => low_memory,
 	stereo => stereo,
 	covox => covox,
-	sdram_start_bank => 0
+	sdram_start_bank => integer(realmax(0.0,ceil(log2(real(internal_ram))-14.0)))
 )
 PORT MAP
 (
@@ -363,10 +414,17 @@ PORT MAP
 	SDRAM_ADDR => SDRAM_ADDR,
 	SDRAM_DO => SDRAM_DO,
 
-	RAM_DO => (others => '1'),
-	RAM_REQUEST_COMPLETE => '1',
-	ROM_DO => (others => '1'),
-	ROM_REQUEST_COMPLETE => '1',
+	RAM_ADDR => RAM_ADDR,
+	RAM_DO => RAM_DO,
+	RAM_REQUEST => RAM_REQUEST,
+	RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
+	RAM_WRITE_ENABLE => RAM_WRITE_ENABLE,
+		
+	ROM_ADDR => ROM_ADDR,
+	ROM_DO => ROM_DO,
+	ROM_REQUEST => ROM_REQUEST,
+	ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
+	ROM_WRITE_ENABLE => ROM_WRITE_ENABLE,
 
 	DMA_FETCH => DMA_FETCH,
 	DMA_READ_ENABLE => DMA_READ_ENABLE,
@@ -380,7 +438,7 @@ PORT MAP
 	RAM_SELECT => RAM_SELECT,
 	CART_EMULATION_SELECT => emulated_cartridge_select,
 	PAL => PAL,
-	ROM_IN_RAM => '1',
+	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT,
 	freezer_enable => freezer_enable,

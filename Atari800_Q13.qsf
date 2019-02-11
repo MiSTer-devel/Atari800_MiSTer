@@ -367,6 +367,7 @@ set_global_assignment -name QIP_FILE sys/sys_q13.qip
 set_global_assignment -name QIP_FILE t65/t65.qip
 set_global_assignment -name VHDL_FILE common/a8core/atari800core.vhd
 set_global_assignment -name VHDL_FILE common/a8core/atari800core_simple_sdram.vhd
+set_global_assignment -name VHDL_FILE common/a8core/internalromram.vhd
 set_global_assignment -name VHDL_FILE common/a8core/cart_logic.vhd
 set_global_assignment -name VHDL_FILE common/a8core/covox.vhd
 set_global_assignment -name VHDL_FILE common/a8core/cpu.vhd

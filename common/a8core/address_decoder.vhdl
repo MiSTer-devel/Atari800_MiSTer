@@ -213,6 +213,8 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal SDRAM_FREEZER_RAM_ADDR   : std_logic_vector(22 downto 0);
 	signal SDRAM_FREEZER_ROM_ADDR   : std_logic_vector(22 downto 0);
 	
+	signal sdram_only_bank : std_logic;
+
 	signal emu_cart_enable: std_logic;
 
 	signal emu_cart_cctl_n: std_logic;
@@ -515,6 +517,7 @@ BEGIN
 	extended_access_antic <= (extended_access_addr and antic_fetch_real_next and not(portb(5)));
 	extended_access_cpu <= (extended_access_addr and cpu_fetch_real_next and not(portb(4)));
 	extended_access_either <= extended_access_addr and not(portb(4));
+	sdram_only_bank <= or_reduce(extended_bank(8 downto sdram_start_bank));
 	
 	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode)
 	begin	
@@ -676,7 +679,7 @@ end generate;
 		rom_in_ram,
 		
 		-- SDRAM base addresses
-		extended_self_test,extended_bank,
+		extended_self_test,extended_bank,sdram_only_bank,
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
@@ -735,9 +738,16 @@ end generate;
 		RAM_ADDR(18 downto 14) <= extended_bank(4 downto 0);
 					
 		if (has_ram='1') then
-			MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
-			sdram_chip_select <= start_request;
-			request_complete <= sdram_request_COMPLETE;
+			if (sdram_only_bank='1') then
+				MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+				sdram_chip_select <= start_request;
+				request_complete <= sdram_request_COMPLETE;
+			else
+				MEMORY_DATA_INT(7 downto 0) <= RAM_DATA(7 downto 0);
+
+				ram_chip_select <= start_request;
+				request_complete <= ram_request_COMPLETE;
+			end if;
 		else
 			MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 			request_complete <= '1';
