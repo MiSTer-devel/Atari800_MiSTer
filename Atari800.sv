@@ -138,6 +138,8 @@ localparam CONF_STR = {
 	"O5,Video mode,PAL,NTSC;",
 	"O6,Aspect ratio,4:3,16:9;",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"-;",
+	"OK,Dual Pokey,No,Yes;",
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"R0,Reset;",
@@ -259,8 +261,8 @@ assign CLK_VIDEO = clk_sys;
 wire cpu_halt;
 
 wire [15:0] laudio, raudio;
-assign AUDIO_R = {raudio[15],raudio[15:1]};
 assign AUDIO_L = {laudio[15],laudio[15:1]};
+assign AUDIO_R = status[20] ? {raudio[15],raudio[15:1]} : AUDIO_L;
 assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
 
