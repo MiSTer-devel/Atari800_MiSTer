@@ -20,7 +20,7 @@ GENERIC
 	min_lines : integer := 0;
 	max_lines : integer := 227;
 	reverse : integer := 0;
-	force_to : signed(7 downto 0) := to_signed(100,8)
+	force_to : signed(7 downto 0) := to_signed(127,8)
 );
 PORT 
 ( 
@@ -79,6 +79,10 @@ pot_clock_div : entity work.enable_divider
 		end if;
 		if (abs(pos2) < 16 and force_high='1') then
 			pos2 := force_to;
+		end if;
+		
+		if pos2 = -128 then
+			pos2 := to_signed(-127,8);
 		end if;
 
 		count_next <= count_reg;
