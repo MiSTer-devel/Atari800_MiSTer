@@ -28,7 +28,11 @@ ENTITY atari5200core_simplesdram is
 
 		video_bits : integer := 8;
 	
-		palette : integer := 1
+		palette : integer :=1;
+
+		-- For initial port may help to have no
+		internal_rom : integer := 0;  -- if 0 expects it in sdram,is 1:16k os+basic, is 2:... TODO
+		internal_ram : integer := 0   -- at start of memory map
 	);
 	PORT
 	(
@@ -109,6 +113,22 @@ SIGNAL TRIG : STD_LOGIC_VECTOR(1 downto 0);
 
 -- CONSOL
 SIGNAL CONSOL_OUT : STD_LOGIC_VECTOR(3 downto 0);
+
+-- INTERNAL ROM/RAM
+SIGNAL	RAM_ADDR :  STD_LOGIC_VECTOR(18 DOWNTO 0);
+SIGNAL	RAM_DO :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	RAM_REQUEST :  STD_LOGIC;
+SIGNAL	RAM_REQUEST_COMPLETE :  STD_LOGIC;
+SIGNAL	RAM_WRITE_ENABLE :  STD_LOGIC;
+
+SIGNAL	ROM_ADDR :  STD_LOGIC_VECTOR(21 DOWNTO 0);
+SIGNAL	ROM_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
+SIGNAL	ROM_REQUEST :  STD_LOGIC;
+SIGNAL	ROM_REQUEST_COMPLETE :  STD_LOGIC;
+SIGNAL	ROM_WRITE_ENABLE :  STD_LOGIC;
+
+-- CONFIG
+SIGNAL ROM_IN_RAM : STD_LOGIC;
 
 -- POTS
 SIGNAL POT_RESET : STD_LOGIC;
@@ -201,12 +221,41 @@ PORT MAP
 );
 POT_IN(7 downto 4) <= (others=>'0');
 
+-- Internal rom/ram
+internalromram1 : entity work.internalromram
+GENERIC MAP
+(
+	internal_rom => internal_rom,
+	internal_ram => internal_ram 
+)
+PORT MAP (
+	clock   => CLK,
+	reset_n => RESET_N,
+
+	ROM_ADDR => ROM_ADDR,
+	ROM_WR_ENABLE => ROM_WRITE_ENABLE,
+	ROM_DATA_IN => PBI_WRITE_DATA(7 downto 0),
+	ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
+	ROM_REQUEST => ROM_REQUEST,
+	ROM_DATA => ROM_DO,
+	
+	RAM_ADDR => RAM_ADDR,
+	RAM_WR_ENABLE => RAM_WRITE_ENABLE,
+	RAM_DATA_IN => PBI_WRITE_DATA(7 downto 0),
+	RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
+	RAM_REQUEST => RAM_REQUEST,
+	RAM_DATA => RAM_DO(7 downto 0)
+);
+
+RAM_DO(15 downto 8) <= (others => '0');
+ROM_IN_RAM <= '1' when internal_rom=0 else '0';
 atari5200_simple_sdram1 : entity work.atari5200core
 GENERIC MAP
 (
 	cycle_length => cycle_length,
 	video_bits => video_bits,
-	palette => palette
+	palette => palette,
+	sdram_start_bank => internal_ram/16384
 )
 PORT MAP
 (
@@ -275,12 +324,18 @@ PORT MAP
 	SDRAM_ADDR => SDRAM_ADDR,
 	SDRAM_DO => SDRAM_DO,
 
-	RAM_DO => (others => '1'),
-	RAM_REQUEST_COMPLETE => '1',
-	ROM_DO => (others => '1'),
-	ROM_REQUEST_COMPLETE => '1',
+	RAM_ADDR => RAM_ADDR,
+	RAM_DO => RAM_DO,
+	RAM_REQUEST => RAM_REQUEST,
+	RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
+	RAM_WRITE_ENABLE => RAM_WRITE_ENABLE,
+		
+	ROM_ADDR => ROM_ADDR,
+	ROM_DO => ROM_DO,
+	ROM_REQUEST => ROM_REQUEST,
+	ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
+	ROM_WRITE_ENABLE => ROM_WRITE_ENABLE,
 
-	-- DMA memory map differs
 	DMA_FETCH => DMA_FETCH,
 	DMA_READ_ENABLE => DMA_READ_ENABLE,
 	DMA_32BIT_WRITE_ENABLE => DMA_32BIT_WRITE_ENABLE,
@@ -291,7 +346,7 @@ PORT MAP
 	MEMORY_READY_DMA => MEMORY_READY_DMA,
 
 	-- Special config params
-	ROM_IN_RAM => '1',
+	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT
 );

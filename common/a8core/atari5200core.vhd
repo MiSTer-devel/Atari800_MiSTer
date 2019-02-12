@@ -21,7 +21,8 @@ ENTITY atari5200core IS
 		cycle_length : integer := 16; -- or 32...
 		video_bits : integer := 8;
 		palette : integer :=0; -- 0:gtia colour on VIDEO_B, 1:on
-		low_memory : integer := 0 -- 0:8MB memory map, 1:1MB memory map
+		low_memory : integer := 0; -- 0:8MB memory map, 1:1MB memory map
+		sdram_start_bank : integer := 0
 	);
 	PORT
 	(
@@ -140,6 +141,7 @@ ENTITY atari5200core IS
 		ROM_DO : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 		ROM_REQUEST : OUT STD_LOGIC;
 		ROM_REQUEST_COMPLETE : IN STD_LOGIC;
+		ROM_WRITE_ENABLE : OUT STD_LOGIC;
 
 		-- DMA memory map differs
 		-- e.g. some special addresses to read behind hardware registers
@@ -317,7 +319,7 @@ PORT MAP(CLK => CLK,
 -- TODO, this is freddy, replace with 5200 equiv rather than generic
 -- Also remove dma logic from here if possible
 mmu1 : entity work.address_decoder
-GENERIC MAP(low_memory => low_memory, system => 10)
+GENERIC MAP(low_memory => low_memory, system => 10, sdram_start_bank => sdram_start_bank)
 PORT MAP(CLK => CLK,
 		 CPU_FETCH => CPU_FETCH,
 		 CPU_WRITE_N => R_W_N,
@@ -352,6 +354,7 @@ PORT MAP(CLK => CLK,
 		 PORTB => (others=>'0'),
 		 RAM_DATA => RAM_DO,
 		 ram_select => "000",
+		 ATARI800MODE => '0',
 		 ROM_DATA => ROM_DO,
 		 SDRAM_DATA => SDRAM_DO,
 		 DMA_ADDR => DMA_ADDR,
@@ -366,6 +369,7 @@ PORT MAP(CLK => CLK,
 		 PIA_WR_ENABLE => open,
 		 PIA_RD_ENABLE => open,
 		 RAM_WR_ENABLE => RAM_WRITE_ENABLE,
+		 ROM_WR_ENABLE => ROM_WRITE_ENABLE,
 		 PBI_WR_ENABLE => PBI_WRITE_ENABLE,
 		 RAM_REQUEST => RAM_REQUEST,
 		 ROM_REQUEST => ROM_REQUEST,
