@@ -244,8 +244,14 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal last_bus_next : std_logic_vector(7 downto 0);
 
 	signal memory_data_int : std_logic_vector(31 downto 0);
+	
+	signal bank0reg : std_logic_vector(1 downto 0);
+	signal bank0next : std_logic_vector(1 downto 0);
+	signal bank1reg : std_logic_vector(1 downto 0);
+	signal bank1next : std_logic_vector(1 downto 0);
+	signal bbtype : std_logic;
 BEGIN
-		-- register
+	-- register
 	process(clk,reset_n)
 	begin
 		if (reset_n='0') then
@@ -265,7 +271,11 @@ BEGIN
 			pbi_cycle_reg <= '0';
 
 			last_bus_reg <= (others=>'0');
-	elsif (clk'event and clk='1') then
+
+			bank0reg <= (others=>'0');
+			bank1reg <= (others=>'0');
+
+		elsif rising_edge(clk) then
 			addr_reg <= addr_next;
 			state_reg <= state_next;
 			width_8bit_reg <= width_8bit_next;
@@ -282,6 +292,15 @@ BEGIN
 			pbi_cycle_reg <= pbi_cycle_next;
 
 			last_bus_reg <= last_bus_next;
+
+			bank0reg <= bank0next;
+			bank1reg <= bank1next;
+
+			if addr_next(23 downto 12) = x"804" then
+				bbtype <= '0';
+			elsif addr_next(23 downto 16) = x"81" then
+				bbtype <= '1';
+			end if;
 		end if;
 	end process;
 
@@ -678,6 +697,8 @@ end generate;
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
+		
+		bbtype,bank0reg,bank1reg,bank0next,bank1next,
 
 		freezer_enable, freezer_disable_atari, freezer_access_type,
 		freezer_dout, freezer_request_complete,
@@ -723,6 +744,9 @@ end generate;
 		
 		ram_chip_select <= '0';
 		sdram_chip_select <= '0';
+
+		bank0next <= bank0reg;
+		bank1next <= bank1reg;
 		
 	--	if (addr_next(23 downto 17) = "0000000" ) then -- bit 16 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
 		if (or_reduce(addr_next(23 downto 18)) = '0' ) then -- bit 16,17 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
@@ -1087,7 +1111,7 @@ end generate;
 		end if;
 
 	 	if system=10 then
-		case addr_next(15 downto 8) is 
+			case addr_next(15 downto 8) is 
 				-- GTIA
 				when 	X"c0"|X"c1"|X"c2"|X"c3"|X"c4"|X"c5"|X"c6"|X"c7"|
 					X"c8"|X"c9"|X"ca"|X"cb"|X"cc"|X"cd"|X"ce"|X"cf" =>
@@ -1127,6 +1151,23 @@ end generate;
 					X"68"|X"69"|X"6A"|X"6B"|X"6C"|X"6D"|X"6E"|X"6F"|
 					X"70"|X"71"|X"72"|X"73"|X"74"|X"75"|X"76"|X"77"|
 					X"78"|X"79"|X"7A"|X"7B"|X"7C"|X"7D"|X"7E"|X"7F" =>
+					
+					if bbtype = '1' then
+						if addr_next(15 downto 0) >= x"4FF6" and addr_next(15 downto 0) <= x"4FF9" then
+							bank0next <= addr_next(3)&addr_next(0);
+						end if;
+						if addr_next(15 downto 0) >= x"5FF6" and addr_next(15 downto 0) <= x"5FF9" then
+							bank1next <= addr_next(3)&addr_next(0);
+						end if;
+
+						if(addr_next(12) = '0') then
+							SDRAM_ADDR(15 downto 12) <= "01"&bank0next;
+							RAM_ADDR(15 downto 12)   <= "01"&bank0next;
+						else
+							SDRAM_ADDR(15 downto 12) <= "11"&bank1next;
+							RAM_ADDR(15 downto 12)   <= "11"&bank1next;
+						end if;
+					end if;
 
 					if (write_enable_next = '1') then
 						sdram_chip_select <= '0';

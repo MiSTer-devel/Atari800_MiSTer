@@ -1,11 +1,11 @@
 static const int main_ram_size=16384;
 #include "main.h" //!!!
 
-void loadromfile(struct SimpleFile *file, int size, size_t ram_address)
+void loadromfile(int size, size_t ram_address)
 {
 	void* absolute_ram_address = SDRAM_BASE + ram_address;
 	int read = 0;
-	file_read(file, absolute_ram_address, size, &read);
+	file_read(&files[4], absolute_ram_address, size, &read);
 } 
 
 void load_cartridge(int type)
@@ -13,7 +13,7 @@ void load_cartridge(int type)
 	switch(type)
 	{
 	case 4: //32k
-		loadromfile(&files[4],0x8000,0x004000);
+		loadromfile(0x8000,0x004000);
 		break;
 	case 6: // 16k two chip
 		{
@@ -25,8 +25,8 @@ void load_cartridge(int type)
 			//*atari_colbk = 0x68;
 			//wait_us(5000000);
 
-			loadromfile(&files[4],0x2000,0x004000);
-			loadromfile(&files[4],0x2000,0x008000);
+			loadromfile(0x2000,0x004000);
+			loadromfile(0x2000,0x008000);
 	
 			for (i=0; i!=0x2000; ++i)
 			{
@@ -35,9 +35,35 @@ void load_cartridge(int type)
 			}
 		}
 		break;
+	case 7:
+		{
+			unsigned char *src  = (unsigned char *)(0x8000 + SDRAM_BASE);
+			unsigned char *dest = (unsigned char *)(0xA000 + SDRAM_BASE);
+			unsigned char *dest2 = (unsigned char *)(0x4000 + SDRAM_BASE);
+
+			int i;
+			loadromfile(0x2000,0x008000);
+			if(*src == 0x2F)
+			{
+				for (i=0; i!=0x2000; ++i) dest2[i] = src[i];
+				loadromfile(0x2000,0x006000);
+				loadromfile(0x4000,0x00C000);
+				loadromfile(0x2000,0x008000);
+			}
+			else
+			{
+				loadromfile(0x4000,0x004000);
+				loadromfile(0x4000,0x00C000);
+			}
+	
+			for (i=0; i!=0x2000; ++i) dest[i] = src[i];
+
+			*(unsigned char *)(0x10000 + SDRAM_BASE) = 0;
+		}
+		break;
 	case 16: // 16k one chip
 		{
-			loadromfile(&files[4],0x4000,0x008000);
+			loadromfile(0x4000,0x008000);
 			unsigned char *src = (unsigned char *)(0x8000 + SDRAM_BASE);
 			unsigned char *dest1 = (unsigned char *)(0x4000 + SDRAM_BASE);
 			int i = 0;
@@ -51,7 +77,7 @@ void load_cartridge(int type)
 		{
 			//*atari_colbk = 0x58;
 			//wait_us(4000000);
-			loadromfile(&files[4],0x2000,0x004000);
+			loadromfile(0x2000,0x004000);
 			unsigned char *src = (unsigned char *)(0x4000 + SDRAM_BASE);
 			unsigned char *dest1 = (unsigned char *)(0x6000 + SDRAM_BASE);
 			unsigned char *dest2 = (unsigned char *)(0x8000 + SDRAM_BASE);
@@ -69,7 +95,7 @@ void load_cartridge(int type)
 		{
 			//*atari_colbk = 0x58;
 			//wait_us(4000000);
-			loadromfile(&files[4],0x1000,0x004000);
+			loadromfile(0x1000,0x004000);
 			unsigned char *src = (unsigned char *)(0x4000 + SDRAM_BASE);
 			unsigned char *dest1 = (unsigned char *)(0x5000 + SDRAM_BASE);
 			unsigned char *dest2 = (unsigned char *)(0x6000 + SDRAM_BASE);
@@ -109,7 +135,8 @@ int select_cartridge()
 	int type = -1;
 	int size = file_size(&files[4]);
 
-	if (size == 32768) type = 4;
+	if (size == 40960) type = 7;
+	else if (size == 32768) type = 4;
 	else if (size == 16384)
 	{
 		struct joystick_status joy;
