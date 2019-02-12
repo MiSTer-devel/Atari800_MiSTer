@@ -155,15 +155,7 @@ pll pll
 	.locked(locked)
 );
 
-wire reset = RESET | status[0] | ~initReset_n | buttons[1];
-
-reg initReset_n = 0;
-always @(posedge clk_sys) begin
-	integer timeout = 0;
-	
-	if(timeout < 5000000) timeout <= timeout + 1;
-	else initReset_n <= 1;
-end
+wire reset = RESET | status[0] | buttons[1];
 
 //////////////////   HPS I/O   ///////////////////
 wire [15:0] joy_0;
@@ -405,6 +397,8 @@ always @(posedge clk_sys) begin
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end
+	
+	if(reset) zpu_mounted <= |img_size[31:0];
 end
 
 
