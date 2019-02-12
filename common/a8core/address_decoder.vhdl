@@ -739,7 +739,6 @@ end generate;
 				request_complete <= sdram_request_COMPLETE;
 			else
 				MEMORY_DATA_INT(7 downto 0) <= RAM_DATA(7 downto 0);
-
 				ram_chip_select <= start_request;
 				request_complete <= ram_request_COMPLETE;
 			end if;
@@ -1237,10 +1236,17 @@ end generate;
 					ROM_WR_ENABLE <= write_enable_next;
 					
 				when "100"|"101"|"110"|"111" => -- sdram, 8MB
-					MEMORY_DATA_INT <= SDRAM_DATA;
-					sdram_chip_select <= start_request;
-					request_complete <= sdram_request_COMPLETE;	
-					SDRAM_ADDR <= addr_next(22 downto 0);				
+					if (addr_next(22 downto 14)>=std_logic_vector(to_unsigned(sdram_start_bank,9))) then
+						MEMORY_DATA_INT <= SDRAM_DATA;
+						sdram_chip_select <= start_request;
+						request_complete <= sdram_request_COMPLETE;
+						SDRAM_ADDR <= addr_next(22 downto 0);
+					else
+						MEMORY_DATA_INT(7 downto 0) <= RAM_DATA(7 downto 0);
+						ram_chip_select <= start_request;
+						request_complete <= ram_request_COMPLETE;
+						RAM_ADDR <= addr_next(18 downto 0);
+					end if;
 				when others =>
 					-- NOP
 			end case;
