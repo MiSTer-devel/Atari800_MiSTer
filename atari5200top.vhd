@@ -43,8 +43,7 @@ PORT
 	SDRAM_A    : OUT STD_LOGIC_VECTOR(12 DOWNTO 0);
 	SDRAM_DQ   : INOUT STD_LOGIC_VECTOR(15 DOWNTO 0);
 
-	PS2_CLK    : IN  STD_LOGIC;
-	PS2_DAT    : IN  STD_LOGIC;
+	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 	
 	CPU_SPEED  : IN std_logic_vector(5 downto 0);
 
@@ -129,12 +128,12 @@ JOY <= JOY1 or JOY2;
 
 -- PS2 to pokey
 keyboard_map1 : entity work.ps2_to_atari5200
+generic map (ps2_enable => 0, direct_enable => 1)
 PORT MAP
 ( 
 	CLK => clk,
 	RESET_N => reset_n,
-	PS2_CLK => ps2_clk,
-	PS2_DAT => ps2_dat,
+	INPUT => x"000"&"000"&ps2_key(9)&"000"&ps2_key(8)&x"0"&ps2_key(7 downto 0),
 
 	JOY1 => JOY1,
 	JOY2 => JOY2,

@@ -45,12 +45,11 @@ PORT
 	SDRAM_A    : OUT STD_LOGIC_VECTOR(12 DOWNTO 0);
 	SDRAM_DQ   : INOUT STD_LOGIC_VECTOR(15 DOWNTO 0);
 
-	PS2_CLK    : IN  STD_LOGIC;
-	PS2_DAT    : IN  STD_LOGIC;
+	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
-	CPU_SPEED  : IN std_logic_vector(5 downto 0);
-	RAM_SIZE   : IN std_logic_vector(2 downto 0);
-	DRV_SPEED  : IN std_logic_vector(2 downto 0);
+	CPU_SPEED  : IN  STD_LOGIC_VECTOR(5 downto 0);
+	RAM_SIZE   : IN  STD_LOGIC_VECTOR(2 downto 0);
+	DRV_SPEED  : IN  STD_LOGIC_VECTOR(2 downto 0);
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -207,12 +206,13 @@ JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"00" when paddle_2(2) = '0' else X"
 
 -- PS2 to pokey
 keyboard_map1 : entity work.ps2_to_atari800
+generic map (ps2_enable => 0, direct_enable => 1)
 PORT MAP
 ( 
 	CLK => clk,
 	RESET_N => reset_n,
-	PS2_CLK => ps2_clk,
-	PS2_DAT => ps2_dat,
+
+	INPUT => x"000"&"000"&ps2_key(9)&"000"&ps2_key(8)&x"0"&ps2_key(7 downto 0),
 
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,

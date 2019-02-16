@@ -135,7 +135,7 @@ localparam CONF_STR = {
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"R0,Reset;",
-	"J,Fire 1,Fire 2,*,#,Start,Pause,Reset,0,1,2,3;",
+	"J1,Fire 1,Fire 2,*,#,Start,Pause,Reset,0,1,2,3;",
 	"V,v",`BUILD_DATE
 };
 
@@ -165,6 +165,7 @@ wire [15:0] joya_1;
 wire  [1:0] buttons;
 wire [31:0] status;
 wire [24:0] ps2_mouse;
+wire [10:0] ps2_key;
 
 wire PS2_CLK;
 wire PS2_DAT;
@@ -199,12 +200,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.status(status),
 	.forced_scandoubler(forced_scandoubler),
 
-	.ps2_kbd_clk_out(PS2_CLK),
-	.ps2_kbd_data_out(PS2_DAT),
-	
-	.ps2_kbd_led_use(0),
-	.ps2_kbd_led_status(0),
-
+	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
 	.sd_lba(sd_lba),
@@ -286,8 +282,7 @@ atari5200top atari5200top
 
 	.CPU_HALT(cpu_halt),
 
-	.PS2_CLK(PS2_CLK),
-	.PS2_DAT(PS2_DAT),
+	.PS2_KEY(ps2_key),
 
 	.JOY1X(ax),
 	.JOY1Y(ay),

@@ -181,6 +181,7 @@ wire [15:0] joya_1;
 wire  [1:0] buttons;
 wire [31:0] status;
 wire [24:0] ps2_mouse;
+wire [10:0] ps2_key;
 
 wire PS2_CLK;
 wire PS2_DAT;
@@ -222,12 +223,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(3)) hps_io
 	.status(status),
 	.forced_scandoubler(forced_scandoubler),
 
-	.ps2_kbd_clk_out(PS2_CLK),
-	.ps2_kbd_data_out(PS2_DAT),
-	
-	.ps2_kbd_led_use(0),
-	.ps2_kbd_led_status(0),
-
+	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
 	.sd_lba(sd_lba),
@@ -293,6 +289,9 @@ atari800top atari800top
 	.SDRAM_A(SDRAM_A),
 	.SDRAM_DQ(SDRAM_DQ),
 
+	.ROM_ADDR(rom_addr),
+	.ROM_DO(rom_do),
+
 	.PAL(~status[5]),
 	.VGA_VS(VSync),
 	.VGA_HS(HSync),
@@ -319,11 +318,7 @@ atari800top atari800top
 	
 	.CPU_HALT(cpu_halt),
 
-	.PS2_CLK(PS2_CLK),
-	.PS2_DAT(PS2_DAT),
-
-	.ROM_ADDR(rom_addr),
-	.ROM_DO(rom_do),
+	.PS2_KEY(ps2_key),
 
 	.JOY1X(ax),
 	.JOY1Y(ay),
