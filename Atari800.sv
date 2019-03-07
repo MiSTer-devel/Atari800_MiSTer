@@ -125,9 +125,12 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
+	"-;",
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
 	"S2,CARROMBIN,Load Cart;",
+	"-;",
+	"OL,Swap Joysticks,No,Yes;",
 	"-;",
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",
 	"OAC,Drive Speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
@@ -320,13 +323,13 @@ atari800top atari800top
 
 	.PS2_KEY(ps2_key),
 
-	.JOY1X(ax),
-	.JOY1Y(ay),
-	.JOY2X(joya_1[7:0]),
-	.JOY2Y(joya_1[15:8]),
+	.JOY1X(status[21] ? joya_1[7:0]  : ax),
+	.JOY1Y(status[21] ? joya_1[15:8] : ay),
+	.JOY2X(status[21] ? ax : joya_1[7:0] ),
+	.JOY2Y(status[21] ? ay : joya_1[15:8]),
 
-	.JOY1(j0),
-	.JOY2(joy_1[8:0])
+	.JOY1(status[21] ? joy_1[8:0] : j0),
+	.JOY2(status[21] ? j0 : joy_1[8:0])
 );
 
 assign VGA_F1 = 0;
