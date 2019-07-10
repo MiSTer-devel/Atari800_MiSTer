@@ -368,7 +368,7 @@ BEGIN
 		ldqm_next <= '1';
 		udqm_next <= '1';
 		ba_next <= (others=>'0');
-		addr_next <= (others=>'1');
+		addr_next <= (others=>'0');
 
 		-- TODO - use bank states!!
 		-- TODO - MUCH MORE SMART STUFF!
@@ -473,12 +473,14 @@ BEGIN
 				dq_out_next(15 downto 8) <= (data_in_sreg(15 downto 8) and not(repeat(8,dqm_mask_sreg(0)))) or (data_in_sreg(7 downto 0) and repeat(8,dqm_mask_sreg(0)));
 				ldqm_next <= dqm_mask_sreg(0);
 				udqm_next <= dqm_mask_sreg(1);
+				addr_next(12 downto 11) <= dqm_mask_sreg(1 downto 0);
 			when X"4" =>
 				dq_output_next <= '1';
 				dq_out_next(7 downto 0) <= (data_in_sreg(23 downto 16) and not(repeat(8,dqm_mask_sreg(0)))) or (data_in_sreg(15 downto 8) and repeat(8,dqm_mask_sreg(0)));
 				dq_out_next(15 downto 8) <= data_in_sreg(31 downto 24);
 				ldqm_next <= dqm_mask_sreg(2);
 				udqm_next <= dqm_mask_sreg(3);
+				addr_next(12 downto 11) <= dqm_mask_sreg(3 downto 2);
 
 				reply_next <= request_sreg;				
 			when X"6" => -- after 3 cycles we can do the next ACT (21 ns psc)

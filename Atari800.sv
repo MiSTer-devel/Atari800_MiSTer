@@ -165,15 +165,14 @@ localparam CONF_STR = {
 
 wire locked;
 wire clk_sys;
-wire clk_mem;
+wire clk_mem = clk_sys;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_mem),
+	.outclk_0(clk_sys),
 	.outclk_1(SDRAM_CLK),
-	.outclk_2(clk_sys),
 	.locked(locked)
 );
 
@@ -285,6 +284,9 @@ wire [15:0]	ZPU_WR;
 
 wire areset;
 
+assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
+assign SDRAM_CKE = 1;
+
 atari800top atari800top
 (
 	.CLK(clk_sys),
@@ -297,9 +299,6 @@ atari800top atari800top
 	.SDRAM_nRAS(SDRAM_nRAS),
 	.SDRAM_nCAS(SDRAM_nCAS),
 	.SDRAM_nWE(SDRAM_nWE),
-	.SDRAM_DQMH(SDRAM_DQMH),
-	.SDRAM_DQML(SDRAM_DQML),
-	.SDRAM_CKE(SDRAM_CKE),
 	.SDRAM_A(SDRAM_A),
 	.SDRAM_DQ(SDRAM_DQ),
 
