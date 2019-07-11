@@ -28,8 +28,8 @@ PORT
 	PS2_CLK : IN STD_LOGIC := '1';
 	PS2_DAT : IN STD_LOGIC := '1';
 	
-	JOY1  : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
-	JOY2  : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+	JOY1  : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
+	JOY2  : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
 	
 	INPUT : IN STD_LOGIC_VECTOR(31 downto 0) := (others=>'0');
 	
@@ -154,12 +154,12 @@ end generate;
 			atari_keyboard(15)<=(ps2_keys_reg(16#16#) and not(ps2_keys_reg(16#14#))) or JOY1(12); --1
 			atari_keyboard(14)<=(ps2_keys_reg(16#1E#) and not(ps2_keys_reg(16#14#))) or JOY1(13); --2
 			atari_keyboard(13)<=(ps2_keys_reg(16#26#) and not(ps2_keys_reg(16#14#))) or JOY1(14); --3
-			atari_keyboard(11)<=(ps2_keys_reg(16#15#) and not(ps2_keys_reg(16#14#))); --q
-			atari_keyboard(10)<=(ps2_keys_reg(16#1D#) and not(ps2_keys_reg(16#14#))); --w
-			atari_keyboard(9)<=(ps2_keys_reg(16#24#) and not(ps2_keys_reg(16#14#)));  --e
-			atari_keyboard(7)<=(ps2_keys_reg(16#1c#) and not(ps2_keys_reg(16#14#)));  --a
-			atari_keyboard(6)<=(ps2_keys_reg(16#1b#) and not(ps2_keys_reg(16#14#)));  --s
-			atari_keyboard(5)<=(ps2_keys_reg(16#23#) and not(ps2_keys_reg(16#14#)));  --d
+			atari_keyboard(11)<=(ps2_keys_reg(16#15#) and not(ps2_keys_reg(16#14#))) or JOY1(15); --q
+			atari_keyboard(10)<=(ps2_keys_reg(16#1D#) and not(ps2_keys_reg(16#14#))) or JOY1(16); --w
+			atari_keyboard(9)<=(ps2_keys_reg(16#24#) and not(ps2_keys_reg(16#14#)))  or JOY1(17); --e
+			atari_keyboard(7)<=(ps2_keys_reg(16#1c#) and not(ps2_keys_reg(16#14#)))  or JOY1(18); --a
+			atari_keyboard(6)<=(ps2_keys_reg(16#1b#) and not(ps2_keys_reg(16#14#)))  or JOY1(19); --s
+			atari_keyboard(5)<=(ps2_keys_reg(16#23#) and not(ps2_keys_reg(16#14#)))  or JOY1(20); --d
 			atari_keyboard(3)<=(ps2_keys_reg(16#1a#) and not(ps2_keys_reg(16#14#)))  or JOY1(6);  --z 
 			atari_keyboard(2)<=(ps2_keys_reg(16#22#) and not(ps2_keys_reg(16#14#)))  or JOY1(11); --x
 			atari_keyboard(1)<=(ps2_keys_reg(16#21#) and not(ps2_keys_reg(16#14#)))  or JOY1(7);  --c
@@ -171,12 +171,12 @@ end generate;
 			atari_keyboard(15)<=(ps2_keys_reg(16#25#) and not(ps2_keys_reg(16#14#))) or JOY2(12); -- 4
 			atari_keyboard(14)<=(ps2_keys_reg(16#2e#) and not(ps2_keys_reg(16#14#))) or JOY2(13); -- 5
 			atari_keyboard(13)<=(ps2_keys_reg(16#36#) and not(ps2_keys_reg(16#14#))) or JOY2(14); -- 6
-			atari_keyboard(11)<=(ps2_keys_reg(16#2d#) and not(ps2_keys_reg(16#14#))); -- r
-			atari_keyboard(10)<=(ps2_keys_reg(16#2c#) and not(ps2_keys_reg(16#14#))); -- t 
-			atari_keyboard(9)<=(ps2_keys_reg(16#35#) and not(ps2_keys_reg(16#14#)));  -- y
-			atari_keyboard(7)<=(ps2_keys_reg(16#2b#) and not(ps2_keys_reg(16#14#)));  -- f
-			atari_keyboard(6)<=(ps2_keys_reg(16#34#) and not(ps2_keys_reg(16#14#)));  -- g
-			atari_keyboard(5)<=(ps2_keys_reg(16#33#) and not(ps2_keys_reg(16#14#)));  -- h
+			atari_keyboard(11)<=(ps2_keys_reg(16#2d#) and not(ps2_keys_reg(16#14#))) or JOY2(15); -- r
+			atari_keyboard(10)<=(ps2_keys_reg(16#2c#) and not(ps2_keys_reg(16#14#))) or JOY2(16); -- t 
+			atari_keyboard(9)<=(ps2_keys_reg(16#35#) and not(ps2_keys_reg(16#14#)))  or JOY2(17); -- y
+			atari_keyboard(7)<=(ps2_keys_reg(16#2b#) and not(ps2_keys_reg(16#14#)))  or JOY2(18); -- f
+			atari_keyboard(6)<=(ps2_keys_reg(16#34#) and not(ps2_keys_reg(16#14#)))  or JOY2(19); -- g
+			atari_keyboard(5)<=(ps2_keys_reg(16#33#) and not(ps2_keys_reg(16#14#)))  or JOY2(20); -- h
 			atari_keyboard(3)<=(ps2_keys_reg(16#2a#) and not(ps2_keys_reg(16#14#)))  or JOY2(6);  -- v
 			atari_keyboard(2)<=(ps2_keys_reg(16#32#) and not(ps2_keys_reg(16#14#)))  or JOY2(11); -- b
 			atari_keyboard(1)<=(ps2_keys_reg(16#31#) and not(ps2_keys_reg(16#14#)))  or JOY2(7);  -- n

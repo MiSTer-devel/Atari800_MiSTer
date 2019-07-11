@@ -53,8 +53,8 @@ PORT
 	JOY2X      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
-	JOY1       : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
-	JOY2       : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+	JOY1       : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
+	JOY2       : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
 
 	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
 	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
@@ -74,7 +74,7 @@ signal capslock_pressed : std_logic;
 signal capsheld_next : std_logic;
 signal capsheld_reg : std_logic;
 
-signal JOY    :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+signal JOY    :  STD_LOGIC_VECTOR(20 DOWNTO 0);
 
 SIGNAL KEYBOARD_RESPONSE :  STD_LOGIC_VECTOR(1 DOWNTO 0);
 SIGNAL KEYBOARD_SCAN :  STD_LOGIC_VECTOR(5 DOWNTO 0);

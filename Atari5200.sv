@@ -146,7 +146,7 @@ localparam CONF_STR = {
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"R0,Reset;",
-	"J1,Fire 1,Fire 2,*,#,Start,Pause,Reset,0,1,2,3;",
+	"J1,Fire 1,Fire 2,*,#,Start,Pause,Reset,0,1,2,3,4,5,6,7,8,9;",
 	"V,v",`BUILD_DATE
 };
 
@@ -154,23 +154,22 @@ localparam CONF_STR = {
 
 wire locked;
 wire clk_sys;
-wire clk_mem;
+wire clk_mem = clk_sys;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_mem),
+	.outclk_0(clk_sys),
 	.outclk_1(SDRAM_CLK),
-	.outclk_2(clk_sys),
 	.locked(locked)
 );
 
 wire reset = RESET | status[0] | buttons[1];
 
 //////////////////   HPS I/O   ///////////////////
-wire [15:0] joy_0;
-wire [15:0] joy_1;
+wire [20:0] joy_0;
+wire [20:0] joy_1;
 wire [15:0] joya_0;
 wire [15:0] joya_1;
 wire  [1:0] buttons;
@@ -300,8 +299,8 @@ atari5200top atari5200top
 	.JOY2X(joya_1[7:0]),
 	.JOY2Y(joya_1[15:8]),
 
-	.JOY1(j0 & {12'b111111111111, {4{joy_d1ena}}}),
-	.JOY2(joy_1 & {12'b111111111111, {4{joy_d2ena}}})
+	.JOY1(j0    & {17'b11111111111111111, {4{joy_d1ena}}}),
+	.JOY2(joy_1 & {17'b11111111111111111, {4{joy_d2ena}}})
 );
 
 assign VGA_F1 = 0;
@@ -412,7 +411,7 @@ end
 reg         emu = 0;
 wire  [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
 wire  [7:0] ay = emu ? my[7:0] : joya_0[15:8];
-wire [15:0] j0 = emu ? {joy_0[15:6], ps2_mouse[1:0], joy_0[3:0]} : joy_0;
+wire [20:0] j0 = emu ? {joy_0[20:6], ps2_mouse[1:0], joy_0[3:0]} : joy_0;
 
 reg  signed [8:0] mx = 0;
 wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};
