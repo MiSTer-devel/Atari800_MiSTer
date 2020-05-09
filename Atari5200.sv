@@ -167,7 +167,6 @@ pll pll
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys),
-	.outclk_1(SDRAM_CLK),
 	.locked(locked)
 );
 
@@ -200,6 +199,8 @@ wire        img_mounted;
 wire [63:0] img_size;
 wire  [7:0] ioctl_index;
 
+wire [21:0] gamma_bus;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -215,6 +216,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.forced_scandoubler(forced_scandoubler),
+	.gamma_bus(gamma_bus),
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
@@ -258,6 +260,10 @@ wire [31:0]	ZPU_OUT3;
 wire [15:0]	ZPU_RD;
 wire [15:0]	ZPU_WR;
 
+assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
+assign SDRAM_CKE = 1;
+assign SDRAM_nCS = 0;
+
 atari5200top atari5200top
 (
 	.CLK(clk_sys),
@@ -265,13 +271,9 @@ atari5200top atari5200top
 	.RESET_N(~reset),
 
 	.SDRAM_BA(SDRAM_BA),
-	.SDRAM_nCS(SDRAM_nCS),
 	.SDRAM_nRAS(SDRAM_nRAS),
 	.SDRAM_nCAS(SDRAM_nCAS),
 	.SDRAM_nWE(SDRAM_nWE),
-	.SDRAM_DQMH(SDRAM_DQMH),
-	.SDRAM_DQML(SDRAM_DQML),
-	.SDRAM_CKE(SDRAM_CKE),
 	.SDRAM_A(SDRAM_A),
 	.SDRAM_DQ(SDRAM_DQ),
 
@@ -309,14 +311,40 @@ atari5200top atari5200top
 	.JOY2(joy_1 & {17'b11111111111111111, {4{joy_d2ena}}})
 );
 
+altddio_out
+#(
+	.extend_oe_disable("OFF"),
+	.intended_device_family("Cyclone V"),
+	.invert_output("OFF"),
+	.lpm_hint("UNUSED"),
+	.lpm_type("altddio_out"),
+	.oe_reg("UNREGISTERED"),
+	.power_up_high("OFF"),
+	.width(1)
+)
+sdramclk_ddr
+(
+	.datain_h(1'b0),
+	.datain_l(1'b1),
+	.outclock(clk_mem),
+	.dataout(SDRAM_CLK),
+	.aclr(1'b0),
+	.aset(1'b0),
+	.oe(1'b1),
+	.outclocken(1'b1),
+	.sclr(1'b0),
+	.sset(1'b0)
+); 
+
 assign VGA_F1 = 0;
 assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
 
 wire [2:0] scale = status[19:17];
 
-video_mixer video_mixer
+video_mixer #(.GAMMA(1)) video_mixer
 (
 	.*,
+	.clk_vid(clk_sys),
 	.ce_pix_out(CE_PIXEL),
 
 	.scanlines(0),

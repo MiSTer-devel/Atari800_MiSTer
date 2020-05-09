@@ -253,7 +253,7 @@ PORT MAP
 	SDRAM_ADDR => SDRAM_A,
 	reset_client_n => SDRAM_RESET_N
 );
-bios: work.spram generic map(11,8, "rom/5200.mif")
+bios: work.spram generic map(11,8, "rtl/rom/5200.mif")
 port map
 (
 	clock => clk,

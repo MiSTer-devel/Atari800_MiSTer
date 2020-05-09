@@ -178,7 +178,6 @@ pll pll
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys),
-	.outclk_1(SDRAM_CLK),
 	.locked(locked)
 );
 
@@ -226,6 +225,8 @@ wire        ioctl_wr;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
 
+wire [21:0] gamma_bus;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -241,6 +242,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(3)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.forced_scandoubler(forced_scandoubler),
+	.gamma_bus(gamma_bus),
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
@@ -292,6 +294,7 @@ wire areset;
 
 assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
 assign SDRAM_CKE = 1;
+assign SDRAM_nCS = 0;
 
 atari800top atari800top
 (
@@ -301,7 +304,6 @@ atari800top atari800top
 	.ARESET(areset),
 
 	.SDRAM_BA(SDRAM_BA),
-	.SDRAM_nCS(SDRAM_nCS),
 	.SDRAM_nRAS(SDRAM_nRAS),
 	.SDRAM_nCAS(SDRAM_nCAS),
 	.SDRAM_nWE(SDRAM_nWE),
@@ -348,6 +350,31 @@ atari800top atari800top
 	.JOY2(status[21] ? j0 : joy_1[8:0])
 );
 
+altddio_out
+#(
+	.extend_oe_disable("OFF"),
+	.intended_device_family("Cyclone V"),
+	.invert_output("OFF"),
+	.lpm_hint("UNUSED"),
+	.lpm_type("altddio_out"),
+	.oe_reg("UNREGISTERED"),
+	.power_up_high("OFF"),
+	.width(1)
+)
+sdramclk_ddr
+(
+	.datain_h(1'b0),
+	.datain_l(1'b1),
+	.outclock(clk_mem),
+	.dataout(SDRAM_CLK),
+	.aclr(1'b0),
+	.aset(1'b0),
+	.oe(1'b1),
+	.outclocken(1'b1),
+	.sclr(1'b0),
+	.sset(1'b0)
+); 
+
 assign VGA_F1 = 0;
 assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
 
@@ -361,9 +388,10 @@ always @(posedge CLK_VIDEO) begin
 	end
 end
 
-video_mixer video_mixer
+video_mixer #(.GAMMA(1)) video_mixer
 (
 	.*,
+	.clk_vid(clk_sys),
 	.ce_pix_out(CE_PIXEL),
 	
 	.HSync(hsync_o),
@@ -380,7 +408,7 @@ video_mixer video_mixer
 wire [14:0] rom_addr;
 wire  [7:0] xl_do, bas_do, osa_do, osb_do;
 
-dpram #(14,8, "rom/ATARIXL.mif") romxl
+dpram #(14,8, "rtl/rom/ATARIXL.mif") romxl
 (
 	.clock(clk_sys),
 
@@ -395,7 +423,7 @@ dpram #(14,8, "rom/ATARIXL.mif") romxl
 reg [13:0] osrom_off = 0;
 always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 0) osrom_off <= 14'h3FFF - ioctl_addr;
 
-dpram #(13,8, "rom/ATARIBAS.mif") basic
+dpram #(13,8, "rtl/rom/ATARIBAS.mif") basic
 (
 	.clock(clk_sys),
 
@@ -407,14 +435,14 @@ dpram #(13,8, "rom/ATARIBAS.mif") basic
 	.q_b(bas_do)
 );
 
-spram #(14,8, "rom/ATARIOSA.mif") osa
+spram #(14,8, "rtl/rom/ATARIOSA.mif") osa
 (
 	.clock(clk_sys),
 	.address(rom_addr[13:0]),
 	.q(osa_do)
 );
 
-spram #(14,8, "rom/ATARIOSB.mif") osb
+spram #(14,8, "rtl/rom/ATARIOSB.mif") osb
 (
 	.clock(clk_sys),
 	.address(rom_addr[13:0]),
