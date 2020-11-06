@@ -39,8 +39,8 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output  [7:0] VIDEO_ARX,
-	output  [7:0] VIDEO_ARY,
+	output [11:0] VIDEO_ARX,
+	output [11:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -50,6 +50,7 @@ module emu
 	output        VGA_DE,    // = ~(VBlank | HBlank)
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
+	output        VGA_SCALER, // Force VGA scaler
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -64,6 +65,7 @@ module emu
 	// b[0]: osd button
 	output  [1:0] BUTTONS,
 
+	input         CLK_AUDIO, // 24.576 MHz
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
@@ -133,9 +135,12 @@ assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
+assign VGA_SCALER= 0;
 
-assign VIDEO_ARX = status[6] ? 8'd16 : 8'd4;
-assign VIDEO_ARY = status[6] ? 8'd9  : 8'd3;
+wire [1:0] ar = status[23:22];
+
+assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
+assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 
 wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 
@@ -156,7 +161,7 @@ localparam CONF_STR = {
 	"ODF,RAM,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
 	"-;",
 	"O5,Video mode,PAL,NTSC;",
-	"O6,Aspect ratio,4:3,16:9;",
+	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
 	"OK,Dual Pokey,No,Yes;",
