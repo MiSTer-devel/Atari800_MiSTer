@@ -228,7 +228,7 @@ void actions()
 
 		if(num<4)
 		{
-			set_cart_select(0);
+			//set_cart_select(0);
 			set_drive_status(num,file->size ? file : 0);
 		}
 		else
