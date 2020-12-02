@@ -23,7 +23,6 @@ Additionally, you can control the speed of turbo loading in OSD menu.
 ### Disks
 A800: After mounting the disk, press F10 to boot.
 Some games don't like the Basic ROM. Keep F8(Option) pressed while pressing F10 to skip the Basic.
-Currently disks are read-only.
 
 ### Differences from original version
 * Joystick/Paddle mode switched by joystick. Press **Paddle1/2** to switch to paddle mode (analog X/Y). Press **Fire** to switch to joystick mode (digital X/Y).
