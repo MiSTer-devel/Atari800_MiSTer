@@ -214,7 +214,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXX XXXXXXXXX XXXXXXXXXXXXXX
+// XXXXXX XXXXXXXXX XXXXXXXXXXXXXX  xxxxxxxx
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -235,6 +235,8 @@ localparam CONF_STR = {
 	"O5,Video mode,PAL,NTSC;",
 	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"o03,Analog Video H-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
+	"o47,Analog Video V-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
 	"-;",
 	"d0OO,Vertical Crop,Disabled,216p(5x);",
 	"d0OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
@@ -466,12 +468,32 @@ end
 video_mixer #(.GAMMA(1)) video_mixer
 (
 	.*,
-	.HSync(hsync_o),
-	.VSync(vsync_o),
+	.HSync(hsync_rs),
+	.VSync(vsync_rs),
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 	.VGA_DE(vga_de)
 );
+
+wire hsync_rs, vsync_rs;
+wire [3:0]  voffset = status[39:36];
+wire [3:0]  hoffset = status[35:32];
+
+jtframe_resync jtframe_resync
+(
+  .clk(clk_sys),
+  .pxl_cen(ce_pix),
+  .hs_in(hsync_o),
+  .vs_in(vsync_o),
+  .LVBL(VBlank),
+  .LHBL(HBlank),
+  .hoffset(hoffset),
+  .voffset(voffset),
+  .hs_out(hsync_rs),
+  .vs_out(vsync_rs)
+);
+
+
 
 ////////////////   ROM   ////////////////////
 
