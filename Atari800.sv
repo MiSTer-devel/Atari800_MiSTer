@@ -402,6 +402,7 @@ atari800top atari800top
 	.RAM_SIZE(status[15:13]),
 	.DRV_SPEED(status[12:10]),
 
+	.STEREO(status[20]),
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
 

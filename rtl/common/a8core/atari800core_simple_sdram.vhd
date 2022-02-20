@@ -40,9 +40,6 @@ ENTITY atari800core_simple_sdram is
 		-- Use 1MB memory map if low memory set (for Aeon lite)
 		low_memory : integer := 0;
 
-		-- one or two pokey chips
-		stereo : integer := 1;
-
 		-- resistor ladder style 8-bit sample thing
 		covox : integer := 1
 	);
@@ -70,6 +67,7 @@ ENTITY atari800core_simple_sdram is
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
+		STEREO : IN  STD_LOGIC;
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
 		AUDIO_R : OUT std_logic_vector(15 downto 0);
 
@@ -328,7 +326,6 @@ GENERIC MAP
 	video_bits => video_bits,
 	palette => palette,
 	low_memory => low_memory,
-	stereo => stereo,
 	covox => covox,
 	sdram_start_bank => internal_ram/16384
 )
@@ -352,6 +349,7 @@ PORT MAP
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
 
+	STEREO => STEREO,
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
 	SIO_AUDIO => "00000000",

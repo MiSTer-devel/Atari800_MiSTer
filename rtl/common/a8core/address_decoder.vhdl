@@ -15,7 +15,6 @@ ENTITY address_decoder IS
 GENERIC
 (
 	low_memory : integer := 0; -- if 0, we assume 8MB SDRAM, if 1, we assume 1MB 'SDRAM', if 2 we assume 512KB 'SDRAM'.
-	stereo : integer := 1; 
 	system : integer := 0; -- 0=Atari XL/XE, 10=Atari5200 (space left for more systems)
 	sdram_start_bank : integer := 0 -- 0=sdram only. Number of banks in SRAM (SRAM_SIZE/16384)
 );
@@ -54,6 +53,7 @@ PORT
 	PIA_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	RAM_DATA : IN STD_LOGIC_VECTOR(15 downto 0);
 	PBI_DATA : in std_logic_Vector(7 downto 0);
+	STEREO : in std_logic;
 
 	-- pbi external acccess!
 	PBI_TAKEOVER : in std_logic;
@@ -814,7 +814,7 @@ end generate;
 			
 				-- POKEY
 				when X"D2" =>				
-					if (stereo=0 or addr_next(4) = '0') then
+					if (STEREO = '0' or addr_next(4) = '0') then
 						POKEY_WR_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= POKEY_DATA;
 						MEMORY_DATA_INT(15 downto 8) <= CACHE_POKEY_DATA;

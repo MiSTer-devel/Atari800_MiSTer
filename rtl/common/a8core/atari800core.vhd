@@ -22,7 +22,6 @@ ENTITY atari800core IS
 		video_bits : integer := 8;
 		palette : integer :=0; -- 0:gtia colour on VIDEO_B, 1:on
 		low_memory : integer := 0; -- 0:8MB memory map, 1:1MB memory map
-		stereo : integer := 1;
 		covox : integer := 1;
 		sdram_start_bank : integer := 0
 	);
@@ -48,6 +47,7 @@ ENTITY atari800core IS
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
+		STEREO  : IN  STD_LOGIC;
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
 		AUDIO_R : OUT std_logic_vector(15 downto 0);
 		SIO_AUDIO : IN std_logic_vector(7 downto 0);
@@ -278,6 +278,8 @@ signal POKEY2_CHANNEL0 : std_logic_vector(3 downto 0);
 signal POKEY2_CHANNEL1 : std_logic_vector(3 downto 0);
 signal POKEY2_CHANNEL2 : std_logic_vector(3 downto 0);
 signal POKEY2_CHANNEL3 : std_logic_vector(3 downto 0);
+signal AUDIO_L_pre : std_logic_vector(15 downto 0);
+signal AUDIO_R_pre : std_logic_vector(15 downto 0);
 
 -- COVOX (after market DAC)
 signal covox_write_enable : std_logic;
@@ -395,11 +397,12 @@ PORT MAP(CLK => CLK,
 		 CHANNEL_R_3 => POKEY2_CHANNEL3,
 		 COVOX_CHANNEL_R_0 => covox_channel2,
 		 COVOX_CHANNEL_R_1 => covox_channel3,
-		 VOLUME_OUT_L => AUDIO_L,
-		 VOLUME_OUT_R => AUDIO_R);
-		 
+		 VOLUME_OUT_L => AUDIO_L_pre,
+		 VOLUME_OUT_R => AUDIO_R_pre);
 
-gen_stereo : if stereo=1 generate
+AUDIO_L <= AUDIO_L_pre;
+AUDIO_R <= AUDIO_R_pre when STEREO = '1' else AUDIO_L_pre;
+
 pokey2 : entity work.pokey
 PORT MAP(CLK => CLK,
 		 ENABLE_179 => ANTIC_ENABLE_179,
@@ -417,14 +420,6 @@ PORT MAP(CLK => CLK,
 		 SIO_IN3 => '1',
 		 keyboard_response => "00",
 		 pot_in=>"00000000");
-end generate;
-
-gen_mono : if stereo=0 generate
-	POKEY2_CHANNEL0 <= POKEY1_CHANNEL0;
-	POKEY2_CHANNEL1 <= POKEY1_CHANNEL1;
-	POKEY2_CHANNEL2 <= POKEY1_CHANNEL2;
-	POKEY2_CHANNEL3 <= POKEY1_CHANNEL3;
-end generate;
 
 pia1 : entity work.pia
 PORT MAP(CLK => CLK,
@@ -452,7 +447,7 @@ PORT MAP(CLK => CLK,
 		 PORTB_OUT => PORTB_OUT_INT);
 
 mmu1 : entity work.address_decoder
-GENERIC MAP(low_memory => low_memory, stereo => stereo, sdram_start_bank => sdram_start_bank)
+GENERIC MAP(low_memory => low_memory, sdram_start_bank => sdram_start_bank)
 PORT MAP(CLK => CLK,
 		 CPU_FETCH => CPU_FETCH,
 		 CPU_WRITE_N => R_W_N,
@@ -483,6 +478,7 @@ PORT MAP(CLK => CLK,
 		 GTIA_DATA => GTIA_DO,
 		 CACHE_GTIA_DATA => CACHE_GTIA_DO,
 		 PIA_DATA => PIA_DO,
+		 STEREO => STEREO,
 		 POKEY2_DATA => POKEY2_DO,
 		 CACHE_POKEY2_DATA => CACHE_POKEY2_DO,
 		 POKEY_DATA => POKEY_DO,
