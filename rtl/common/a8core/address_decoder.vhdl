@@ -700,6 +700,8 @@ end generate;
 		
 		bbtype,bank0reg,bank1reg,bank0next,bank1next,
 
+		STEREO,
+
 		freezer_enable, freezer_disable_atari, freezer_access_type,
 		freezer_dout, freezer_request_complete,
 		SDRAM_FREEZER_RAM_ADDR, SDRAM_FREEZER_ROM_ADDR
