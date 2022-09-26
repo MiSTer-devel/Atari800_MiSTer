@@ -27,7 +27,8 @@ PORT
 	RESET_N : IN STD_LOGIC;
 	PS2_CLK : IN STD_LOGIC := '1';
 	PS2_DAT : IN STD_LOGIC := '1';
-	INPUT : IN STD_LOGIC_VECTOR(31 downto 0) := (others=>'0');
+	INPUT  : IN STD_LOGIC_VECTOR(31 downto 0) := (others=>'0');
+	INPUT2 : IN STD_LOGIC_VECTOR(4 downto 0) := (others=>'0');
 	
 	KEYBOARD_SCAN : IN STD_LOGIC_VECTOR(5 downto 0);
 	KEYBOARD_RESPONSE : OUT STD_LOGIC_VECTOR(1 downto 0);
@@ -142,7 +143,7 @@ end generate;
 	end process;
 
 	-- map to atari key code
-	process(ps2_keys_reg)
+	process(ps2_keys_reg, input2)
 	begin
 		atari_keyboard <= (others=>'0');
 
@@ -216,9 +217,9 @@ end generate;
 		atari_keyboard(19)<=ps2_keys_reg(16#04#);
 		atari_keyboard(20)<=ps2_keys_reg(16#0c#);
 
-		consol_start_int<=ps2_keys_reg(16#0B#);
-		consol_select_int<=ps2_keys_reg(16#83#);
-		consol_option_int<=ps2_keys_reg(16#0a#);
+		consol_start_int<=ps2_keys_reg(16#0B#) or INPUT2(0);
+		consol_select_int<=ps2_keys_reg(16#83#) or INPUT2(1);
+		consol_option_int<=ps2_keys_reg(16#0a#) or INPUT2(2);
 		shift_pressed<=ps2_keys_reg(16#12#) or ps2_keys_reg(16#59#);
 		--control_pressed<=ps2_keys_reg(16#14#) or ps2_keys_reg(16#94#);
 		control_pressed<=ps2_keys_reg(16#14#) or ps2_keys_reg(16#114#) or ps2_keys_reg(16#172#) or ps2_keys_reg(16#175#) or ps2_keys_reg(16#16b#) or ps2_keys_reg(16#174#);
@@ -232,8 +233,8 @@ end generate;
 		fkeys_int(5)<=ps2_keys_reg(16#0B#);
 		fkeys_int(6)<=ps2_keys_reg(16#83#);
 		fkeys_int(7)<=ps2_keys_reg(16#0a#);
-		fkeys_int(8)<=ps2_keys_reg(16#01#);
-		fkeys_int(9)<=ps2_keys_reg(16#09#);
+		fkeys_int(8)<=ps2_keys_reg(16#01#) or INPUT2(3);
+		fkeys_int(9)<=ps2_keys_reg(16#09#) or INPUT2(4);
 		fkeys_int(10)<=ps2_keys_reg(16#78#);
 		fkeys_int(11)<=ps2_keys_reg(16#07#);
 

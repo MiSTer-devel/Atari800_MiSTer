@@ -58,8 +58,8 @@ PORT
 	JOY2X      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
-	JOY1       : IN  STD_LOGIC_VECTOR(8 DOWNTO 0);
-	JOY2       : IN  STD_LOGIC_VECTOR(8 DOWNTO 0);
+	JOY1       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
+	JOY2       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 
 	ROM_ADDR   : OUT STD_LOGIC_VECTOR(14 DOWNTO 0);
 	ROM_DO     : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -87,7 +87,7 @@ signal capsheld_reg : std_logic;
 
 signal JOY1_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
 signal JOY2_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
-signal JOY    :  STD_LOGIC_VECTOR(8 DOWNTO 0);
+signal JOY    :  STD_LOGIC_VECTOR(13 DOWNTO 0);
 signal JOY1_X :  STD_LOGIC_VECTOR(7 downto 0);
 signal JOY2_X :  STD_LOGIC_VECTOR(7 downto 0);
 signal JOY1_Y :  STD_LOGIC_VECTOR(7 downto 0);
@@ -214,6 +214,7 @@ PORT MAP
 	RESET_N => reset_n,
 
 	INPUT => x"000"&"000"&ps2_key(9)&"000"&ps2_key(8)&x"0"&ps2_key(7 downto 0),
+	INPUT2 => JOY(13 downto 9),
 
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,

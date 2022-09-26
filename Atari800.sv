@@ -245,7 +245,7 @@ localparam CONF_STR = {
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"R0,Reset;",
-	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT;",
+	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
 	"V,v",`BUILD_DATE
 };
 
@@ -421,8 +421,8 @@ atari800top atari800top
 	.JOY2X(status[21] ? ax : joya_1[7:0] ),
 	.JOY2Y(status[21] ? ay : joya_1[15:8]),
 
-	.JOY1(status[21] ? joy_1[8:0] : j0),
-	.JOY2(status[21] ? j0 : joy_1[8:0])
+	.JOY1(status[21] ? joy_1[13:0] : j0),
+	.JOY2(status[21] ? j0 : joy_1[13:0])
 );
 
 altddio_out
@@ -621,9 +621,9 @@ end
 
 //////////////////   ANALOG AXIS   ///////////////////
 reg        emu = 0;
-wire [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
-wire [7:0] ay = emu ? my[7:0] : joya_0[15:8];
-wire [8:0] j0 = {emu ? ps2_mouse[1:0] : joy_0[8:7], joy_0[6:0]};
+wire  [7:0] ax = emu ? mx[7:0] : joya_0[7:0];
+wire  [7:0] ay = emu ? my[7:0] : joya_0[15:8];
+wire [13:0] j0 = {joy_0[13:9], emu ? ps2_mouse[1:0] : joy_0[8:7], joy_0[6:0]};
 
 reg  signed [8:0] mx = 0;
 wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};
