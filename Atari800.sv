@@ -217,7 +217,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXX XXXXXXXXX XXXXXXXXXXXXXX
+// XXXXXX XXXXXXXXX XXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -238,6 +238,7 @@ localparam CONF_STR = {
 	"O5,Video mode,PAL,NTSC;",
 	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"OV,NTSC/PAL artifacting,No,Yes;",
 	"-;",
 	"d0OO,Vertical Crop,Disabled,216p(5x);",
 	"d0OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
@@ -344,9 +345,9 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 );
 
 
-wire [7:0] R,G,B;
-wire HBlank,VBlank;
-wire VSync, HSync;
+wire [7:0] R,G,B, Ro,Go,Bo;
+wire HBlank,VBlank,HBlank_o,VBlank_o;
+wire VSync, HSync, VSync_o, HSync_o;
 wire ce_pix;
 
 assign CLK_VIDEO = clk_sys;
@@ -390,14 +391,14 @@ atari800top atari800top
 	.ROM_DO(rom_do),
 
 	.PAL(~status[5]),
-	.VGA_VS(VSync),
-	.VGA_HS(HSync),
-	.VGA_B(B),
-	.VGA_G(G),
-	.VGA_R(R),
+	.VGA_VS(VSync_o),
+	.VGA_HS(HSync_o),
+	.VGA_B(Bo),
+	.VGA_G(Go),
+	.VGA_R(Ro),
 	.VGA_PIXCE(ce_pix),
-	.HBLANK(HBlank),
-	.VBLANK(VBlank),
+	.HBLANK(HBlank_o),
+	.VBLANK(VBlank_o),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
 	.RAM_SIZE(status[15:13]),
@@ -460,16 +461,38 @@ wire [2:0] scale = status[19:17];
 reg hsync_o, vsync_o;
 always @(posedge CLK_VIDEO) begin
 	if(ce_pix) begin
-		hsync_o <= HSync;
-		if(~hsync_o & HSync) vsync_o <= VSync;
+		hsync_o <= HSync_o;
+		if(~hsync_o & HSync_o) vsync_o <= VSync_o;
 	end
 end
+
+articolor articolor
+(
+	.clk(CLK_VIDEO),
+	.ce_pix(ce_pix),
+	
+	.enable(status[31]),
+
+	.r_in(Ro),
+	.g_in(Go),
+	.b_in(Bo),
+	.hbl_in(HBlank_o),
+	.vbl_in(VBlank_o),
+	.hs_in(hsync_o),
+	.vs_in(vsync_o),
+
+	.r_out(R),
+	.g_out(G),
+	.b_out(B),
+	.hbl_out(HBlank),
+	.vbl_out(VBlank),
+	.hs_out(HSync),
+	.vs_out(VSync)
+);
 
 video_mixer #(.GAMMA(1)) video_mixer
 (
 	.*,
-	.HSync(hsync_o),
-	.VSync(vsync_o),
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 	.freeze_sync(),

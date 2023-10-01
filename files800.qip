@@ -52,5 +52,6 @@ set_global_assignment -name VHDL_FILE rtl/common/zpu/sio_handler.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/zpu/fifo_transmit.vhd
 set_global_assignment -name VHDL_FILE rtl/common/zpu/fifo_receive.vhd
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/articolor.sv
 set_global_assignment -name VHDL_FILE rtl/atari800top.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE Atari800.sv
