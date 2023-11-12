@@ -217,7 +217,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXX XXXXXXXXX XXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -246,6 +246,8 @@ localparam CONF_STR = {
 	"-;",
 	"OK,Dual Pokey,No,Yes;",
 	"O34,Stereo mix,None,25%,50%,100%;",
+	"-;",
+	"O6,Mouse Y,Normal,Inverted;",
 	"-;",
 	"R0,Reset;",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
@@ -658,7 +660,7 @@ wire signed [8:0] nmx = mx + mdx2;
 reg  signed [8:0] my = 0;
 wire signed [8:0] mdy = {ps2_mouse[5],ps2_mouse[5],ps2_mouse[23:17]};
 wire signed [8:0] mdy2 = (mdy > 10) ? 9'd10 : (mdy < -10) ? -9'd10 : mdy;
-wire signed [8:0] nmy = my + mdy2;
+wire signed [8:0] nmy = status[6] ? (my - mdy2) : (my + mdy2);
 
 always @(posedge clk_sys) begin
 	reg old_stb = 0;
