@@ -64,6 +64,7 @@ ARCHITECTURE vhdl OF sio_handler IS
 	signal addr_decoded : std_logic_vector(15 downto 0);
 
 	signal receive_enable : std_logic;
+	signal receive_detect : std_logic;
 	signal transmit_enable : std_logic;
 	
 	signal fifo_tx_write : std_logic;	
@@ -297,7 +298,7 @@ begin
 
 	end process;
 
-	process(pokey_enable,receive_enable,receive_divisor_reg,receive_divisor_count_reg)
+	process(pokey_enable,receive_enable,receive_detect,receive_divisor_reg,receive_divisor_count_reg)
 	begin
 		receive_divisor_next <= receive_divisor_reg;
 		receive_divisor_count_next <= receive_divisor_count_reg;
@@ -307,8 +308,11 @@ begin
 		end if;
 
 		if (receive_enable='1') then
-			receive_divisor_next <= receive_divisor_count_reg;
 			receive_divisor_count_next <= (others=>'0');
+		end if;
+
+		if (receive_enable='1' and receive_detect='1') then
+			receive_divisor_next <= receive_divisor_count_reg;
 		end if;
 
 	end process;
@@ -446,6 +450,7 @@ receive_fifo : entity work.fifo_receive
 
 		s2p_start <= '0';
 		s2p_write <= '0';
+		receive_detect <= '0';
 
 		if (framing_error_clear='1') then
 			s2p_framing_error_next <= '0';
@@ -461,10 +466,13 @@ receive_fifo : entity work.fifo_receive
 						s2p_start <= '1';
 					end if;
 				when S2P_STATE_SHIFT_0 =>
+					receive_detect <= '1';
 					s2p_state_next <= S2P_STATE_SHIFT_1;
 				when S2P_STATE_SHIFT_1 =>
+					receive_detect <= '1';
 					s2p_state_next <= S2P_STATE_SHIFT_2;
 				when S2P_STATE_SHIFT_2 =>
+					receive_detect <= '1';
 					s2p_state_next <= S2P_STATE_SHIFT_3;
 				when S2P_STATE_SHIFT_3 =>
 					s2p_state_next <= S2P_STATE_SHIFT_4;

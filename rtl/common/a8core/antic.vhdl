@@ -47,9 +47,6 @@ PORT
 	COLOUR_CLOCK_OUT : out std_logic;
 	HIGHRES_COLOUR_CLOCK_OUT : out std_logic; -- 2x to allow for half pixel modes
 	
-	HBLANK : OUT STD_LOGIC;
-	VBLANK : OUT STD_LOGIC;
-	
 	-- DMA fetch
 	dma_fetch_out : out std_logic;
 	dma_address_out : out std_logic_vector(15 downto 0);
@@ -62,6 +59,9 @@ PORT
 
 	-- if we are in turbo mode
 	turbo_out : out std_logic;
+
+	-- used to throttle in vblank mode
+	vblank_out : out std_logic;
 	
 	-- for debugging
 	shift_out : out std_logic_vector(7 downto 0);
@@ -352,9 +352,7 @@ ARCHITECTURE vhdl OF antic IS
 	
 	signal hblank_next : std_logic;
 	signal hblank_reg : std_logic;
-	signal hblank_ex_next : std_logic;
-	signal hblank_ex_reg : std_logic;
-
+	
 	signal playfield_dma_start_cycle : std_logic_vector(9 downto 0);
 	signal playfield_dma_end_cycle : std_logic_vector(9 downto 0);
 	signal playfield_display_start_cycle : std_logic_vector(7 downto 0);
@@ -585,7 +583,6 @@ BEGIN
 			shiftclock_reg <= shiftclock_next;
 			
 			hblank_reg <= hblank_next;
-			hblank_ex_reg <= hblank_ex_next;
 			
 			an_reg <= an_next;
 			an_current_reg <= an_current_next;
@@ -886,7 +883,7 @@ BEGIN
 	end process;
 
 	-- Actions done based on horizontal position - notably dma!
-	process (dmactl_delayed_enabled, hcount_reg, vcount_reg, vblank_reg, hblank_reg, hblank_ex_reg, dmactl_delayed_reg, playfield_dma_start_cycle, playfield_dma_end_cycle, playfield_display_start_cycle, playfield_display_end_cycle, instruction_final_row_reg, display_list_address_reg, pmbase_reg, first_line_of_instruction_reg, last_line_of_instruction_live, last_line_of_instruction_reg, instruction_type_reg, dma_clock_character_name, dma_clock_character_data, dma_clock_bitmap_data, allow_real_dma_reg, row_count_reg, dma_address_reg, memory_scan_address_reg, chbase_delayed_reg, line_buffer_data_out, enable_dma, colour_clock_1x, colour_clock_selected, two_part_instruction_reg, dma_fetch_destination_reg, playfield_display_active_reg, character_reg, dma_clock_character_inc, single_colour_character_reg, twoline_character_reg, instruction_reg, dli_enabled_reg, refresh_fetch_next, chactl_reg, vscrol_enabled_reg, vscrol_last_enabled_reg,twopixel_reg,dli_nmi_reg,vbi_nmi_reg,displayed_character_reg, playfield_dma_enabled)
+	process (dmactl_delayed_enabled, hcount_reg, vcount_reg, vblank_reg, hblank_reg, dmactl_delayed_reg, playfield_dma_start_cycle, playfield_dma_end_cycle, playfield_display_start_cycle, playfield_display_end_cycle, instruction_final_row_reg, display_list_address_reg, pmbase_reg, first_line_of_instruction_reg, last_line_of_instruction_live, last_line_of_instruction_reg, instruction_type_reg, dma_clock_character_name, dma_clock_character_data, dma_clock_bitmap_data, allow_real_dma_reg, row_count_reg, dma_address_reg, memory_scan_address_reg, chbase_delayed_reg, line_buffer_data_out, enable_dma, colour_clock_1x, colour_clock_selected, two_part_instruction_reg, dma_fetch_destination_reg, playfield_display_active_reg, character_reg, dma_clock_character_inc, single_colour_character_reg, twoline_character_reg, instruction_reg, dli_enabled_reg, refresh_fetch_next, chactl_reg, vscrol_enabled_reg, vscrol_last_enabled_reg,twopixel_reg,dli_nmi_reg,vbi_nmi_reg,displayed_character_reg, playfield_dma_enabled)
 	begin
 		allow_real_dma_next <= allow_real_dma_reg;
 
@@ -910,7 +907,6 @@ BEGIN
 		increment_line_buffer_address <= '0';
 		
 		hblank_next <= hblank_reg;
-		hblank_ex_next <= hblank_ex_reg;
 		hcount_reset <= '0';
 		
 		vcount_increment <= '0';
@@ -1043,9 +1039,6 @@ BEGIN
 
 					when X"22" =>
 						hblank_next <= '0';					
-
-					when X"29" =>
-						hblank_ex_next <= '0';
 						
 					when X"31" => -- start refresh					
 						load_refresh_count <= '1';
@@ -1062,14 +1055,9 @@ BEGIN
 					when X"D8" => -- vscrol value checked at cycle 108
 						last_line_of_instruction_next <= last_line_of_instruction_live;
 					
-					when X"DB" =>
-						hblank_ex_next <= '1';
-
 					when X"DE" => -- Increment vcount immediately before cycle 111 (again the 4 offset as seen in hscrol...)
 						vcount_increment <= '1';
 						hblank_next <= '1';					
-										
-
 						
 					when X"E3" => -- Wrap hcount after 227 (i.e. 0 to 227)
 						hcount_reset <= '1';
@@ -1867,10 +1855,9 @@ BEGIN
 
 	turbo_out <= dmactl_raw_reg(6);
 
+	vblank_out <= vblank_reg;
+
 	next_cycle_type <= (others=>'X'); -- TODO! Need to know after prior colour clock, if next one will be dma...
-
-	HBLANK <= hblank_ex_reg;
-	VBLANK <= vblank_reg;
-
+	
 END vhdl;
 

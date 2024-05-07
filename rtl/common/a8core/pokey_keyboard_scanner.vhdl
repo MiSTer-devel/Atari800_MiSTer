@@ -124,7 +124,7 @@ begin
 			when state_wait_key =>
 				if (keyboard_response(0) = '0') then -- detected key press
 					if (debounce_disable = '1') then
-						keycode_latch_next <= control_pressed_reg&shift_pressed_reg&bincnt_reg;
+						keycode_latch_next <= control_pressed_reg&shift_pressed_reg&not(bincnt_reg);
 						irq_next <= '1';
 						key_held_next<= '1';
 					else
@@ -136,7 +136,7 @@ begin
 			when state_key_bounce =>
 				if (keyboard_response(0) = '0') then -- detected key press
 					if (my_key = '1') then -- same key
-						keycode_latch_next <= control_pressed_reg&shift_pressed_reg&compare_latch_reg;
+						keycode_latch_next <= control_pressed_reg&shift_pressed_reg&not(compare_latch_reg);
 						irq_next <= '1';
 						key_held_next<= '1';
 						state_next <= state_valid_key;
@@ -172,13 +172,13 @@ begin
 				state_next <= state_wait_key; 
 			end case;
 			
-			if (bincnt_reg(3 downto 0)  = "0000") then
+			if (bincnt_reg(3 downto 0)  = "1111") then
 				case bincnt_reg(5 downto 4) is
-				when "11" =>
-					break_pressed_next <= not(keyboard_response(1)); --0x30
-				when "01" =>
-					shift_pressed_next <= not(keyboard_response(1)); --0x10
 				when "00" =>
+					break_pressed_next <= not(keyboard_response(1)); --0x30
+				when "10" =>
+					shift_pressed_next <= not(keyboard_response(1)); --0x10
+				when "11" =>
 					control_pressed_next <= not(keyboard_response(1)); -- 0x00
 				when others =>
 					--
@@ -192,7 +192,7 @@ begin
 	end process;
 	
 	-- outputs
-	keyboard_scan <= not(bincnt_reg);
+	keyboard_scan <= bincnt_reg;
 	
 	key_held <= key_held_reg;	
 	shift_held <= shift_pressed_reg;
