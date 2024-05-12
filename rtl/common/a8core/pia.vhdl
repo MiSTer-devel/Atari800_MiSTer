@@ -287,27 +287,29 @@ begin
 	
 	-- irq handing
 	-- TODO REVIEW, this stuff is complicated! I think Atari does not need it anyway...
-	process (irqa_next, irqa_reg, porta_control_next, porta_control_reg, read_ora, write_ora, ca2_output_reg, CA1_SYNC, CA1_reg, ca2_in_SYNC, ca2_reg, ca1_edge_reg, ca2_edge_reg, ENABLE_ORIG)
+	process (irqa_reg, porta_control_next, porta_control_reg, read_ora, write_ora, ca2_output_reg, CA1_SYNC, CA1_reg, ca2_in_SYNC, ca2_reg, ca1_edge_reg, ca2_edge_reg, ENABLE_ORIG)
+		variable irqa_next_proposed : std_logic_vector(1 downto 0);
 	begin
-		irqa_next(1) <= irqa_reg(1) and not(read_ora);
-		irqa_next(0) <= irqa_reg(0) and not(read_ora);
+		irqa_next_proposed(1) := irqa_reg(1) and not(read_ora);
+		irqa_next_proposed(0) := irqa_reg(0) and not(read_ora);
 				
 		ca2_output_next <= ca2_output_reg;
 
 		if (CA1_SYNC = '1' and CA1_reg = '0') then
-			irqa_next(1) <= ca1_edge_reg or irqa_next(1);
+			irqa_next_proposed(1) := ca1_edge_reg or irqa_next_proposed(1);
 		end if;
 		if (CA1_SYNC = '0' and CA1_reg = '1') then
-			irqa_next(1) <= not(ca1_edge_reg) or irqa_next(1);
+			irqa_next_proposed(1) := not(ca1_edge_reg) or irqa_next_proposed(1);
 		end if;
 		
 		if (CA2_in_SYNC = '1' and CA2_reg = '0') then
-			irqa_next(0) <= ca2_edge_reg or (irqa_next(0) and not(porta_control_reg(5)));
+			irqa_next_proposed(0) := ca2_edge_reg or (irqa_next_proposed(0) and not(porta_control_reg(5)));
 		end if;
 		
 		if (CA2_in_SYNC = '0' and CA2_reg = '1') then	
-			irqa_next(0) <= not(ca2_edge_reg) or (irqa_next(0) and not(porta_control_reg(5)));
+			irqa_next_proposed(0) := not(ca2_edge_reg) or (irqa_next_proposed(0) and not(porta_control_reg(5)));
 		end if;
+		irqa_next <= irqa_next_proposed;
 		
 		ca1_edge_next <= porta_control_next(1); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
 		ca2_edge_next <= porta_control_next(4); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
@@ -342,27 +344,30 @@ begin
 
 	end process;
 
-	process (irqb_next, irqb_reg, portb_control_next, portb_control_reg, read_orb, write_orb, cb2_output_reg, CB1_SYNC, CB1_reg, cb2_in_SYNC, cb2_reg, cb1_edge_reg, cb2_edge_reg,enable_orig)
+	process (irqb_reg, portb_control_next, portb_control_reg, read_orb, write_orb, cb2_output_reg, CB1_SYNC, CB1_reg, cb2_in_SYNC, cb2_reg, cb1_edge_reg, cb2_edge_reg,enable_orig)
+		variable irqb_next_proposed : std_logic_vector(1 downto 0);
 	begin
-		irqb_next(1) <= irqb_reg(1) and not(read_orb);
-		irqb_next(0) <= irqb_reg(0) and not(read_orb);
+		irqb_next_proposed(1) := irqb_reg(1) and not(read_orb);
+		irqb_next_proposed(0) := irqb_reg(0) and not(read_orb);
 				
 		cb2_output_next <= cb2_output_reg;
 
 		if (CB1_SYNC = '1' and CB1_reg = '0') then
-			irqb_next(1) <= cb1_edge_reg or irqb_next(1);
+			irqb_next_proposed(1) := cb1_edge_reg or irqb_next_proposed(1);
 		end if;
 		if (CB1_SYNC = '0' and CB1_reg = '1') then
-			irqb_next(1) <= not(cb1_edge_reg) or irqb_next(1);
+			irqb_next_proposed(1) := not(cb1_edge_reg) or irqb_next_proposed(1);
 		end if;			
 		
 		if (CB2_in_SYNC = '1' and CB2_reg = '0') then
-			irqb_next(0) <= cb2_edge_reg or (irqb_next(0) and not(portb_control_reg(5)));
+			irqb_next_proposed(0) := cb2_edge_reg or (irqb_next_proposed(0) and not(portb_control_reg(5)));
 		end if;
 		
 		if (CB2_in_SYNC = '0' and CB2_reg = '1') then
-			irqb_next(0) <= not(cb2_edge_reg) or (irqb_next(0) and not(portb_control_reg(5)));
+			irqb_next_proposed(0) := not(cb2_edge_reg) or (irqb_next_proposed(0) and not(portb_control_reg(5)));
 		end if;			
+
+		irqb_next <= irqb_next_proposed;
 
 		cb1_edge_next <= portb_control_next(1); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
 		cb2_edge_next <= portb_control_next(4); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
