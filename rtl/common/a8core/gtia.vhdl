@@ -52,7 +52,11 @@ PORT
 	BLANK : out std_logic;
 	BURST : out std_logic;
 	START_OF_FIELD : out std_logic;
-	ODD_LINE : out std_logic
+	ODD_LINE : out std_logic;
+
+	-- special for MISTER!
+	HBLANK : out std_logic;
+	VBLANK : out std_logic
 );
 END gtia;
 
@@ -1823,5 +1827,9 @@ begin
 	odd_line<=odd_scanline_reg;
 	
 	consol_out <= consol_output_reg;
+
+	-- special for MISTER
+	hblank<=hblank_reg;
+	vblank<=vsync_reg;
 
 end vhdl;
