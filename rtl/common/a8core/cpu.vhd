@@ -70,13 +70,7 @@ end component;
 	signal di_unsigned : unsigned(7 downto 0);
    signal do_unsigned : unsigned(7 downto 0);
 	signal addr_unsigned : unsigned(15 downto 0);
-	signal CPU_ENABLE_RDY : std_logic; -- it has not RDY line
 	signal WE : std_logic;
-	signal nmi_pending_next : std_logic; -- NMI during RDY
-	signal nmi_pending_reg : std_logic;
-	signal nmi_n_adjusted : std_logic;
-	signal nmi_n_reg : std_logic;
-	signal nmi_edge : std_logic;
 	
 	signal CPU_ENABLE_RESET : std_logic;
 	signal not_rdy : std_logic;	
@@ -95,10 +89,10 @@ BEGIN
 		)
 		port map (
 			clk => clk,
-			enable => CPU_ENABLE_RDY,
-			halt => '0',
+			enable => CPU_ENABLE_RESET,
+			halt => not_rdy,
 			reset=>reset,
-			nmi_n=>nmi_n_adjusted,
+			nmi_n=>nmi_n,
 			irq_n=>irq_n,
 			d=>di_unsigned,
 			q=>do_unsigned,
@@ -111,27 +105,9 @@ BEGIN
 			debugY => debugY,
 			debugS => debugS
 		);
-		CPU_ENABLE_RDY <= (CPU_ENABLE and (rdy or we)) or reset;
-		
 		CPU_ENABLE_RESET <= CPU_ENABLE or reset;
-		not_rdy <= not(rdy);
+		not_rdy <= not(rdy) and not(we);
 		
-		nmi_edge <= not(nmi_n) and nmi_n_reg;
-		nmi_pending_next <= (nmi_edge and not(rdy or we)) or (nmi_pending_reg and not(rdy)) or (nmi_pending_reg and rdy and not(cpu_enable));
-		nmi_n_adjusted <= not(nmi_pending_reg) and nmi_n;
-		
-	-- register
-	process(clk,reset)
-	begin
-		if (RESET = '1') then
-			nmi_pending_reg <= '0';
-			nmi_n_reg <= '1';
-		elsif (clk'event and clk='1') then						
-			nmi_pending_reg <= nmi_pending_next;		
-			nmi_n_reg <= nmi_n;
-		end if;
-	end process;	
-
 	-- outputs
 	r_w_n <= not(we);
 	do <= std_logic_vector(do_unsigned);
