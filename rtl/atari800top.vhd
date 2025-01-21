@@ -64,6 +64,16 @@ PORT
 	ROM_ADDR   : OUT STD_LOGIC_VECTOR(14 DOWNTO 0);
 	ROM_DO     : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
 
+	SIO_MODE   : IN  STD_LOGIC := '0';
+	SIO_IN     : IN  STD_LOGIC;
+	SIO_OUT    : OUT STD_LOGIC;
+	SIO_CLKOUT : OUT STD_LOGIC;
+	SIO_CLKIN  : IN  STD_LOGIC;
+	SIO_CMD    : OUT STD_LOGIC;
+	SIO_PROC   : IN  STD_LOGIC;
+	SIO_MOTOR  : OUT STD_LOGIC;
+	SIO_IRQ    : IN  STD_LOGIC;
+
 	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
 	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
 	ZPU_IN3    : IN  STD_LOGIC_VECTOR(31 downto 0);
@@ -132,6 +142,10 @@ signal zpu_sio_txd : std_logic;
 signal zpu_sio_rxd : std_logic;
 signal zpu_sio_command : std_logic;
 signal zpu_sio_clk : std_logic;
+signal sio_rxd : std_logic;
+signal sio_txd : std_logic;
+signal sio_command : std_logic;
+signal sio_clk : std_logic;
 
 signal OLD_OUT : STD_LOGIC_VECTOR(7 DOWNTO 0);
 signal old_command : std_logic;
@@ -271,10 +285,14 @@ PORT MAP
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
 
-	SIO_COMMAND => zpu_sio_command,
-	SIO_RXD => zpu_sio_txd,
-	SIO_TXD => zpu_sio_rxd,
-	SIO_CLOCK => zpu_sio_clk,
+	SIO_COMMAND => sio_command,
+	SIO_RXD => sio_rxd,
+	SIO_TXD => sio_txd,
+	SIO_CLOCK => sio_clk,
+	SIO_CLOCK_IN => SIO_CLKIN,
+	SIO_PROC => SIO_PROC,
+	SIO_IRQ  => SIO_IRQ,
+	SIO_MOTOR => SIO_MOTOR,
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
@@ -310,6 +328,16 @@ PORT MAP
 	freezer_enable => freezer_enable,
 	freezer_activate => freezer_activate
 );
+
+SIO_CLKOUT <= sio_clk;
+SIO_OUT    <= sio_txd;
+SIO_CMD    <= sio_command;
+
+zpu_sio_rxd     <= sio_txd     when SIO_MODE = '0' else '1';
+zpu_sio_command <= sio_command when SIO_MODE = '0' else '1';
+zpu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
+
+sio_rxd <= zpu_sio_txd when SIO_MODE = '0' else SIO_IN;
 
 sdram_adaptor : entity work.sdram_statemachine
 GENERIC MAP

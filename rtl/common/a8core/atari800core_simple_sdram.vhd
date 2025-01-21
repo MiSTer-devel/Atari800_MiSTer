@@ -89,6 +89,10 @@ ENTITY atari800core_simple_sdram is
 		SIO_RXD : in std_logic;
 		SIO_TXD : out std_logic;
 		SIO_CLOCK : out std_logic;
+		SIO_CLOCK_IN : in std_logic := '1';
+		SIO_PROC : in std_logic := '1';
+		SIO_IRQ  : in std_logic := '1';
+		SIO_MOTOR : out std_logic;
 
 		-- GTIA consol
 		CONSOL_OPTION : IN STD_LOGIC;
@@ -207,11 +211,12 @@ ARCHITECTURE vhdl OF atari800core_simple_sdram IS
 BEGIN
 
 -- PIA mapping
-CA1_IN <= '1';
-CB1_IN <= '1';
+CA1_IN <= SIO_PROC;
+CB1_IN <= SIO_IRQ;
 CA2_IN <= CA2_OUT when CA2_DIR_OUT='1' else '1';
 CB2_IN <= CB2_OUT when CB2_DIR_OUT='1' else '1';
 SIO_COMMAND <= CB2_OUT;
+SIO_MOTOR <= CA2_OUT;
 PORTA_IN <= ((JOY2_n(3)&JOY2_n(2)&JOY2_n(1)&JOY2_n(0)&JOY1_n(3)&JOY1_n(2)&JOY1_n(1)&JOY1_n(0)) and not (porta_dir_out)) or (porta_dir_out and porta_out);
 PORTB_IN <= PORTB_OUT;
 
@@ -397,6 +402,8 @@ PORT MAP
 	SIO_RXD => SIO_RXD,
 	SIO_TXD => SIO_TXD,
 	SIO_CLOCKOUT => SIO_CLOCK,
+	SIO_CLOCKIN_IN => SIO_CLOCK_IN,
+	
 
 	CONSOL_OPTION => CONSOL_OPTION,
 	CONSOL_SELECT => CONSOL_SELECT,
