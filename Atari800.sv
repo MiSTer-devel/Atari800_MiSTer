@@ -57,6 +57,7 @@ module emu
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
+	output        HDMI_BLACKOUT,
 
 `ifdef MISTER_FB
 	// Use framebuffer in DDRAM
@@ -175,7 +176,6 @@ module emu
 );
 
 assign ADC_BUS  = 'Z;
-assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
@@ -187,6 +187,7 @@ assign BUTTONS   = 0;
 assign VGA_SCALER= 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
+assign HDMI_BLACKOUT = 0;
 
 wire [1:0] ar       = status[23:22];
 wire       vcrop_en = status[24];
@@ -217,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -239,7 +240,6 @@ localparam CONF_STR = {
 	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OV,NTSC/PAL artifacting,No,Yes;",
-	"-;",
 	"d0OO,Vertical Crop,Disabled,216p(5x);",
 	"d0OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
 	"OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
@@ -248,6 +248,8 @@ localparam CONF_STR = {
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"-;",
 	"O6,Mouse Y,Normal,Inverted;",
+	"-;",
+	"OG,SIO Connected to,Emu,USER I/O;",
 	"-;",
 	"R0,Reset;",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
@@ -375,6 +377,9 @@ assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
 assign SDRAM_CKE = 1;
 assign SDRAM_nCS = 0;
 
+wire SIO_MODE = status[16];
+wire SIO_IN,SIO_OUT, SIO_CLKOUT, SIO_CLKIN, SIO_CMD, SIO_PROC, SIO_MOTOR, SIO_IRQ;
+
 atari800top atari800top
 (
 	.CLK(clk_sys),
@@ -416,6 +421,16 @@ atari800top atari800top
 	.ZPU_OUT3(ZPU_OUT3),
 	.ZPU_RD(ZPU_RD),
 	.ZPU_WR(ZPU_WR),
+
+	.SIO_MODE(SIO_MODE),
+	.SIO_IN(SIO_IN),
+	.SIO_OUT(SIO_OUT),
+	//.SIO_CLKOUT(SIO_CLKOUT),
+	.SIO_CLKIN(SIO_CLKIN),
+	.SIO_CMD(SIO_CMD),
+	.SIO_PROC(SIO_PROC),
+	.SIO_MOTOR(SIO_MOTOR),
+	.SIO_IRQ(SIO_IRQ),
 	
 	.CPU_HALT(cpu_halt),
 
@@ -678,5 +693,27 @@ always @(posedge clk_sys) begin
 		my <= 0;
 	end
 end
+
+//////////////////   USER I/O   ///////////////////
+
+//
+// Pin | USB Name |   |Signal
+// ----+----------+---+-------------
+// 0   | D+       | I |SIO_IN
+// 1   | D-       | O |SIO_OUT
+// 2   | TX-      | O |SIO_CMD
+// 3   | GND_d    | I |SIO_CLKIN
+// 4   | RX+      | I |SIO_PROC
+// 5   | RX-      | I |SIO_IRQ
+// 6   | TX+      | O |SIO_MOTOR
+//
+
+assign USER_OUT  = SIO_MODE ? {SIO_MOTOR, 1'b1, 1'b1, 1'b1, SIO_CMD, SIO_OUT, 1'b1} : 7'b1111111;
+
+assign SIO_IN    = ~SIO_MODE | USER_IN[0];
+assign SIO_CLKIN = ~SIO_MODE | USER_IN[3];
+assign SIO_PROC  = ~SIO_MODE | USER_IN[4];
+assign SIO_IRQ   = ~SIO_MODE | USER_IN[5];
+
 
 endmodule
