@@ -179,6 +179,9 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal extended_self_test : std_logic;
 	signal extended_bank : std_logic_vector(8 downto 0); -- ONLY "000" - "103" valid...
 
+	signal basic_next : std_logic;
+	signal basic_reg : std_logic;
+
 	signal ram_c000 : std_logic;
 	signal has_ram : std_logic;
 	
@@ -274,6 +277,7 @@ BEGIN
 
 			bank0reg <= (others=>'0');
 			bank1reg <= (others=>'0');
+			basic_reg <= '0';
 
 		elsif rising_edge(clk) then
 			addr_reg <= addr_next;
@@ -295,6 +299,7 @@ BEGIN
 
 			bank0reg <= bank0next;
 			bank1reg <= bank1next;
+			basic_reg <= basic_next;
 
 			if addr_next(23 downto 12) = x"804" then
 				bbtype <= '0';
@@ -694,6 +699,7 @@ end generate;
 		
 		-- SDRAM base addresses
 		extended_self_test,extended_bank,
+		basic_reg,
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
@@ -749,6 +755,12 @@ end generate;
 
 		bank0next <= bank0reg;
 		bank1next <= bank1reg;
+
+		basic_next <= basic_reg;
+
+		if (portb(4)='0') then
+			basic_next <= not(portb(1)); -- Only update basic flag when not accessing extended ram
+		end if;
 		
 	--	if (addr_next(23 downto 17) = "0000000" ) then -- bit 16 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
 		if (or_reduce(addr_next(23 downto 18)) = '0' ) then -- bit 16,17 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
@@ -951,7 +963,7 @@ end generate;
 							ram_chip_select <= '0';
 						end if;
 					else
-						if (atari800mode = '0' and portb(1) = '0') then
+						if (atari800mode = '0' and basic_reg = '1') then
 							sdram_chip_select <= '0';
 							ram_chip_select <= '0';							
 							--request_complete <= ROM_REQUEST_COMPLETE;
