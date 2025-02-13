@@ -763,7 +763,7 @@ end generate;
 
 		basic_next <= basic_reg;
 
-		if (portb(4)='0' or basic_latched_when_banking='1') then
+		if (portb(4)='1' or basic_latched_when_banking='1') then
 			basic_next <= not(portb(1)); -- Only update basic flag when not accessing extended ram (depending on mode)
 		end if;
 		
