@@ -33,6 +33,7 @@ PORT
 	ANTIC_ENABLE_179 : IN std_logic;
 	
 	PAL : IN STD_LOGIC;
+	EXT_ANTIC : IN STD_LOGIC;
 	
 	lightpen : in std_logic;
 	
@@ -680,7 +681,7 @@ BEGIN
 		end if;
 	end process;
 	
-	process(colour_clock_half_x,colour_clock_1x,colour_clock_2x, colour_clock_4x, colour_clock_8x, dmactl_delayed_reg, playfield_dma_start_reg, playfield_dma_start_raw, playfield_dma_end_reg, playfield_dma_end_raw, hcount_reg, hscrol_reg, an_current_next)
+	process(colour_clock_half_x,colour_clock_1x,colour_clock_2x, colour_clock_4x, colour_clock_8x, dmactl_delayed_reg, playfield_dma_start_reg, playfield_dma_start_raw, playfield_dma_end_reg, playfield_dma_end_raw, hcount_reg, hscrol_reg, an_current_next, ext_antic)
 	begin
 		enable_dma <= colour_clock_half_x;
 		colour_clock_selected <= colour_clock_1x;
@@ -694,30 +695,34 @@ BEGIN
 		an_current <= an_current_next(0);
 		an_prev <= an_current_next(1);
 		
-		case dmactl_delayed_reg(6 downto 5) is
-		when "01" =>
-			dmactl_delayed_enabled <= '1';
-		when "10" =>
-			enable_dma <= colour_clock_1x;
-			colour_clock_selected <= colour_clock_2x;		
-			colour_clock_selected_highres <= colour_clock_4x;
-			dmactl_delayed_enabled <= '1';
-			playfield_dma_start <= playfield_dma_start_reg(3+24);
-			playfield_dma_end <= playfield_dma_end_reg(7+24);
-			cycle_latter <= hcount_reg(1);
-			hscrol_adj <= "0"&hscrol_reg(3 downto 1)&"0";
-		when "11" =>
-			enable_dma <= colour_clock_2x;
-			colour_clock_selected <= colour_clock_4x;
-			colour_clock_selected_highres <= colour_clock_8x;
-			dmactl_delayed_enabled <= '1';
-			playfield_dma_start <= playfield_dma_start_reg(5+36);
-			playfield_dma_end <= playfield_dma_end_reg(11+36);
-			cycle_latter <= hcount_reg(0);
-			hscrol_adj <= "00"&hscrol_reg(3 downto 1);
-		when others =>
-			--nop
-		end case;		
+		if (ext_antic = '1') then
+			case dmactl_delayed_reg(6 downto 5) is
+			when "01" =>
+				dmactl_delayed_enabled <= '1';
+			when "10" =>
+				enable_dma <= colour_clock_1x;
+				colour_clock_selected <= colour_clock_2x;
+				colour_clock_selected_highres <= colour_clock_4x;
+				dmactl_delayed_enabled <= '1';
+				playfield_dma_start <= playfield_dma_start_reg(3+24);
+				playfield_dma_end <= playfield_dma_end_reg(7+24);
+				cycle_latter <= hcount_reg(1);
+				hscrol_adj <= "0"&hscrol_reg(3 downto 1)&"0";
+			when "11" =>
+				enable_dma <= colour_clock_2x;
+				colour_clock_selected <= colour_clock_4x;
+				colour_clock_selected_highres <= colour_clock_8x;
+				dmactl_delayed_enabled <= '1';
+				playfield_dma_start <= playfield_dma_start_reg(5+36);
+				playfield_dma_end <= playfield_dma_end_reg(11+36);
+				cycle_latter <= hcount_reg(0);
+				hscrol_adj <= "00"&hscrol_reg(3 downto 1);
+			when others =>
+				--nop
+			end case;
+		else
+			dmactl_delayed_enabled <= dmactl_delayed_reg(5);
+		end if;
 	end process;	
 
 	-- Counters (memory address for data, memory address for display list)

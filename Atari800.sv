@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -239,6 +239,7 @@ localparam CONF_STR = {
 	"ODF,RAM,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
 	"-;",
 	"O5,Video mode,PAL,NTSC;",
+	"o3,Hi-Res Antic,Off,On;",
 	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OV,NTSC/PAL artifacting,No,Yes;",
@@ -400,6 +401,7 @@ atari800top atari800top
 	.ROM_DO(rom_do),
 
 	.PAL(~status[5]),
+	.EXT_ANTIC(status[35]),
 	.VGA_VS(VSync_o),
 	.VGA_HS(HSync_o),
 	.VGA_B(Bo),

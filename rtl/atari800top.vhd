@@ -20,6 +20,7 @@ PORT
 	ARESET     : OUT STD_LOGIC;
 
 	PAL        : IN  STD_LOGIC;
+	EXT_ANTIC  : IN  STD_LOGIC;
 	VGA_VS     : OUT STD_LOGIC;
 	VGA_HS     : OUT STD_LOGIC;
 	VGA_BLANK  : OUT STD_LOGIC;
@@ -323,6 +324,7 @@ PORT MAP
 
 	RAM_SELECT => RAM_SIZE,
 	PAL => PAL,
+	EXT_ANTIC => EXT_ANTIC,
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
 	emulated_cartridge_select => emulated_cartridge_select,
