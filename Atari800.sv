@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -227,6 +227,8 @@ localparam CONF_STR = {
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
 	"S2,CARROMBIN,Load Cart;",
+	"S3,XEXCOMEXE,Load XEX;",
+	"o02,Loader At,$700,$800,$900,$A00,$B00,$400,$500,$600;",
 	"-;",
 	"OL,Swap Joysticks,No,Yes;",
 	"-;",
@@ -294,14 +296,14 @@ wire        forced_scandoubler;
 wire [21:0] gamma_bus;
 
 reg  [31:0] sd_lba;
-reg   [2:0] sd_rd;
-reg   [2:0] sd_wr;
-wire  [2:0] sd_ack;
+reg   [3:0] sd_rd;
+reg   [3:0] sd_wr;
+wire  [3:0] sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
 wire  [7:0] sd_buff_din;
 wire        sd_buff_wr;
-wire  [2:0] img_mounted;
+wire  [3:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
 wire [13:0] ioctl_addr;
@@ -310,7 +312,7 @@ wire        ioctl_wr;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
 
-hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -329,13 +331,13 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
-	.sd_lba('{sd_lba,sd_lba,sd_lba}),
+	.sd_lba('{sd_lba,sd_lba,sd_lba,sd_lba}),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din}),
+	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din}),
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
@@ -410,6 +412,7 @@ atari800top atari800top
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
 	.RAM_SIZE(status[15:13]),
 	.DRV_SPEED(status[12:10]),
+	.XEX_LOC(status[34:32]),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
@@ -650,9 +653,10 @@ always @(posedge clk_sys) begin
 		if(img_mounted[0]) zpu_fileno <= 0;
 		if(img_mounted[1]) zpu_fileno <= 1;
 		if(img_mounted[2]) zpu_fileno <= 4;
+		if(img_mounted[3]) zpu_fileno <= 5;
 
 		zpu_filetype <= ioctl_index[7:6];
-		zpu_readonly <= img_readonly | img_mounted[2];
+		zpu_readonly <= img_readonly | img_mounted[2] | img_mounted[3];
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end

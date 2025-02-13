@@ -4,7 +4,7 @@ LD      = $(BASE)-gcc
 AS      = $(BASE)-as
 CP      = $(BASE)-objcopy
 DUMP    = $(BASE)-objdump
-SREC    = srec
+SREC    = srec_cat
 
 # we use mincrt0.s from here
 STARTUP_DIR = .
@@ -45,12 +45,16 @@ CFLAGS_5200 = $(CFLAGS) -DFIRMWARE_5200
 # Our target.
 all: 800 5200
 
-800: $(BUILD_DIR) $(PRJ).bin $(PRJ).rpt $(PRJ).mif
+xex_loader.h: xex_loader.asm
+	xa -M -l xex_loader.lab -o xex_loader.o65 xex_loader.asm
+	python3 process_xex_loader.py
+
+800: xex_loader.h $(BUILD_DIR) $(PRJ).bin $(PRJ).rpt $(PRJ).mif
 
 5200: $(BUILD_DIR) $(5200_PRJ).bin $(5200_PRJ).rpt $(5200_PRJ).mif
 
 clean:
-	rm -rf $(BUILD_DIR)/* *.hex *.elf *.map *.lst *.srec *.bin *.rpt
+	rm -rf $(BUILD_DIR)/* *.hex *.elf *.map *.lst *.srec *.bin *.rpt *.o65 *.lab
 
 
 # Convert ELF binary to bin file.
