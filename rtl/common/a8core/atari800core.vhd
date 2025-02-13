@@ -192,6 +192,7 @@ ENTITY atari800core IS
 			-- 400/800 mode: 16K,32K,48K,52K,...? 
 		CART_EMULATION_SELECT : in std_logic_vector(5 downto 0);
 		PAL :  in STD_LOGIC;
+		EXT_ANTIC :  in STD_LOGIC;
 		ROM_IN_RAM : in std_logic;
 		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0);
 		HALT : in std_logic;
@@ -362,6 +363,7 @@ PORT MAP(CLK => CLK,
 		 MEMORY_READY_CPU => MEMORY_READY_CPU,
 		 ANTIC_ENABLE_179 => ANTIC_ENABLE_179,
 		 PAL => PAL,
+		 EXT_ANTIC => EXT_ANTIC,
 		 lightpen => ANTIC_LIGHTPEN,
 		 ADDR => PBI_ADDR_INT(3 DOWNTO 0),
 		 CPU_DATA_IN => WRITE_DATA(7 DOWNTO 0),

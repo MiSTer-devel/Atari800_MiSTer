@@ -74,6 +74,7 @@ BIT_REG_RO(,0x1,18,mod_win,zpu_in1)
 BIT_REG_RO(,0x3f,12,controls,zpu_in1) // (esc)FLRDU
 
 BIT_REG_RO(,0x7,0,speeddrv,zpu_in2)
+BIT_REG_RO(,0x7,4,xexloc,zpu_in2)
 
 // file i/o registers
 BIT_REG_RO(,0x1,8,sd_done,zpu_in2)
@@ -184,6 +185,23 @@ void clear_main_ram()
 	memset32(SDRAM_BASE, 0, main_ram_size/4);
 }
 
+struct SimpleFile *xex_file;
+int xex_cart;
+
+void try_remove_xex_cart(char hard)
+{
+	if(hard)
+	{
+		xex_file = 0;
+	}
+
+	if(xex_cart)
+	{
+		xex_cart = 0;
+		set_cart_select(0);
+	}
+}
+
 void
 reboot(int cold)
 {
@@ -192,6 +210,11 @@ reboot(int cold)
 	{
 		set_freezer_enable(0);
 		clear_main_ram();
+	}
+	else
+	{
+		// Clean up XEX loader stuff in case of soft reset during loading
+		try_remove_xex_cart(1);
 	}
 	set_reset_6502(1);
 	// Do nothing in here - this resets the memory controller!
@@ -231,6 +254,8 @@ int main(void)
 	init_printf(0, char_out);
 
 	last_mount = 0;
+	xex_file = 0;
+	xex_cart = 0;
 	mainloop();
 	return 0;
 }
