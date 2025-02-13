@@ -191,6 +191,35 @@ int load_car(struct SimpleFile* file)
 	return mode;
 }
 
+#include "xex_loader.h"
+
+const char xex_reloc_tab[8] = { 0, 1, 2, 3, 4, -3, -2, -1 };
+
+unsigned volatile char *xex_loader_mem;
+unsigned volatile char *xex_buffer_mem;
+
+int load_xex(struct SimpleFile* file)
+{
+	int i;
+	if (CARTRIDGE_MEM == 0) return 0;
+
+	xex_file = file;
+	xex_cart = 1;
+
+	memcp8(car_xex_loader, CARTRIDGE_MEM, 0, CAR_XEX_LOADER_SIZE);
+	memcp8(car_xex_header, CARTRIDGE_MEM + 0x2000 - CAR_XEX_HEADER_SIZE, 0, CAR_XEX_HEADER_SIZE);
+
+	char xloc = xex_reloc_tab[get_xexloc()];
+
+	for(i = 0; i < XEX_RELOC_OFFSETS_SIZE; i++)
+	{
+		((unsigned volatile char *)CARTRIDGE_MEM)[xex_reloc_offsets[i]] += xloc;
+	}
+	xex_loader_mem = (unsigned volatile char *)(SDRAM_BASE + 0x700 + xloc*0x100);
+	xex_buffer_mem = (unsigned volatile char *)(SDRAM_BASE + 0x800 + xloc*0x100);
+
+	return TC_MODE_ATARIMAX1;
+}
 
 void mainloop()
 {
@@ -244,6 +273,10 @@ void actions()
 			{
 				set_cart_select(0);
 			}
+			else if(num == 5)
+			{
+				set_cart_select(load_xex(file));
+			}
 			else
 			{
 				int type = load_car(file);
@@ -260,6 +293,30 @@ void actions()
 
 			restore();
 			reboot(1);
+		}
+	}
+
+	if(xex_file)
+	{
+		if(xex_loader_mem[XEX_MAGIC] == 0x1F)
+		{
+			// Loader got active on Atari, cart is no longer needed
+			try_remove_xex_cart(0);
+			if(!xex_loader_mem[XEX_READ_STATUS])
+			{
+				// NOTE! purposely reusing the "mounted" variable
+				file_read(xex_file, (unsigned char *)xex_buffer_mem, 0x100, &mounted);
+				while(mounted < 0x100)
+				{
+					xex_buffer_mem[mounted++] = 0;
+				}
+				xex_loader_mem[XEX_READ_STATUS] = 1;
+			}
+		}
+		else if(xex_loader_mem[XEX_MAGIC] == 0x1E)
+		{
+			// The loader reports it's done, clean up fully
+			try_remove_xex_cart(1);
 		}
 	}
 
