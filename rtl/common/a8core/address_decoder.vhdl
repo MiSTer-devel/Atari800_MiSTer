@@ -540,12 +540,12 @@ BEGIN
 	extended_access_antic <= (extended_access_addr and antic_fetch_real_next and not(portb(5)));
 	extended_access_cpu <= (extended_access_addr and cpu_fetch_real_next and not(portb(4)));
 	extended_access_either <= extended_access_addr and not(portb(4));
-	basic_latched_when_banking <= '1';
 	
 	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode)
 	begin	
 		extended_bank <= "0000000"&addr_next(15 downto 14);
 		extended_self_test <= '1';
+		basic_latched_when_banking <= '1';
 		ram_c000 <= '0';
 		has_ram <= '1';
 
@@ -704,7 +704,7 @@ end generate;
 		
 		-- SDRAM base addresses
 		extended_self_test,extended_bank,
-		basic_reg,batch_latched_when_banking,
+		basic_reg,basic_latched_when_banking,
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
