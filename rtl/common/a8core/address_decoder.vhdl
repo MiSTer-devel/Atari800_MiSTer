@@ -181,6 +181,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 
 	signal basic_next : std_logic;
 	signal basic_reg : std_logic;
+	signal basic_latched_when_banking : std_logic;
 
 	signal ram_c000 : std_logic;
 	signal has_ram : std_logic;
@@ -539,6 +540,7 @@ BEGIN
 	extended_access_antic <= (extended_access_addr and antic_fetch_real_next and not(portb(5)));
 	extended_access_cpu <= (extended_access_addr and cpu_fetch_real_next and not(portb(4)));
 	extended_access_either <= extended_access_addr and not(portb(4));
+	basic_latched_when_banking <= '1';
 	
 	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode)
 	begin	
@@ -587,19 +589,22 @@ BEGIN
 						extended_bank <= std_logic_vector("000000100" + unsigned("0000"&portb(7 downto 6)&portb(3 downto 1)));
 						extended_self_test <= '0';
 					end if;
+					basic_latched_when_banking <= '0';
 				when "101" => -- 576k rambo
 					if (extended_access_either='1') then
 						extended_bank <= std_logic_vector("000000100" + unsigned("0000"&portb(6 downto 5)&portb(3 downto 1)));
 					end if;
+					basic_latched_when_banking <= '0';
 				when "110" => -- 1088k rambo
 					if (extended_access_either='1') then
 						extended_bank <= std_logic_vector("000000100" + unsigned("000"&portb(7 downto 5)&portb(3 downto 1)));
 						extended_self_test <= '0';
 					end if;
+					basic_latched_when_banking <= '0';
 				when "111" => -- 4MB!	
 					if (extended_access_addr='1') then
 						extended_bank <= std_logic_vector("000000100" + unsigned('0'&portb(7 downto 0)));
-						extended_self_test <= and_reduce(portb(6 downto 4));	 -- which means self-test is in the middle of half the banks - euuugh, oh well!						
+						extended_self_test <= '0';
 					end if;
 				when others =>
 					-- TODO - portc!
@@ -699,7 +704,7 @@ end generate;
 		
 		-- SDRAM base addresses
 		extended_self_test,extended_bank,
-		basic_reg,
+		basic_reg,batch_latched_when_banking,
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
@@ -758,8 +763,8 @@ end generate;
 
 		basic_next <= basic_reg;
 
-		if (portb(4)='0') then
-			basic_next <= not(portb(1)); -- Only update basic flag when not accessing extended ram
+		if (portb(4)='0' or basic_latched_when_banking='1') then
+			basic_next <= not(portb(1)); -- Only update basic flag when not accessing extended ram (depending on mode)
 		end if;
 		
 	--	if (addr_next(23 downto 17) = "0000000" ) then -- bit 16 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
