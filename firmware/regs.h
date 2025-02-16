@@ -58,6 +58,22 @@ static const int screen_address = 11328;
 
 #define atari_cartswitch ((unsigned char volatile *)(0xd500 + atari_regbase))
 
+#define atari_coldst ((unsigned char volatile *)(0x244 + atari_regbase))
+#define atari_basicf ((unsigned char volatile *)(0x3F8 + atari_regbase))
+#define atari_gintlk ((unsigned char volatile *)(0x3FA + atari_regbase))
+#define atari_pupbt1 ((unsigned char volatile *)(0x33D + atari_regbase))
+#define atari_pupbt2 ((unsigned char volatile *)(0x33E + atari_regbase))
+#define atari_pupbt3 ((unsigned char volatile *)(0x33F + atari_regbase))
+#define atari_bootflag ((unsigned char volatile *)(0x09 + atari_regbase))
+#define atari_casinil ((unsigned char volatile *)(0x02 + atari_regbase))  
+#define atari_casinih ((unsigned char volatile *)(0x03 + atari_regbase))
+#define atari_dosvecl ((unsigned char volatile *)(0x0A + atari_regbase))  
+#define atari_dosvech ((unsigned char volatile *)(0x0B + atari_regbase))
+#define atari_runadl ((unsigned char volatile *)(0x2E0 + atari_regbase))  
+#define atari_runadh ((unsigned char volatile *)(0x2E1 + atari_regbase))
+#define atari_initadl ((unsigned char volatile *)(0x2E2 + atari_regbase))  
+#define atari_initadh ((unsigned char volatile *)(0x2E3 + atari_regbase))
+
 #ifdef FIRMWARE_5200
 // 5200: GTIA and POKEY are on different addresses
 #define atari_colbk ((unsigned char volatile *)(0xc01a + atari_regbase))

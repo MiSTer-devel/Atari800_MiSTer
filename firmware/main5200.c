@@ -180,11 +180,11 @@ void actions()
 
 	if (get_hotkey_softboot())
 	{
-		reboot(0);	
+		reboot(0, 0);
 	}
 	else if (get_hotkey_coldboot())
 	{
-		reboot(1);	
+		reboot(1, 0);
 	}
 	
 	if (last_mount != mounted)
@@ -204,7 +204,7 @@ void actions()
 		select_cartridge();
 
 		restore();
-		reboot(1);	
+		reboot(1, 0);	
 	}
 }
 
@@ -213,6 +213,6 @@ void mainloop()
 	memset8(SRAM_BASE+0x4000, 0, 32768);
 	memset32(SDRAM_BASE+0x4000, 0, 32768/4);
 
-	reboot(1);
+	reboot(1, 0);
 	for (;;) actions();
 }

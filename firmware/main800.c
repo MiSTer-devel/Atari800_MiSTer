@@ -193,41 +193,17 @@ int load_car(struct SimpleFile* file)
 
 #include "xex_loader.h"
 
-const char xex_reloc_tab[8] = { 0, 1, 2, 3, 4, -3, -2, -1 };
-
-unsigned volatile char *xex_loader_mem;
-unsigned volatile char *xex_buffer_mem;
-
-int load_xex(struct SimpleFile* file)
-{
-	int i;
-	if (CARTRIDGE_MEM == 0) return 0;
-
-	xex_file = file;
-	xex_cart = 1;
-
-	memcp8(car_xex_loader, CARTRIDGE_MEM, 0, CAR_XEX_LOADER_SIZE);
-	memcp8(car_xex_header, CARTRIDGE_MEM + 0x2000 - CAR_XEX_HEADER_SIZE, 0, CAR_XEX_HEADER_SIZE);
-
-	char xloc = xex_reloc_tab[get_xexloc()];
-
-	for(i = 0; i < XEX_RELOC_OFFSETS_SIZE; i++)
-	{
-		((unsigned volatile char *)CARTRIDGE_MEM)[xex_reloc_offsets[i]] += xloc;
-	}
-	xex_loader_mem = (unsigned volatile char *)(SDRAM_BASE + 0x700 + xloc*0x100);
-	xex_buffer_mem = (unsigned volatile char *)(SDRAM_BASE + 0x800 + xloc*0x100);
-
-	return TC_MODE_ATARIMAX1;
-}
-
 void mainloop()
 {
 	init_drive_emulator();
 
-	reboot(1);
+	reboot(1, 0);
 	run_drive_emulator();
 }
+
+unsigned char volatile *xex_loader_base;
+int xex_file_first_block;
+unsigned char xex_reloc;
 
 void actions()
 {
@@ -235,11 +211,11 @@ void actions()
 
 	if (get_hotkey_softboot())
 	{
-		reboot(0);	
+		reboot(0, 0);	
 	}
 	else if (get_hotkey_coldboot())
 	{
-		reboot(1);	
+		reboot(1, 0);	
 	}
 	
 	if (last_mount != mounted)
@@ -260,7 +236,47 @@ void actions()
 			//set_cart_select(0);
 			set_drive_status(num,file->size ? file : 0);
 		}
-		else
+		else if(num == 5)
+		{
+			if(file->size)
+			{
+				xex_file = file;
+				xex_file_first_block = 1;
+
+				set_pause_6502(1);
+				set_cart_select(0);
+
+				// Clean reboot, but hold it for now
+				reboot(1, 1);
+
+				xex_reloc = get_xexloc() ? 1 : 7;
+
+				xex_loader_base = (unsigned char volatile *)(atari_regbase + xex_reloc*0x100);
+				memcp8(xex_loader, (unsigned char *)(atari_regbase + 0x700), 0, XEX_LOADER_SIZE);
+				if(xex_reloc != 7)
+				{
+					((unsigned char volatile *)(atari_regbase+0x700))[XEX_STACK_FLAG] = xex_reloc;
+				}
+
+				*atari_coldst = 0;
+				*atari_basicf = 1;
+				*atari_gintlk = 0;
+				if(!get_mode800())
+				{
+					*atari_pupbt1 = 0x5C;
+					*atari_pupbt2 = 0x93;
+					*atari_pupbt3 = 0x25;
+				} 
+				*atari_bootflag = 2;
+				*atari_casinil = XEX_INIT1;  
+				*atari_casinih = 0x07;
+				*atari_dosvecl = 0x71;
+				*atari_dosvech = 0xE4;
+
+				set_pause_6502(0);
+			}
+		}
+		else // num == 4
 		{
 			set_pause_6502(1);
 			freeze();
@@ -272,10 +288,6 @@ void actions()
 			if(!file->size)
 			{
 				set_cart_select(0);
-			}
-			else if(num == 5)
-			{
-				set_cart_select(load_xex(file));
 			}
 			else
 			{
@@ -292,31 +304,64 @@ void actions()
 			}
 
 			restore();
-			reboot(1);
+			reboot(1, 0);
 		}
 	}
 
 	if(xex_file)
 	{
-		if(xex_loader_mem[XEX_MAGIC] == 0x1F)
+		// Is loader ready?
+		if(xex_loader_base[0] == 0x60)
 		{
-			// Loader got active on Atari, cart is no longer needed
-			try_remove_xex_cart(0);
-			if(!xex_loader_mem[XEX_READ_STATUS])
+			if(!xex_loader_base[XEX_READ_STATUS])
 			{
+				unsigned char len_buf[2];
+				enum SimpleFileStatus ok;
+				int read_offset, to_read;
+
+				len_buf[0] = 0xFF;
+				len_buf[1] = 0xFF;
+
+				// Point to rts
+				*atari_initadl = 0;  
+				*atari_initadh = xex_reloc;
+				
 				// NOTE! purposely reusing the "mounted" variable
-				file_read(xex_file, (unsigned char *)xex_buffer_mem, 0x100, &mounted);
-				while(mounted < 0x100)
-				{
-					xex_buffer_mem[mounted++] = 0;
+				while(len_buf[0] == 0xFF && len_buf[1] == 0xFF)
+				{					
+					ok = file_read(xex_file, len_buf, 2, &mounted);
+					if(ok != SimpleFile_OK || mounted != 2)
+						goto xex_eof;
 				}
-				xex_loader_mem[XEX_READ_STATUS] = 1;
+				read_offset = (len_buf[0] & 0xFF) | ((len_buf[1] << 8) & 0xFF00);
+				if(xex_file_first_block)
+				{
+					xex_file_first_block = 0;					
+					*atari_runadl = len_buf[0];
+					*atari_runadh = len_buf[1];
+				}
+				
+				ok = file_read(xex_file, len_buf, 2, &mounted);
+				if(ok != SimpleFile_OK || mounted != 2)
+					goto xex_eof;
+				
+				to_read = ((len_buf[0] & 0xFF) | ((len_buf[1] << 8) & 0xFF00)) + 1 - read_offset;
+				if(to_read < 1)
+					goto xex_eof;
+				
+				ok = file_read(xex_file, (unsigned char *)(atari_regbase + read_offset), to_read, &mounted);
+				if(ok != SimpleFile_OK || mounted != to_read)
+					goto xex_eof;
+
+				xex_loader_base[XEX_READ_STATUS] = 1;
 			}
 		}
-		else if(xex_loader_mem[XEX_MAGIC] == 0x1E)
+		// Is loader done?
+		else if(xex_loader_base[0] == 0x5F)
+xex_eof:
 		{
-			// The loader reports it's done, clean up fully
-			try_remove_xex_cart(1);
+			xex_loader_base[XEX_READ_STATUS] = 0xFF;
+			xex_file = 0;
 		}
 	}
 
