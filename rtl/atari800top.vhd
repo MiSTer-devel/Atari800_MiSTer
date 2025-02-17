@@ -54,7 +54,7 @@ PORT
 	RAM_SIZE   : IN  STD_LOGIC_VECTOR(2 downto 0);
 	DRV_SPEED  : IN  STD_LOGIC_VECTOR(2 downto 0);
 	XEX_LOC    : IN  STD_LOGIC;
-	MODE_800   : IN  STD_LOGIC;
+	OS_MODE_800   : IN  STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -433,7 +433,7 @@ PORT MAP
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
 			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&FKEYS(9 downto 0),
-	ZPU_IN2 => X"0000"& ZPU_IN2 & "000" & XEX_LOC & MODE_800 & DRV_SPEED,
+	ZPU_IN2 => X"0000"& ZPU_IN2 & "000" & XEX_LOC & OS_MODE_800 & DRV_SPEED,
 	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",
 	
