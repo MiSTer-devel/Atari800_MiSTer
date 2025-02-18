@@ -228,8 +228,8 @@ localparam CONF_STR = {
 	"S1,ATRXEXXFDATX,Mount D2;",
 	"S2,CARROMBIN,Load Cart;",
 	"-;",
-	"S3,XEXCOMEXE,Load XEX;",
-	"o0,Loader At,Standard,Stack;",
+	"D1S3,XEXCOMEXE,Load XEX;",
+	"D1o0,Loader At,Standard,Stack;",
 	"-;",
 	"OL,Swap Joysticks,No,Yes;",
 	"-;",
@@ -327,7 +327,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({en216p}),
+	.status_menumask({status[2],en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
