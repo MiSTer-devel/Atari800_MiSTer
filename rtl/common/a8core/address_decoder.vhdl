@@ -551,7 +551,6 @@ BEGIN
 
 		if (atari800mode='1') then
 			extended_self_test <= '0';
-			ram_c000 <= '1';
 			case ram_select is
 				when "000" => -- 8k
 					has_ram <= not(addr_next(15) or addr_next(14) or addr_next(13));
@@ -562,6 +561,7 @@ BEGIN
 				when "011" => -- 48k
 					has_ram <= not(addr_next(15)) or not(addr_next(14));
 				when "100" => -- 52k
+					ram_c000 <= '1';
 					-- yes we have 64k here, but its hidden!
 				--TODO -- 800 memory expansions - axlon??
 				when others =>
@@ -786,7 +786,12 @@ end generate;
 				request_complete <= ram_request_COMPLETE;
 			end if;
 		else
-			MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
+			-- The only purpose of has_ram seems to be marking absence
+			-- of it above the Atari 800 mem config, the OS-B
+			-- actually requires this non-RAM region to behave like
+			-- ROM, last_bus_reg seems not to be doing the trick here, 
+			-- so we fix it to 0xFF.
+			MEMORY_DATA_INT(7 downto 0) <= "11111111";
 			request_complete <= '1';
 		end if;
 		

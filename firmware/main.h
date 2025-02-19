@@ -56,6 +56,9 @@ BIT_REG(,0x7,8,ram_select,zpu_out1)
 BIT_REG(,0x3f,17,cart_select,zpu_out1)
 // reserve 2 bits for extending cart_select
 BIT_REG(,0x01,25,freezer_enable,zpu_out1)
+#ifndef FIRMWARE_5200
+BIT_REG(,0x01,26,reset_rnmi,zpu_out1)
+#endif
 
 BIT_REG_RO(,0x1,0,hotkey_f1,zpu_in1)
 BIT_REG_RO(,0x1,1,hotkey_f2,zpu_in1)
@@ -74,7 +77,9 @@ BIT_REG_RO(,0x1,18,mod_win,zpu_in1)
 BIT_REG_RO(,0x3f,12,controls,zpu_in1) // (esc)FLRDU
 
 BIT_REG_RO(,0x7,0,speeddrv,zpu_in2)
+#ifndef FIRMWARE_5200
 BIT_REG_RO(,0x1,3,mode800,zpu_in2)
+#endif
 BIT_REG_RO(,0x1,4,xexloc,zpu_in2)
 
 // file i/o registers
@@ -202,9 +207,41 @@ reboot(int cold, int pause)
 		// Clean up XEX loader stuff in case of soft reset during loading
 		xex_file = 0;
 	}
-	set_reset_6502(1);
+#ifndef FIRMWARE_5200
+	int rnmi_reset;
+	// Both cold==1 and pause==1 is a special case when 
+	// the XEX loader performs a cold/warm boot to push 
+	// in the loader, in this case on the 800 we just want
+	// the same effect as pressing the RESET (so soft)
+	// while we actually mean a power cycle with forced
+	// OS initialization. (In other words, on 800 a power
+	// cycle does not allow to pre-init the OS to do a warm
+	// start, it will always be cold).
+
+	rnmi_reset = get_mode800() && (!cold || pause);
+
+	if(rnmi_reset)
+	{
+		set_reset_rnmi(1);		
+	}
+	else
+	{
+#endif
+		set_reset_6502(1);
+#ifndef FIRMWARE_5200
+	}
 	// Do nothing in here - this resets the memory controller!
-	set_reset_6502(0);
+	if(rnmi_reset)
+	{
+		set_reset_rnmi(0);		
+	}
+	else
+	{
+#endif
+		set_reset_6502(0);
+#ifndef FIRMWARE_5200
+	}
+#endif
 	set_pause_6502(pause);
 }
 

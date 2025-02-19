@@ -157,6 +157,7 @@ signal end_command : std_logic;
 
 -- system control from zpu
 signal reset_atari : std_logic;
+signal reset_rnmi_atari : std_logic;
 signal pause_atari : std_logic;
 signal emulated_cartridge_select: std_logic_vector(5 downto 0);
 
@@ -328,6 +329,8 @@ PORT MAP
 	PAL => PAL,
 	EXT_ANTIC => EXT_ANTIC,
 	CLIP_SIDES => CLIP_SIDES,
+	RESET_RNMI => reset_rnmi_atari,
+	ATARI800MODE => OS_MODE_800,
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
 	emulated_cartridge_select => emulated_cartridge_select,
@@ -450,6 +453,7 @@ pause_atari <= zpu_out1(0);
 reset_atari <= zpu_out1(1);
 emulated_cartridge_select <= zpu_out1(22 downto 17);
 freezer_enable <= zpu_out1(25);
+reset_rnmi_atari <= zpu_out1(26);
 
 CPU_HALT <= pause_atari;
 

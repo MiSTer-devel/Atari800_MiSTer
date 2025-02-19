@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -228,16 +228,17 @@ localparam CONF_STR = {
 	"S1,ATRXEXXFDATX,Mount D2;",
 	"S2,CARROMBIN,Load Cart;",
 	"-;",
-	"D1S3,XEXCOMEXE,Load XEX;",
-	"D1o0,Loader At,Standard,Stack;",
+	"S3,XEXCOMEXE,Load XEX;",
+	"o0,Loader At,Standard,Stack;",
 	"-;",
 	"OL,Swap Joysticks,No,Yes;",
 	"-;",
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",
 	"OAC,Drive Speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"-;",
-	"O12,BIOS,XL+Basic,XL,OS-A,OS-B;",
-	"ODF,RAM,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
+	"O12,Machine/BIOS,XL+Basic,XL,800/OS-A,800/OS-B;",
+	"D1ODF,RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
+	"d1o35,RAM 800,8K,16K,32K,48K,52K;",
 	"-;",
 	"O5,Video mode,PAL,NTSC;",
 	"o1,Hi-Res Antic,Off,On;",
@@ -415,7 +416,7 @@ atari800top atari800top
 	.VBLANK(VBlank_o),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
-	.RAM_SIZE(status[15:13]),
+	.RAM_SIZE((status[2]) ? status[37:35] : status[15:13]), 
 	.DRV_SPEED(status[12:10]),
 	.XEX_LOC(status[32]),
 	.OS_MODE_800(status[2]),

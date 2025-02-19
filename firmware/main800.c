@@ -238,7 +238,7 @@ void actions()
 		}
 		else if(num == 5)
 		{
-			if(file->size && !get_mode800())
+			if(file->size)
 			{
 				xex_file = file;
 				xex_file_first_block = 1;
@@ -261,9 +261,12 @@ void actions()
 				*atari_coldst = 0;
 				*atari_basicf = 1;
 				*atari_gintlk = 0;
-				*atari_pupbt1 = 0x5C;
-				*atari_pupbt2 = 0x93;
-				*atari_pupbt3 = 0x25;
+				if(!get_mode800())
+				{
+					*atari_pupbt1 = 0x5C;
+					*atari_pupbt2 = 0x93;
+					*atari_pupbt3 = 0x25;
+				}
 				*atari_bootflag = 2;
 				*atari_casinil = XEX_INIT1;  
 				*atari_casinih = 0x07;
