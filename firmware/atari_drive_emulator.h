@@ -23,7 +23,7 @@ void run_drive_emulator(); // Blocks. Pokey at its fastest is 6 cycles * 10 bits
 struct SimpleFile;
 void set_drive_status(int driveNumber, struct SimpleFile * file);
 struct SimpleFile * get_drive_status(int driveNumber);
-void describe_disk(int driveNumber, char * buffer);
+// void describe_disk(int driveNumber, char * buffer);
 
 // Pokey divisor
 void set_turbo_drive(int pos);

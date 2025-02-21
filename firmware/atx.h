@@ -80,11 +80,11 @@ struct atxTrackChunk {
 /***************************************************************/
 /***************************************************************/
 
-// load an ATX file (returns sector size if ATX file is successfully loaded; 0 if not)
-u16 loadAtxFile(u08 drive);
+// load an ATX file, returns density for info (1, 2, 3) or 0 on failure
+u08 loadAtxFile(u08 drive);
 
-// load data for a specific disk sector (returns number of data bytes read or 0 if sector not found)
-u16 loadAtxSector(u08 drive, u16 num, unsigned short *sectorSize, u08 *status);
+// load data for a specific disk sector (returns 0 on success, -1 on internal error, 1 on Atari drive error)
+int loadAtxSector(u08 drive, u16 num, unsigned short *sectorSize, u08 *status);
 
 // returns the current head position in angular units
 u16 getCurrentHeadPosition();

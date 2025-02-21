@@ -88,6 +88,7 @@ void clearAtariSectorBuffer()
 		atari_sector_buffer[i] = 0;
 }
 
+// TODO make the xex boot loader relocatable?
 uint8_t boot_xex_loader[179] = {
 	0x72,0x02,0x5f,0x07,0xf8,0x07,0xa9,0x00,0x8d,0x04,0x03,0x8d,0x44,0x02,0xa9,0x07,
 	0x8d,0x05,0x03,0xa9,0x70,0x8d,0x0a,0x03,0xa9,0x01,0x8d,0x0b,0x03,0x85,0x09,0x60,
@@ -125,7 +126,8 @@ struct command
 
 static void switch_speed()
 {
-
+	// TODO don't understand this?
+	// Should it switch back and forth between $28 and currently selected fast speed?
 	int tmp = *zpu_uart_divisor;
 	*zpu_uart_divisor = tmp-1;
 }
@@ -184,7 +186,8 @@ void getCommand(struct command * cmd)
 			*zpu_uart_debug2 = 0x44;
 			// got a command frame
 			//
-			switch_speed();
+			// TODO why was this here?
+			// switch_speed();
 			break;
 		} else {
 			*zpu_uart_debug2 = 0xff;
@@ -214,10 +217,13 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 
 	//printf("WTF:%d %x\n",driveNumber, file);
 
+	offset = -256;
 	// Read header
 	read = 0;
 	file_seek(file,0);
 	*zpu_uart_debug2 = 0x23;
+	
+	// TODO issue - a XEX file can potentially be smaller than 16 bytes
 	file_read(file,(unsigned char *)&atr_header, 16, &read);
 	*zpu_uart_debug2 = 0x33;
 	if (read!=16)
@@ -259,29 +265,17 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	}
 	if (file_type(file) == 3)
 	{
-		int i;
-		unsigned char j;
-		int k;
-		int orig;
-		u16 sectorSize;
-		offset = -256;
 		custom_loader = 2;
-		atr_header.wMagic = 0xffff;
-		xex_size = file_size(file);
-		atr_header.wPars = xex_size/16;
-		atr_header.wSecSize = XEX_SECTOR_SIZE;
-		atr_header.btFlags = 1;
-
 		gAtxFile = file;
-		sectorSize = loadAtxFile(0);
+		atr_header.btFlags = 1;
+		u08 atxType = loadAtxFile(driveNumber);
+		info |= atxType;
 	}
 	else if (atr_header.wMagic == 0xFFFF) // XEX
 	{
-		int i;
 		//printf("XEX ");
-		offset = -256;
 		custom_loader = 1;
-		atr_header.wMagic = 0xffff;
+		// atr_header.wMagic = 0xffff;
 		xex_size = file_size(file);
 		atr_header.wPars = xex_size/16;
 		atr_header.wSecSize = XEX_SECTOR_SIZE;
@@ -306,29 +300,33 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		info |= DI_RO;
 	}
 
-	if (atr_header.wSecSize == 0x80)
+	// This part of info is taken care of for ATX files above
+	if(custom_loader != 2) 
 	{
-		if (atr_header.wPars>(720*128/16))
-			info |= DI_MD;
+		if (atr_header.wSecSize == 0x80)
+		{
+			if (atr_header.wPars>(720*128/16))
+				info |= DI_MD;
+			else
+				info |= DI_SD;
+		}
+		else if (atr_header.wSecSize == 0x100)
+		{
+			info |= DI_DD;
+		}
+		else if (atr_header.wSecSize < 0x100)
+		{
+			info |= DI_XD;
+		}
 		else
-			info |= DI_SD;
+		{
+			//printf("BAD sector size");
+			return;
+		}	
+		//printf("%d",atr_header.wPars);
+		//printf("0\n");
+		//
 	}
-	else if (atr_header.wSecSize == 0x100)
-	{
-		info |= DI_DD;
-	}
-	else if (atr_header.wSecSize < 0x100)
-	{
-		info |= DI_XD;
-	}
-	else
-	{
-		//printf("BAD sector size");
-		return;
-	}	
-	//printf("%d",atr_header.wPars);
-	//printf("0\n");
-	//
 	*zpu_uart_debug2 = 0x15;
 
 	drives[driveNumber] = file;
@@ -436,6 +434,7 @@ void processCommand()
 			if (action.respond)
 				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(action.bytes, action.success);
 			if (action.speed>=0)
+				// TODO review the HSIO treatment
 				USART_Init(action.speed); // Wait until fifo is empty - then set speed!
 		}
 		else
@@ -448,6 +447,7 @@ void processCommand()
 void handleSpeed(struct command command, struct SimpleFile * file, struct sio_action * action)
 {
 	//printf("Speed:");
+	// TODO what is this?
 	int sector = ((int)command.aux2)<<8;
 	atari_sector_buffer[0] = speedfast;
 	//hexdump_pure(atari_sector_buffer,1);
@@ -479,6 +479,7 @@ void handleFormat(struct command command,struct  SimpleFile * file, struct sio_a
 	else
 	{
 		int i;
+		// TODO what if this is another type of file (not ATR)?
 		int pos = offset;
 
 		// fill image with zeros
@@ -529,6 +530,8 @@ void handleGetStatus(struct command command, struct SimpleFile * file, struct si
 	//printf("Stat:");
 
 	status = 0x10; // Motor on;
+	// TODO Do this based on info flags
+	// TODO record sector size
 	if (atr_header.btFlags&1)
 	{
 		status |= 0x08; // write protected; // no write support yet...
@@ -655,10 +658,10 @@ void handleWrite(struct command command, struct SimpleFile * file, struct sio_ac
 void handleRead(struct command command, struct SimpleFile * file, struct sio_action * action)
 {
 	int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
+	int driveNumber = (command.deviceId & 0xf) -1;
 
 	int read = 0;
 	int location =0;
-
 
 	//printf("Sector:");
 	//printf("%d",sector);
@@ -670,6 +673,7 @@ void handleRead(struct command command, struct SimpleFile * file, struct sio_act
 		u08 *spt, *dpt;
 		int file_sectors;
 
+		// TODO check if this really producers a DOS readable disk
 		//file_sectors se pouzije pro sektory $168 i $169 (optimalizace)
 		//zarovnano nahoru, tj. =(size+124)/125
 		file_sectors = ((xex_size+(u32)(XEX_SECTOR_SIZE-3-1))/((u32)XEX_SECTOR_SIZE-3));
@@ -763,14 +767,16 @@ set_number_of_sectors_to_buffer_1_2:
 	}
 	else if (custom_loader==2)
 	{
+		// TODO custom_loader needs to be an array
 		gAtxFile = file;
 		unsigned short ss;
-		int res = loadAtxSector(0,sector, &ss, &atari_sector_status);
+		int res = loadAtxSector(driveNumber, sector, &ss, &atari_sector_status);
 
 		action->bytes = ss;
-		action->success = res;
+		action->success = (res == 0);
 
 		// Are existing default delays workable or do they need removing?
+		// TODO Yes, they need fixing
 		// What if put into drive 3/4? Boom?
 	}
 	else
@@ -832,10 +838,12 @@ CommandHandler getCommandHandler(struct command command)
 		break;
 	case 0x50: // write
 	case 0x57: // write with verify
+		// TODO need to know total sectors
 		if (sector!=0)
 			res = &handleWrite;
 		break;
 	case 0x52: // read
+		// TODO need to know total sectors
 		if (sector!=0)
 			res = &handleRead;
 		break;
@@ -900,6 +908,8 @@ void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len, i
 	printf(")");*/
 }
 
+// TODO Not needed here!
+/*
 void describe_disk(int driveNumber, char * buffer)
 {
 	if (drives[driveNumber]==0)
@@ -936,6 +946,7 @@ void describe_disk(int driveNumber, char * buffer)
 	buffer[4] = 'D';
 	buffer[5] = '\0';
 }
+*/
 
 int turbo_div()
 {
