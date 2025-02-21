@@ -59,6 +59,8 @@ struct atxTrackInfo {
     u32 offset;   // absolute position within file for start of track header
 };
 
+enum atx_density { atx_single, atx_medium, atx_double };
+
 extern unsigned char atari_sector_buffer[256];
 // extern u16 last_angle_returned; // extern so we can display it on the screen
 
@@ -68,6 +70,7 @@ struct atxTrackInfo gTrackInfo[NUM_ATX_DRIVES][MAX_TRACK];  // pre-calculated in
                                                      // support slot D1 and D2 only because of insufficient RAM!
 u16 gLastAngle[NUM_ATX_DRIVES];
 u08 gCurrentHeadTrack[NUM_ATX_DRIVES];
+u08 atxDensity[NUM_ATX_DRIVES];
 
 u08 loadAtxFile(u08 drive) {
     struct atxFileHeader *fileHeader;
@@ -90,11 +93,12 @@ u08 loadAtxFile(u08 drive) {
         fileHeader->minVersion != ATX_VERSION) {
         return r;
     }
-    r = fileHeader->density + 1;
+    r = fileHeader->density;
     // enhanced density is 26 sectors per track, single and double density are 18
-    gSectorsPerTrack[drive] = (r == 2) ? (u08) 26 : (u08) 18;
+    gSectorsPerTrack[drive] = (r == atx_medium) ? (u08) 26 : (u08) 18;
     // single and enhanced density are 128 bytes per sector, double density is 256
-    gBytesPerSector[drive] = (r == 3) ? (u16) 256 : (u16) 128;
+    gBytesPerSector[drive] = (r == atx_double) ? (u16) 256 : (u16) 128;
+    atxDensity[drive] = r;
     gCurrentHeadTrack[drive] = 0;
 
     // calculate track offsets
@@ -115,7 +119,7 @@ u08 loadAtxFile(u08 drive) {
 
 // Return 0 on full success, 1 on "Atari disk problem" (may have data)
 // -1 on internal storage problem (corrupt ATX) 
-int loadAtxSector(u08 drive, u16 num, u16 *sectorSize, u08 *status) {
+int loadAtxSector(u08 drive, u16 num, u08 *status) {
 
     struct atxTrackHeader *trackHeader;
     struct atxSectorListHeader *slHeader;
@@ -134,9 +138,6 @@ int loadAtxSector(u08 drive, u16 num, u16 *sectorSize, u08 *status) {
     *status = MASK_FDC_MISSING;
 
     u16 atxSectorSize = gBytesPerSector[drive];
-
-    // set the sector size
-    *sectorSize = atxSectorSize;
 
     // delay for the time the drive takes to process the request
     // TODO
@@ -178,8 +179,7 @@ int loadAtxSector(u08 drive, u16 num, u16 *sectorSize, u08 *status) {
 	    }
     }
 
-    // TODO check also for density match!
-    if (trackHeader->trackNumber != tgtTrackNumber) {
+    if (trackHeader->trackNumber != tgtTrackNumber || atxDensity[drive] != ((trackHeader->flags & 0x2) ? atx_medium : atx_single)) {
 	    sectorCount = 0;
     }
 

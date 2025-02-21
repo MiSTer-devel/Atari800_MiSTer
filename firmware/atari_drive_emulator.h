@@ -13,6 +13,8 @@
 // Both these are mapped into zpu config regs
 #include "file.h"
 
+#define MAX_DRIVES 2
+
 void actions(); // this is called whenever possible - should be quick
 
 void init_drive_emulator();
@@ -26,7 +28,7 @@ struct SimpleFile * get_drive_status(int driveNumber);
 // void describe_disk(int driveNumber, char * buffer);
 
 // Pokey divisor
-void set_turbo_drive(int pos);
-int get_turbo_drive();
-char const * get_turbo_drive_str();
+//void set_turbo_drive(int pos);
+//int get_turbo_drive();
+//char const * get_turbo_drive_str();
 

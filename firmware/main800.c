@@ -231,10 +231,10 @@ void actions()
 		file->offset = 0;
 		file_reset();
 
-		if(num<4)
+		if(num<MAX_DRIVES)
 		{
 			//set_cart_select(0);
-			set_drive_status(num,file->size ? file : 0);
+			set_drive_status(num, file->size ? file : 0);
 		}
 		else if(num == 5)
 		{
@@ -281,10 +281,10 @@ void actions()
 			set_pause_6502(1);
 			freeze();
 
-			set_drive_status(0,0);
-			set_drive_status(1,0);
-			set_drive_status(3,0);
-			set_drive_status(4,0);
+			for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
+			{
+				set_drive_status(mounted, 0);
+			}
 			if(!file->size)
 			{
 				set_cart_select(0);

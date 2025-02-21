@@ -24,6 +24,7 @@ void byteSwapAtxTrackHeader(struct atxTrackHeader * header)
     longbyteswap(&header->size); // used
     byteswap(&header->sectorCount); // used
     longbyteswap(&header->headerSize); // used
+    longbyteswap(&header->flags); // used
 }
 
 void byteSwapAtxSectorListHeader(struct atxSectorListHeader * header)
