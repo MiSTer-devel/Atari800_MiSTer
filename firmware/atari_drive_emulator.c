@@ -294,7 +294,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		//printf("XEX ");
 		drive_infos[driveNumber].custom_loader = 1;
 		// atr_header.wMagic = 0xffff;
-		drive_infos[driveNumber].sector_count = 3+0x170+(file_size(file)+124)/125;
+		drive_infos[driveNumber].sector_count = 0x173+(file_size(file)+(XEX_SECTOR_SIZE-4))/(XEX_SECTOR_SIZE-3);
 		drive_infos[driveNumber].sector_size = XEX_SECTOR_SIZE;
 		//atr_header.wPars = (drive_infos[driveNumber].sector_count+3+0x170) / 8;
 		//atr_header.wSecSize = XEX_SECTOR_SIZE;
@@ -586,7 +586,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 {
 	//debug_pos = 0;
 
-	int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
+	u16 sector = command.aux1 + (command.aux2 << 8);
 	int sectorSize = 0;
 	int location =0;
 
@@ -681,7 +681,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 
 void handleRead(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
-	int sector = ((int)command.aux1) + (((int)command.aux2)<<8);
+	u16 sector = command.aux1 + (command.aux2<<8);
 
 	int read = 0;
 	int location =0;
@@ -699,7 +699,8 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 		// TODO check if this really producers a DOS readable disk
 		//file_sectors se pouzije pro sektory $168 i $169 (optimalizace)
 		//zarovnano nahoru, tj. =(size+124)/125
-		file_sectors = ((file_size(file)+(u32)(XEX_SECTOR_SIZE-3-1))/((u32)XEX_SECTOR_SIZE-3));
+		//file_sectors = ((file_size(file)+(u32)(XEX_SECTOR_SIZE-3-1))/((u32)XEX_SECTOR_SIZE-3));
+		//file_sectors = drive_infos[driveNumber].sector_count - 0x173;
 
 		//printf("XEX ");
 
@@ -723,49 +724,56 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 		else
 		if(sector==0x168)
 		{
-			//printf("numtobuffer ");
-			//vrati pocet sektoru diskety
-			//byty 1,2
+			file_sectors = drive_infos[driveNumber].sector_count;
+			int vtoc_sectors = file_sectors / 1024;
+			int rem = file_sectors - (vtoc_sectors * 1024);
+			if(rem > 943) {
+				vtoc_sectors += 2;
+			}
+			else if(rem)
+			{
+				vtoc_sectors++;
+			}
+			if(!(vtoc_sectors % 2))
+			{
+				vtoc_sectors++;
+			} 
+				
+			file_sectors -= (vtoc_sectors + 12);
+			atari_sector_buffer[0] = (u08)((vtoc_sectors + 3)/2);
 			goto set_number_of_sectors_to_buffer_1_2;
 		}
 		else
 		if(sector==0x169)
 		{
+			file_sectors = drive_infos[driveNumber].sector_count - 0x173;
 			//printf("name ");
 			//fatGetDirEntry(FileInfo.vDisk.file_index,5,0);
 			//fatGetDirEntry(FileInfo.vDisk.file_index,0); //ale musi to posunout o 5 bajtu doprava
 
-			{
-				u08 i,j;
-				for(i=j=0;i<8+3;i++)
-				{
-					// TODO This obviously is not working
-					// TODO fill in a fake name like FILENAME.XEX
-					/*if( ((xex_name[i]>='A' && xex_name[i]<='Z') ||
-						(xex_name[i]>='0' && xex_name[i]<='9')) )
-					{
-					  //znak je pouzitelny na Atari
-					  atari_sector_buffer[j]=xex_name[i];
-					  j++;
-					}*/
-					if ( (i==7) || (i==8+2) )
-					{
-						for(;j<=i;j++) atari_sector_buffer[j]=' ';
-					}
-				}
-				//posune nazev z 0-10 na 5-15 (0-4 budou systemova adresarova data)
-				//musi pozpatku
-				for(i=15;i>=5;i--) atari_sector_buffer[i]=atari_sector_buffer[i-5];
-				//a pak uklidi cely zbytek tohoto sektoru
-				for(i=5+8+3;i<XEX_SECTOR_SIZE;i++)
+			//{
+				atari_sector_buffer[5] = 'F';
+				atari_sector_buffer[6] = 'I';
+				atari_sector_buffer[7] = 'L';
+				atari_sector_buffer[8] = 'E';
+				atari_sector_buffer[9] = 'N';
+				atari_sector_buffer[10] = 'A';
+				atari_sector_buffer[11] = 'M';
+				atari_sector_buffer[12] = 'E';
+				atari_sector_buffer[13] = 'X';
+				atari_sector_buffer[14] = 'E';
+				atari_sector_buffer[15] = 'X';
+
+				u08 i;
+				for(i=16;i<XEX_SECTOR_SIZE;i++)
 					atari_sector_buffer[i]=0x00;
-			}
+			//}
 
 			//teprve ted muze pridat prvnich 5 bytu na zacatek nulte adresarove polozky (pred nazev)
 			//atari_sector_buffer[0]=0x42;							//0
 			//jestlize soubor zasahuje do sektoru cislo 1024 a vic,
 			//status souboru je $46 misto standardniho $42
-			atari_sector_buffer[0]=(file_sectors>(0x400-0x171))? 0x46 : 0x42; //0
+			atari_sector_buffer[0]=(file_sectors > 0x28F) ? 0x46 : 0x42; //0
 
 			TWOBYTESTOWORD(atari_sector_buffer+3,0x0171);			//3,4
 set_number_of_sectors_to_buffer_1_2:
