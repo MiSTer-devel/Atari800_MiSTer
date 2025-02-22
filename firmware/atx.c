@@ -21,21 +21,22 @@
 
 #include "atx_eclaire.h"
 #include "atx.h"
+#include "regs.h"
 
 // number of angular units in a full disk rotation
 #define AU_FULL_ROTATION         26042
-// number of angular units to read one sector
-#define AU_ONE_SECTOR_READ       1208
-// number of ms for each angular unit
-// #define MS_ANGULAR_UNIT_VAL      0.007999897601
-// number of milliseconds drive takes to process a request
-#define MS_DRIVE_REQUEST_DELAY   3.22
-// number of milliseconds to calculate CRC
-#define MS_CRC_CALCULATION       2
-// number of milliseconds drive takes to step 1 track
-#define MS_TRACK_STEP            5.3
-// number of milliseconds drive head takes to settle after track stepping
-#define MS_HEAD_SETTLE           0
+
+#define US_CS_CALC_1050 270 // According to Altirra
+#define US_CS_CALC_810 5136 // According to Altirra
+
+#define US_TRACK_STEP_810 5300 // number of microseconds drive takes to step 1 track
+#define US_TRACK_STEP_1050 20120 // According to Avery / Altirra
+#define US_HEAD_SETTLE_1050 20000
+#define US_HEAD_SETTLE_810 10000
+
+#define US_3FAKE_ROT_810 1566000
+#define US_2FAKE_ROT_1050 942000
+
 // mask for checking FDC status "data lost" bit
 #define MASK_FDC_DLOST           0x04
 // mask for checking FDC status "missing" bit
@@ -64,13 +65,37 @@ enum atx_density { atx_single, atx_medium, atx_double };
 extern unsigned char atari_sector_buffer[256];
 // extern u16 last_angle_returned; // extern so we can display it on the screen
 
+// TODO make a struct for all this
+
 u16 gBytesPerSector[NUM_ATX_DRIVES];                                 // number of bytes per sector
 u08 gSectorsPerTrack[NUM_ATX_DRIVES];                                // number of sectors in each track
 struct atxTrackInfo gTrackInfo[NUM_ATX_DRIVES][MAX_TRACK];  // pre-calculated info for each track and drive
                                                      // support slot D1 and D2 only because of insufficient RAM!
-u16 gLastAngle[NUM_ATX_DRIVES];
 u08 gCurrentHeadTrack[NUM_ATX_DRIVES];
 u08 atxDensity[NUM_ATX_DRIVES];
+
+struct head_position_t {
+	u32 stamp;
+	u16 angle;
+} ;
+
+struct head_position_t headPosition;
+
+static void getCurrentHeadPosition() {
+	u32 s = *zpu_timer;
+	headPosition.stamp = s;
+	headPosition.angle = (u16)((s >> 3) % AU_FULL_ROTATION);
+}
+
+static void wait_from_stamp(u32 us_delay) {
+	u32 t = *zpu_timer - headPosition.stamp;
+	t = us_delay - t;
+	// If, for whatever reason, we are already too late, just skip
+	if(t <= us_delay)
+	{
+		wait_us(t);
+	}
+}
 
 u08 loadAtxFile(u08 drive) {
     struct atxFileHeader *fileHeader;
@@ -128,7 +153,7 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
 
     u16 i;
     int r = 1;
-    u08 is1050 = 1; // TODO make this configurable
+    u08 is1050 = 0; // TODO make this configurable
 
     // calculate track and relative sector number from the absolute sector number
     u08 tgtTrackNumber = (num - 1) / gSectorsPerTrack[drive];
@@ -139,10 +164,6 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
 
     u16 atxSectorSize = gBytesPerSector[drive];
 
-    // delay for the time the drive takes to process the request
-    // TODO
-    _delay_ms(MS_DRIVE_REQUEST_DELAY);
-
     // delay for track stepping if needed
     int diff = tgtTrackNumber - gCurrentHeadTrack[drive];
     if (diff) {
@@ -151,19 +172,19 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
 	else
 		diff = -diff;
         // wait for each track (this is done in a loop since _delay_ms needs a compile-time constant)
-        for (i = 0; i < diff; i++) {
-            _delay_ms(MS_TRACK_STEP);
-        }
+        //for (i = 0; i < diff; i++) {
+        //    _delay_ms(MS_TRACK_STEP);
+        //}
         // delay for head settling
-        _delay_ms(MS_HEAD_SETTLE);
+        //_delay_ms(MS_HEAD_SETTLE);
+	wait_us(is1050 ? (diff*US_TRACK_STEP_1050 + US_HEAD_SETTLE_1050) : (diff*US_TRACK_STEP_810 + US_HEAD_SETTLE_810));
     }
 
     // set new head track position
     gCurrentHeadTrack[drive] = tgtTrackNumber;
 
-    // TODO sample current head position
-    u16 headPosition = getCurrentHeadPosition();
-
+    getCurrentHeadPosition();
+    
     u16 sectorCount = 0;
 
     // read the track header
@@ -232,11 +253,9 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
 					continue;
 				}
 				// check if it's the next sector that the head would encounter angularly...
-				int tt = sectorHeader->timev - headPosition;
+				int tt = sectorHeader->timev - headPosition.angle;
 				if (!tgtSectorOffset || (tt > 0 && pTT <= 0) || (tt > 0 && pTT > 0 && tt < pTT) || (tt <= 0 && pTT <= 0 && tt < pTT)) {
 					pTT = tt;
-					// TODO gLastAngle will not be needed later when the timing is fixed
-					gLastAngle[drive] = sectorHeader->timev;
 					*status = sectorHeader->status;
 					tgtSectorIndex = i;
 					tgtSectorOffset = sectorHeader->data;
@@ -282,26 +301,39 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
 		    r = -1;
 		    tgtSectorOffset = 0;
 	    }
-	    // TODO
-	    u16 rotationDelay;
-            if (gLastAngle[drive] > headPosition) {
-                rotationDelay = (gLastAngle[drive] - headPosition);
-            } else {
-                rotationDelay = (AU_FULL_ROTATION - headPosition + gLastAngle[drive]);
-            }
 
-            // determine the angular position we need to wait for by summing the head position, rotational delay and the number 
-            // of rotational units for a sector read. Then wait for the head to reach that position.
-            // (Concern: can the SD card read take more time than the amount the disk would have rotated?)
-            waitForAngularPosition(incAngularDisplacement(incAngularDisplacement(headPosition, rotationDelay), AU_ONE_SECTOR_READ));
+	    u16 au_one_sector_read = (23+actSectorSize)*(atxDensity[drive] == atx_single ? 8 : 4)+2;
+	    // We will need to circulate around the disk one more time if we are re-reading the just written sector	    
+	    wait_from_stamp((au_one_sector_read + pTT + (pTT > 0 ? 0 : AU_FULL_ROTATION))*8);
+
+	    if(*status)
+	    {		    
+		    // This is according to Altirra, but it breaks DjayBee's test J in 1050 mode?!
+		    // wait_us(is1050 ? (US_TRACK_STEP_1050+US_HEAD_SETTLE_1050) : (AU_FULL_ROTATION*8));
+		    // This is what seems to work:
+		    wait_us(AU_FULL_ROTATION*8);
+	    }
+	    
         }else{
-	    // TODO
-    	    waitForAngularPosition(incAngularDisplacement(getCurrentHeadPosition(), AU_FULL_ROTATION));
-    
+
+	    // No matching sector found at all or the track does not match the disk density
+	    wait_from_stamp(is1050 ? US_2FAKE_ROT_1050 : US_3FAKE_ROT_810);
+	    if(is1050 || retries == 2)
+	    {
+		    // Repositioning the head for the target track
+		    if(!is1050)
+		    {
+			    wait_us((43+tgtTrackNumber)*US_TRACK_STEP_810+US_HEAD_SETTLE_810);
+		    }
+		    else if(tgtTrackNumber)
+		    {
+			    wait_us((2*tgtTrackNumber+1)*US_TRACK_STEP_1050+US_HEAD_SETTLE_1050);
+		    }
+	    }
+
         }
 	    
-	    // TODO
-    	headPosition = getCurrentHeadPosition();
+	getCurrentHeadPosition();
 
 	if(!*status || r < 0)
 		break;
@@ -335,20 +367,19 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
         }
     }
 
-    // TODO
-    // delay for CRC calculation
-    _delay_ms(MS_CRC_CALCULATION);
+    wait_from_stamp(is1050 ? US_CS_CALC_1050 : US_CS_CALC_810);
+    // The is no file reading since last time stamp, so the alternative
+    // below is probably equally good
+    //wait_us(is1050 ? US_CS_CALC_1050 : US_CS_CALC_810);
 
     // the Atari expects an inverted FDC status byte
     *status = ~(*status);
-
-    // store the last angle returned for the debugging window
-    // last_angle_returned = gLastAngle[drive];
 
     // return the number of bytes read
     return r;
 }
 
+/*
 u16 incAngularDisplacement(u16 start, u16 delta) {
     // increment an angular position by a delta taking a full rotation into consideration
     u16 ret = start + delta;
@@ -357,3 +388,4 @@ u16 incAngularDisplacement(u16 start, u16 delta) {
     }
     return ret;
 }
+*/

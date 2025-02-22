@@ -51,6 +51,9 @@ drive_infos[MAX_DRIVES];
 
 char speed;
 
+u32 pre_ce_delay;
+u32 pre_an_delay;
+
 #define INFO_RO 0x04
 
 // enum DriveInfo {DI_XD=0,DI_SD=1,DI_MD=2,DI_DD=3,DI_BITS=3,DI_RO=4};
@@ -201,8 +204,8 @@ void getCommand(struct command * cmd)
 			// just an invalid checksum, switch speed anyways
 		}
 	}
-
-	DELAY_T2_MIN;
+	// TODO This is done elsewhere!
+	// DELAY_T2_MIN;
 }
 
 // Called whenever file changed
@@ -362,10 +365,10 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	//printf("appears valid\n");
 }
 
-struct SimpleFile * get_drive_status(int driveNumber)
-{
-	return drives[driveNumber];
-}
+//struct SimpleFile * get_drive_status(int driveNumber)
+//{
+//	return drives[driveNumber];
+//}
 
 void init_drive_emulator()
 {
@@ -428,13 +431,19 @@ void processCommand()
 			//
 			*zpu_uart_debug2 = 0x16;
 			return;
+	
 		}
 
+		pre_ce_delay = 300;
+		pre_an_delay = 100;
+		
 		*zpu_uart_debug3 = command.command;
 
 
 		CommandHandler handleCommand = getCommandHandler(command);
-		DELAY_T2_MIN;
+		// DELAY_T2_MIN;
+		wait_us(pre_an_delay);
+
 		if (handleCommand)
 		{
 			struct sio_action action;
@@ -802,7 +811,7 @@ set_number_of_sectors_to_buffer_1_2:
 	else if (drive_infos[driveNumber].custom_loader == 2)
 	{
 		gAtxFile = file;
-
+		pre_ce_delay = 0; // Taken care of in loadAtxSector
 		int res = loadAtxSector(driveNumber, sector, &drive_infos[driveNumber].atari_sector_status);
 
 		action->bytes = drive_infos[driveNumber].sector_size;
@@ -876,7 +885,13 @@ CommandHandler getCommandHandler(struct command command)
 		break;
 	case 0x52: // read
 		if (sector > 0 && sector <= drive_infos[driveNumber].sector_count)
+		{
+			if(drive_infos[driveNumber].custom_loader == 2) // ATX!
+			{
+				pre_an_delay = 3220;
+			}
 			res = &handleRead;
+		}
 		break;
 	}
 
@@ -910,7 +925,8 @@ void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len, i
 	//printf("(send:");
 	//printf("%d",len);
 
-	DELAY_T5_MIN;
+	wait_us(pre_ce_delay);
+	// DELAY_T5_MIN;
 	//printf("%f:CMPL\n",when());
 	if (success)
 	{

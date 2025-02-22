@@ -88,13 +88,13 @@ u08 loadAtxFile(u08 drive);
 int loadAtxSector(u08 drive, u16 num, u08 *status);
 
 // returns the current head position in angular units
-u16 getCurrentHeadPosition();
+// u16 getCurrentHeadPosition();
 
 // increments an angular unit position with a angular displacement
-u16 incAngularDisplacement(u16 start, u16 delta);
+//u16 incAngularDisplacement(u16 start, u16 delta);
 
 // delays until head position reaches the specified position
-void waitForAngularPosition(u16 pos);
+//void waitForAngularPosition(u16 pos);
 
 // hook to allow platform-specific implementations to change byte ordering as needed
 void byteSwapAtxFileHeader(struct atxFileHeader * header);

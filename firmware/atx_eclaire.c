@@ -45,6 +45,7 @@ void byteSwapAtxTrackChunk(struct atxTrackChunk *header)
 }
 
 
+#if 0
 void waitForAngularPosition(u16 pos)
 {
     int where = getCurrentHeadPosition();
@@ -78,6 +79,7 @@ u16 getCurrentHeadPosition() {
     return res;
 }
 
+#endif
 
 int faccess_offset(int type, int offset, int bytes)
 {
