@@ -81,6 +81,7 @@ BIT_REG_RO(,0x7,0,speeddrv,zpu_in2)
 BIT_REG_RO(,0x1,3,mode800,zpu_in2)
 #endif
 BIT_REG_RO(,0x1,4,xexloc,zpu_in2)
+BIT_REG_RO(,0x1,5,atx1050,zpu_in2)
 
 // file i/o registers
 BIT_REG_RO(,0x1,8,sd_done,zpu_in2)

@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -226,6 +226,8 @@ localparam CONF_STR = {
 	"-;",
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
+	"o6,ATX Drive Timing,1050,810;",
+	"-;",
 	"S2,CARROMBIN,Load Cart;",
 	"-;",
 	"S3,XEXCOMEXE,Load XEX;",
@@ -420,6 +422,7 @@ atari800top atari800top
 	.DRV_SPEED(status[12:10]),
 	.XEX_LOC(status[32]),
 	.OS_MODE_800(status[2]),
+	.ATX_MODE(~status[38]),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),

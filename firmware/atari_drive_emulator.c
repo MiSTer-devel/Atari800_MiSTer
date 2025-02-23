@@ -80,7 +80,6 @@ struct ATRHeader
 	u08 btFlags;
 } __attribute__((packed));
 
-
 // char opendrive;
 
 unsigned char atari_sector_buffer[256];
@@ -98,7 +97,6 @@ void clearAtariSectorBuffer()
 		atari_sector_buffer[i] = 0;
 }
 
-// TODO make the xex boot loader relocatable?
 uint8_t boot_xex_loader[179] = {
 	0x72,0x02,0x5f,0x07,0xf8,0x07,0xa9,0x00,0x8d,0x04,0x03,0x8d,0x44,0x02,0xa9,0x07,
 	0x8d,0x05,0x03,0xa9,0x70,0x8d,0x0a,0x03,0xa9,0x01,0x8d,0x0b,0x03,0x85,0x09,0x60,
@@ -136,8 +134,6 @@ struct command
 
 static void switch_speed()
 {
-	// TODO don't understand this?
-	// Should it switch back and forth between $28 and currently selected fast speed?
 	int tmp = *zpu_uart_divisor;
 	*zpu_uart_divisor = tmp-1;
 }
@@ -202,7 +198,7 @@ void getCommand(struct command * cmd)
 			// just an invalid checksum, switch speed anyways
 		}
 	}
-	// TODO This is done elsewhere!
+	// This is done elsewhere!
 	// DELAY_T2_MIN;
 }
 
@@ -227,7 +223,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	// Read header
 	read = 0;
 	
-	// TODO set_drive_status should be only called once on file loading
+	// set_drive_status should be only called once on file loading
 	// the position should be 0 then and this is obsolete
 	// file_seek(file, 0);
 	*zpu_uart_debug2 = 0x23;
@@ -471,7 +467,6 @@ void processCommand()
 			if (action.respond)
 				USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(action.bytes, action.success);
 			if (action.speed>=0)
-				// TODO review the HSIO treatment
 				USART_Init(action.speed); // Wait until fifo is empty - then set speed!
 		}
 		else
@@ -695,12 +690,6 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 		u08 *spt, *dpt;
 		int file_sectors;
 
-		// TODO check if this really producers a DOS readable disk
-		//file_sectors se pouzije pro sektory $168 i $169 (optimalizace)
-		//zarovnano nahoru, tj. =(size+124)/125
-		//file_sectors = ((file_size(file)+(u32)(XEX_SECTOR_SIZE-3-1))/((u32)XEX_SECTOR_SIZE-3));
-		//file_sectors = drive_infos[driveNumber].sector_count - 0x173;
-
 		//printf("XEX ");
 
 		if (sector<=2)
@@ -715,7 +704,6 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 				b=*spt++;
 				//relokace bootloaderu z $0700 na jine misto
 				//TODO if (b==0x07) b+=bootloader_relocation;
-				//TODO no, that may not work as expected
 				*dpt++=b;
 				i--;
 			} while(i);
@@ -808,7 +796,6 @@ set_number_of_sectors_to_buffer_1_2:
 		action->success = (res == 0);
 
 		// Are existing default delays workable or do they need removing?
-		// TODO Yes, they need fixing
 	}
 	else
 	{
@@ -945,7 +932,7 @@ void USART_Send_cmpl_and_atari_sector_buffer_and_check_sum(unsigned short len, i
 	printf(")");*/
 }
 
-// TODO Not needed here!
+// Not needed here!
 /*
 void describe_disk(int driveNumber, char * buffer)
 {
