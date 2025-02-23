@@ -146,7 +146,6 @@ void getCommand(struct command * cmd)
 {
 	int expchk;
 	int i;
-	unsigned char cmdstat;
 	int prob;
 	prob = 0;
 	while (1)
@@ -196,8 +195,7 @@ void getCommand(struct command * cmd)
 			*zpu_uart_debug2 = 0x44;
 			// got a command frame
 			//
-			// TODO why was this here?
-			// switch_speed();
+			switch_speed();
 			break;
 		} else {
 			*zpu_uart_debug2 = 0xff;
@@ -486,25 +484,17 @@ void processCommand()
 void handleSpeed(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
 	//printf("Speed:");
-	// TODO what is this?
-	int sector = ((int)command.aux2)<<8;
-	atari_sector_buffer[0] = speedfast;
-	//hexdump_pure(atari_sector_buffer,1);
 	action->bytes = 1;
-
-	if (sector == 0)
+	if(drive_infos[driveNumber].custom_loader == 2)
 	{
-		speed = speedfast;
-		//printf("SPDF");
-		//printf("%d",speed);
+		atari_sector_buffer[0] = speedslow;
+		speed = speedslow;
 	}
 	else
 	{
-		speed = speedslow;
-		//printf("SPDS");
-		//printf("%d",speed);
+		atari_sector_buffer[0] = speedfast;
+		speed = command.aux2 ? speedslow : speedfast;
 	}
-
 	action->speed = speed +6;
 }
 

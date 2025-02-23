@@ -153,7 +153,7 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
 
     u16 i;
     int r = 1;
-    u08 is1050 = 0; // TODO make this configurable
+    u08 is1050 = 1; // TODO make this configurable
 
     // calculate track and relative sector number from the absolute sector number
     u08 tgtTrackNumber = (num - 1) / gSectorsPerTrack[drive];
@@ -167,10 +167,13 @@ int loadAtxSector(u08 drive, u16 num, u08 *status) {
     // delay for track stepping if needed
     int diff = tgtTrackNumber - gCurrentHeadTrack[drive];
     if (diff) {
-        if (diff > 0)
+        if (diff > 0) {
 		diff += (is1050 ? 1 : 0);
+	}
 	else
+	{
 		diff = -diff;
+	}
         // wait for each track (this is done in a loop since _delay_ms needs a compile-time constant)
         //for (i = 0; i < diff; i++) {
         //    _delay_ms(MS_TRACK_STEP);
