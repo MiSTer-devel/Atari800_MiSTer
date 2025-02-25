@@ -292,7 +292,7 @@ void actions()
 			else
 			{
 				int type = load_car(file);
-				set_cart_select(type);
+				set_cart_select(0);
 				if(!type)
 				{
 					clearscreen();
@@ -300,6 +300,10 @@ void actions()
 					debug_adjust = 0;
 					printf("Unknown cart type!");
 					wait_us(2000000);
+				}
+				else
+				{
+					set_cart_select(type);
 				}
 			}
 
