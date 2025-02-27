@@ -1824,7 +1824,7 @@ BEGIN
 		end if;
 
 		if(addr_decoded(15) = '1') then --NMIST
-			data_out <= nmist_reg&"00000";
+			data_out <= nmist_reg&"11111";
 		end if;
 		
 	end process;
