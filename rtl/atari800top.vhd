@@ -182,7 +182,7 @@ signal RAM_DATA : std_logic_vector(31 downto 0);
 
 BEGIN
 
-areset_n <= RESET_N and SDRAM_RESET_N and not reset_atari;
+areset_n <= RESET_N and SDRAM_RESET_N and not reset_atari and not reset_rnmi_atari;
 areset <= not areset_n;
 
 process(clk)
