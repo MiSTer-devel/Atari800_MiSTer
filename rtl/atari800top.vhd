@@ -56,6 +56,7 @@ PORT
 	XEX_LOC    : IN  STD_LOGIC;
 	OS_MODE_800   : IN  STD_LOGIC;
 	ATX_MODE   : IN  STD_LOGIC;
+	DRIVE_LED  : OUT STD_LOGIC_VECTOR(1 downto 0);
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -455,6 +456,7 @@ reset_atari <= zpu_out1(1);
 emulated_cartridge_select <= zpu_out1(22 downto 17);
 freezer_enable <= zpu_out1(25);
 reset_rnmi_atari <= zpu_out1(26);
+DRIVE_LED <= zpu_out1(28 downto 27);
 
 CPU_HALT <= pause_atari;
 

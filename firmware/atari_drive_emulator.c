@@ -307,7 +307,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		{
 			info |= INFO_RO;			
 		}
-		drive_infos[driveNumber].sector_count = 3 + ((atr_header.wPars-24)*16) / atr_header.wSecSize;
+		drive_infos[driveNumber].sector_count = 3 + ((atr_header.wPars | (atr_header.btParsHigh << 16))*16 - 128*3) / atr_header.wSecSize;
 		drive_infos[driveNumber].sector_size = atr_header.wSecSize;
 	}
 	else
@@ -579,6 +579,7 @@ void handleGetStatus(struct command command, int driveNumber, struct SimpleFile 
 void handleWrite(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
 	//debug_pos = 0;
+	set_drive_led(driveNumber+1);
 
 	u16 sector = command.aux1 + (command.aux2 << 8);
 	int sectorSize = 0;
@@ -671,10 +672,13 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 		//printf("%f:NACK(bad checksum)\n",when());
 		send_NACK();
 	}
+	set_drive_led(0);
 }
 
 void handleRead(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
+	set_drive_led(driveNumber+1);
+	
 	u16 sector = command.aux1 + (command.aux2<<8);
 
 	int read = 0;
@@ -820,6 +824,7 @@ set_number_of_sectors_to_buffer_1_2:
 		//printf("%f:Read done\n",when());
 	}
 
+	set_drive_led(0);
 	//topofscreen();
 	//hexdump_pure(atari_sector_buffer,sectorSize);
 	//printf("Sending\n");

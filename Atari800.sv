@@ -180,7 +180,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
 
-assign LED_USER  = ioctl_download;
+assign LED_USER  = |drive_led | ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -388,6 +388,8 @@ assign SDRAM_nCS = 0;
 wire SIO_MODE = status[16];
 wire SIO_IN,SIO_OUT, SIO_CLKOUT, SIO_CLKIN, SIO_CMD, SIO_PROC, SIO_MOTOR, SIO_IRQ;
 
+wire [1:0] drive_led;
+
 atari800top atari800top
 (
 	.CLK(clk_sys),
@@ -423,6 +425,7 @@ atari800top atari800top
 	.XEX_LOC(status[32]),
 	.OS_MODE_800(status[2]),
 	.ATX_MODE(~status[38]),
+	.DRIVE_LED(drive_led),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
