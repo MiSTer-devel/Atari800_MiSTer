@@ -56,7 +56,7 @@ PORT
 	XEX_LOC    : IN  STD_LOGIC;
 	OS_MODE_800   : IN  STD_LOGIC;
 	ATX_MODE   : IN  STD_LOGIC;
-	DRIVE_LED  : OUT STD_LOGIC_VECTOR(1 downto 0);
+	DRIVE_LED  : OUT STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -160,6 +160,7 @@ signal end_command : std_logic;
 -- system control from zpu
 signal reset_atari : std_logic;
 signal reset_rnmi_atari : std_logic;
+signal option_force : std_logic;
 signal pause_atari : std_logic;
 signal emulated_cartridge_select: std_logic_vector(5 downto 0);
 
@@ -208,7 +209,7 @@ begin
 			
 			if cnt < 150000000 then
 				cnt := cnt + 1;
-				option_tmp <= option_tmp or JOY(5);
+				option_tmp <= option_tmp or option_force or JOY(5);
 			else
 				option_tmp <= '0';
 			end if;
@@ -456,7 +457,8 @@ reset_atari <= zpu_out1(1);
 emulated_cartridge_select <= zpu_out1(22 downto 17);
 freezer_enable <= zpu_out1(25);
 reset_rnmi_atari <= zpu_out1(26);
-DRIVE_LED <= zpu_out1(28 downto 27);
+DRIVE_LED <= zpu_out1(27);
+option_force <= zpu_out1(28);
 
 CPU_HALT <= pause_atari;
 

@@ -13,7 +13,7 @@
 // Both these are mapped into zpu config regs
 #include "file.h"
 
-#define MAX_DRIVES 2
+#define MAX_DRIVES 4
 
 void actions(); // this is called whenever possible - should be quick
 

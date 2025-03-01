@@ -180,7 +180,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
 
-assign LED_USER  = |drive_led | ioctl_download;
+assign LED_USER  = drive_led | ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -224,14 +224,17 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 localparam CONF_STR = {
 	"ATARI800;;",
 	"-;",
+	"S6,ATRXEXXDFATX,Boot D1;",
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
+	"S2,ATRXEXXFD,Mount D3;",
+	"S3,ATRXEXXFD,Mount D4;",
 	"o6,ATX Drive Timing,1050,810;",
 	"-;",
-	"S2,CARROMBIN,Load Cart;",
-	"-;",
-	"S3,XEXCOMEXE,Load XEX;",
+	"S5,XEXCOMEXE,Load XEX;",
 	"o0,Loader At,Standard,Stack;",
+	"-;",
+	"S4,CARROMBIN,Load Cart;",
 	"-;",
 	"OL,Swap Joysticks,No,Yes;",
 	"-;",
@@ -302,14 +305,14 @@ wire        forced_scandoubler;
 wire [21:0] gamma_bus;
 
 reg  [31:0] sd_lba;
-reg   [3:0] sd_rd;
-reg   [3:0] sd_wr;
-wire  [3:0] sd_ack;
+reg   [6:0] sd_rd;
+reg   [6:0] sd_wr;
+wire  [6:0] sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
 wire  [7:0] sd_buff_din;
 wire        sd_buff_wr;
-wire  [3:0] img_mounted;
+wire  [6:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
 wire [13:0] ioctl_addr;
@@ -318,7 +321,7 @@ wire        ioctl_wr;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
 
-hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(7)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -337,13 +340,13 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
-	.sd_lba('{sd_lba,sd_lba,sd_lba,sd_lba}),
+	.sd_lba('{sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba}),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din}),
+	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din}),
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
@@ -388,7 +391,7 @@ assign SDRAM_nCS = 0;
 wire SIO_MODE = status[16];
 wire SIO_IN,SIO_OUT, SIO_CLKOUT, SIO_CLKIN, SIO_CMD, SIO_PROC, SIO_MOTOR, SIO_IRQ;
 
-wire [1:0] drive_led;
+wire drive_led;
 
 atari800top atari800top
 (
@@ -651,10 +654,10 @@ always @(posedge clk_sys) begin
 	if(zpu_io_wr) zpu_buff_addr <= 0;
 
 	old_blrd <= zpu_block_rd;
-	if(~old_blrd & zpu_block_rd) {zpu_io_done,sd_rd[{zpu_drv_num[2], zpu_drv_num[0]}]} <= 1;
+	if(~old_blrd & zpu_block_rd) {zpu_io_done,sd_rd[{zpu_drv_num[2], zpu_drv_num[1], zpu_drv_num[0]}]} <= 1;
 
 	old_blwr <= zpu_block_wr;
-	if(~old_blwr & zpu_block_wr) {zpu_io_done,sd_wr[{zpu_drv_num[2], zpu_drv_num[0]}]} <= 1;
+	if(~old_blwr & zpu_block_wr) {zpu_io_done,sd_wr[{zpu_drv_num[2], zpu_drv_num[1], zpu_drv_num[0]}]} <= 1;
 
 	if(|sd_ack) {sd_rd, sd_wr} <= 0;
 
@@ -665,11 +668,14 @@ always @(posedge clk_sys) begin
 	if(~old_mounted && |img_mounted) begin
 		if(img_mounted[0]) zpu_fileno <= 0;
 		if(img_mounted[1]) zpu_fileno <= 1;
-		if(img_mounted[2]) zpu_fileno <= 4;
-		if(img_mounted[3]) zpu_fileno <= 5;
+		if(img_mounted[2]) zpu_fileno <= 2;
+		if(img_mounted[3]) zpu_fileno <= 3;
+		if(img_mounted[4]) zpu_fileno <= 4;
+		if(img_mounted[5]) zpu_fileno <= 5;
+		if(img_mounted[6]) zpu_fileno <= 6;
 
 		zpu_filetype <= ioctl_index[7:6];
-		zpu_readonly <= img_readonly | img_mounted[2] | img_mounted[3];
+		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5];
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end

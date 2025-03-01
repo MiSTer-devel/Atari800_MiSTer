@@ -579,7 +579,7 @@ void handleGetStatus(struct command command, int driveNumber, struct SimpleFile 
 void handleWrite(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
 	//debug_pos = 0;
-	set_drive_led(driveNumber+1);
+	set_drive_led(1);
 
 	u16 sector = command.aux1 + (command.aux2 << 8);
 	int sectorSize = 0;
@@ -677,7 +677,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 
 void handleRead(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
-	set_drive_led(driveNumber+1);
+	set_drive_led(1);
 	
 	u16 sector = command.aux1 + (command.aux2<<8);
 

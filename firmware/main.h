@@ -58,7 +58,8 @@ BIT_REG(,0x3f,17,cart_select,zpu_out1)
 BIT_REG(,0x01,25,freezer_enable,zpu_out1)
 #ifndef FIRMWARE_5200
 BIT_REG(,0x01,26,reset_rnmi,zpu_out1)
-BIT_REG(,0x03,27,drive_led,zpu_out1)
+BIT_REG(,0x01,27,drive_led,zpu_out1)
+BIT_REG(,0x01,28,option_force,zpu_out1)
 #endif
 
 BIT_REG_RO(,0x1,0,hotkey_f1,zpu_in1)
@@ -248,7 +249,7 @@ reboot(int cold, int pause)
 	set_pause_6502(pause);
 }
 
-#define NUM_FILES 8
+#define NUM_FILES 7
 struct SimpleFile files[NUM_FILES];
 
 int last_mount;

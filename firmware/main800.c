@@ -236,6 +236,17 @@ void actions()
 			//set_cart_select(0);
 			set_drive_status(num, file->size ? file : 0);
 		}
+		else if(num == 6)
+		{
+			set_pause_6502(1);
+			set_cart_select(0);
+			// TODO Unmount all the other drives?
+			set_drive_status(0, file->size ? file : 0);
+			reboot(1, 0);
+			// Important: if you set Option key before reset it will be cleared by reset
+			set_option_force(1);
+			set_option_force(0);
+		}
 		else if(num == 5)
 		{
 			if(file->size)
@@ -276,7 +287,7 @@ void actions()
 				set_pause_6502(0);
 			}
 		}
-		else // num == 4
+		else if(num == 4)
 		{
 			set_pause_6502(1);
 			freeze();
