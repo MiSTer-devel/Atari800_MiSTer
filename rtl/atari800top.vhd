@@ -57,6 +57,8 @@ PORT
 	OS_MODE_800   : IN  STD_LOGIC;
 	ATX_MODE   : IN  STD_LOGIC;
 	DRIVE_LED  : OUT STD_LOGIC;
+	WARM_RESET_MENU : IN STD_LOGIC;
+	COLD_RESET_MENU : IN STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -177,6 +179,8 @@ signal paddle_2 : std_logic_vector(2 downto 0);
 
 signal areset_n   : std_logic;
 signal option_tmp : std_logic;
+signal warm_reset_request : std_logic;
+signal cold_reset_request : std_logic;
 
 signal RAM_DATA : std_logic_vector(31 downto 0);
 
@@ -196,6 +200,8 @@ begin
 			paddle_2 <= "000";
 			cnt := 0;
 			option_tmp <= '0';
+			warm_reset_request <= '0';
+			cold_reset_request <= '0';
 		else
 			if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
 			if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
@@ -213,6 +219,8 @@ begin
 			else
 				option_tmp <= '0';
 			end if;
+			warm_reset_request <= not(reset_rnmi_atari) and (warm_reset_request or warm_reset_menu);
+			cold_reset_request <= cold_reset_request or cold_reset_menu;
 		end if;
 
 		old_reset := areset_n;
@@ -438,7 +446,7 @@ PORT MAP
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&FKEYS(9 downto 0),
+			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&(FKEYS(9) or cold_reset_request)&(FKEYS(8) or warm_reset_request)&FKEYS(7 downto 0),
 	ZPU_IN2 => X"0000"& ZPU_IN2 & "00" & ATX_MODE & XEX_LOC & OS_MODE_800 & DRV_SPEED,
 	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",

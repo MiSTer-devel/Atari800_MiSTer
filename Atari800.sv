@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -262,7 +262,9 @@ localparam CONF_STR = {
 	"-;",
 	"OG,SIO Connected to,Emu,USER I/O;",
 	"-;",
-	"R0,Reset;",
+	"r7,Warm Reset (F9);",
+	"r8,Cold Reset (F10);",
+	"R0,Core Reset;",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
 	"V,v",`BUILD_DATE
 };
@@ -429,6 +431,8 @@ atari800top atari800top
 	.OS_MODE_800(status[2]),
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
+	.WARM_RESET_MENU(status[39]),
+	.COLD_RESET_MENU(status[40]),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
