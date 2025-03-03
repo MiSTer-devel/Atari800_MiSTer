@@ -9,10 +9,12 @@
 ## Usage notes
 
 ### System ROM
-You can supply other A800 OS ROM as games/ATARI800/boot.rom. 
+You can supply other A800 XL OS ROM as games/ATARI800/boot.rom. 
 Alternative Basic ROM can be placed to games/ATARI800/boot1.rom. 
+Alternative A800 OS-A ROM as games/ATARI800/boot2.rom.
+Alternative A800 OS-B ROM as games/ATARI800/boot3.rom.
 
-Integrated 800XL ROM includes SIO turbo patch (fast disk loading). Note that the single fact that this patch is present can break some titles, especially the timing sensitive ATX disk based ones.
+Integrated OS ROMs include SIO turbo patch (fast disk loading). Note that the single fact that this patch is present can break some titles, especially the timing sensitive ATX disk based ones.
 
 Turbo ROM has hot keys to control the turbo mode:
 * SHIFT+CONTROL+N    Disable highspeed SIO (normal speed)

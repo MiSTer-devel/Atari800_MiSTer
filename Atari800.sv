@@ -557,7 +557,11 @@ dpram #(14,8, "rtl/rom/ATARIXL.mif") romxl
 );
 
 reg [13:0] osrom_off = 0;
+reg [13:0] osrom2_off = 0;
+reg [13:0] osrom3_off = 0;
 always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 0) osrom_off <= 14'h3FFF - ioctl_addr;
+always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 2) osrom2_off <= 14'h3FFF - ioctl_addr;
+always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 3) osrom3_off <= 14'h3FFF - ioctl_addr;
 
 dpram #(13,8, "rtl/rom/ATARIBAS.mif") basic
 (
@@ -571,27 +575,40 @@ dpram #(13,8, "rtl/rom/ATARIBAS.mif") basic
 	.q_b(bas_do)
 );
 
-spram #(14,8, "rtl/rom/ATARIOSA.mif") osa
+dpram #(14,8, "rtl/rom/ATARIOSA.mif") osa
 (
 	.clock(clk_sys),
-	.address(rom_addr[13:0]),
-	.q(osa_do)
+
+	.address_a(ioctl_addr[13:0]),
+	.data_a(ioctl_dout),
+	.wren_a(ioctl_wr && ioctl_index[7:6] == 2),
+
+	.address_b(rom_addr[13:0] - osrom2_off),
+	.q_b(osa_do)
 );
 
-spram #(14,8, "rtl/rom/ATARIOSB.mif") osb
+dpram #(14,8, "rtl/rom/ATARIOSB.mif") osb
 (
 	.clock(clk_sys),
-	.address(rom_addr[13:0]),
-	.q(osb_do)
+
+	.address_a(ioctl_addr[13:0]),
+	.data_a(ioctl_dout),
+	.wren_a(ioctl_wr && ioctl_index[7:6] == 3),
+
+	.address_b(rom_addr[13:0] - osrom3_off),
+	.q_b(osb_do)
 );
 
 reg [1:0] rom_sel = 0;
 always @(posedge clk_sys) if(areset) rom_sel <= status[2:1];
 
+wire [7:0] xl_pad_do = (rom_addr[13:0] >= osrom_off) ? xl_do : 8'hFF;
+wire [7:0] osa_pad_do = (rom_addr[13:0] >= osrom2_off) ? osa_do : 8'hFF;
+wire [7:0] osb_pad_do = (rom_addr[13:0] >= osrom3_off) ? osb_do : 8'hFF;
+
 wire [7:0] rom_do = (!rom_addr[14:13] && !rom_sel[1:0]) ? bas_do :
-                    (rom_addr[14] && !rom_sel[1]) ? ((rom_addr[13:0] >= osrom_off) ? xl_do : 8'hFF) :
-                    rom_addr[14] ? (rom_sel[0] ? osb_do : osa_do) :
-						  8'hFF;
+                    (rom_addr[14] && !rom_sel[1]) ? xl_pad_do :
+                     rom_addr[14] ? (rom_sel[0] ? osb_pad_do : osa_pad_do) : 8'hFF;
 
 //////////////////   SD   ///////////////////
 
