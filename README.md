@@ -19,7 +19,9 @@ Integrated OS ROMs include SIO turbo patch (fast disk loading). Note that the si
 Turbo ROM has hot keys to control the turbo mode:
 * SHIFT+CONTROL+N    Disable highspeed SIO (normal speed)
 * SHIFT+CONTROL+H    Enable highspeed SIO 
-  
+
+Another alternative is to load and set the ROM files from the OSD menu, they will become permanent (use Backspace when loading to clear them), but only if there are no alternative boot.rom files, otherwise those will take precedence. Yet, there is an option to change that behaviour too (that is, keep the boot.rom files on the SD card, but have the ROM data loaded from the OSD selected files on core initialisation).
+
 Additionally, you can control the speed of turbo loading in OSD menu.
 
 ### Disks
@@ -33,7 +35,7 @@ A800: There is an entry to directly load the Atari OS executable files (the so c
 If a title does not load, you may want to try to switch the loader location in Atari memory (Standard - it sits at 0x700, Stack - it is located at the bottom of the stack area at 0x100).
 
 ### Classic Atari 800 mode
-When selecting OS-B in the Machine/BIOS menu option, the core works in the classic Atari 800 mode, and different memory layouts are available / activated. Note that the 52KB memory layout is not compatible with the stock 800 OS-A/B system, it freezes the boot process. This is not a core bug, but an Atari 800 legacy.
+When selecting OS-B in the Machine/BIOS menu option, the core works in the classic Atari 800 mode (reset required to take effect), and different memory layouts are available / activated. Note that the 52KB memory layout is not compatible with the stock 800 OS-A/B system, it freezes the boot process. This is not a core bug, but an Atari 800 legacy.
 
 ### Differences from original version
 * Joystick/Paddle mode switched by joystick. Press **Paddle1/2** to switch to paddle mode (analog X/Y). Press **Fire** to switch to joystick mode (digital X/Y).

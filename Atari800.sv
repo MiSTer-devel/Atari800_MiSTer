@@ -218,49 +218,65 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
 	"-;",
 	"S6,ATRXEXXDFATX,Boot D1;",
+	"-;",
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
 	"S2,ATRXEXXFD,Mount D3;",
 	"S3,ATRXEXXFD,Mount D4;",
-	"o6,ATX Drive Timing,1050,810;",
 	"-;",
 	"S5,XEXCOMEXE,Load XEX;",
-	"o0,Loader At,Standard,Stack;",
 	"-;",
 	"S4,CARROMBIN,Load Cart;",
 	"-;",
-	"OL,Swap Joysticks,No,Yes;",
-	"-;",
-	"O79,CPU Speed,1x,2x,4x,8x,16x;",
-	"OAC,Drive Speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
-	"-;",
-	"O12,Machine/BIOS,XL+Basic,XL,800/OS-A,800/OS-B;",
-	"D1ODF,RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
-	"d1o35,RAM 800,8K,16K,32K,48K,52K;",
-	"-;",
-	"O5,Video mode,PAL,NTSC;",
-	"o1,Hi-Res Antic,Off,On;",
-	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-	"OV,NTSC/PAL artifacting,No,Yes;",
-	"o2,Clip Sides,Off,On;",
-	"d0OO,Vertical Crop,Disabled,216p(5x);",
-	"d0OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
-	"OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
-	"-;",
-	"OK,Dual Pokey,No,Yes;",
-	"O34,Stereo mix,None,25%,50%,100%;",
-	"-;",
-	"O6,Mouse Y,Normal,Inverted;",
-	"-;",
-	"OG,SIO Connected to,Emu,USER I/O;",
+	"P1,Drives & Loader;",
+	"P1-;",
+	"P1OG,SIO Connected to,Emu,USER I/O;",
+	"P1-;",
+	"P1OAC,Drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
+	"P1o6,ATX drive timing,1050,810;",
+	"P1-;",
+	"P1o0,XEX loader,Standard,Stack;",
+	"P2,Hardware & OS;",
+	"P2-;",
+	"P2O79,CPU speed,1x,2x,4x,8x,16x;",
+	"P2-;",
+	"P2O12,Machine/BIOS,XL+Basic,XL,800/OS-A,800/OS-B;",
+	"H1P2ODF,RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
+	"h1P2o35,RAM 800,8K,16K,32K,48K,52K;",
+	"P2-;",
+	"P2o9,Use bootX.rom,Enabled,Disabled;",
+	"P2-;",
+	"P2FC4,ROMBIN,Set XL OS;",
+	"P2FC5,ROMBIN,Set Basic;",
+	"P2FC6,ROMBIN,Set OS-A;",
+	"P2FC7,ROMBIN,Set OS-B;",
+	"P3,Video;",
+	"P3-;",
+	"P3O5,Video mode,PAL,NTSC;",
+	"P3o1,Hi-Res ANTIC,Disabled,Enabled;",
+	"P3-;",
+	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P3OHJ,Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"P3OV,NTSC/PAL artifacting,No,Yes;",
+	"P3o2,Clip sides,Disabled,Enabled;",
+	"P3d0OO,Vertical Crop,Disabled,216p(5x);",
+	"P3d0OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
+	"P3OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
+	"P4,Audio;",
+	"P4-;",
+	"P4OK,Dual Pokey,Disabled,Enabled;",
+	"P4O34,Stereo mix,None,25%,50%,100%;",
+	"P5,Input;",
+	"P5-;",
+	"P5OL,Swap Joysticks,No,Yes;",
+	"P5O6,Mouse Y,Normal,Inverted;",
 	"-;",
 	"r7,Warm Reset (F9);",
 	"r8,Cold Reset (F10);",
@@ -425,14 +441,14 @@ atari800top atari800top
 	.VBLANK(VBlank_o),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
-	.RAM_SIZE((status[2]) ? status[37:35] : status[15:13]), 
+	.RAM_SIZE(ram_config), 
 	.DRV_SPEED(status[12:10]),
 	.XEX_LOC(status[32]),
-	.OS_MODE_800(status[2]),
+	.OS_MODE_800(mode800),
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
 	.WARM_RESET_MENU(status[39]),
-	.COLD_RESET_MENU(status[40]),
+	.COLD_RESET_MENU(status[40] | load_reset),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
@@ -544,24 +560,29 @@ video_mixer #(.GAMMA(1)) video_mixer
 wire [14:0] rom_addr;
 wire  [7:0] xl_do, bas_do, osa_do, osb_do;
 
+reg [13:0] osrom_off = 0;
+reg [13:0] osrom2_off = 0;
+reg [13:0] osrom3_off = 0;
+wire xl_rom_index = (~status[41] && ioctl_index[7:0] == 0) || ioctl_index[5:0] == 4;
+wire basic_rom_index = (~status[41] && ioctl_index[7:0] == 8'b01000000) || ioctl_index[5:0] == 5;
+wire osa_rom_index = (~status[41] && ioctl_index[7:0] == 8'b10000000) || ioctl_index[5:0] == 6;
+wire osb_rom_index = (~status[41] && ioctl_index[7:0] == 8'b11000000) || ioctl_index[5:0] == 7;
+wire load_sys_rom = ioctl_index[5:2] == 4'b0001;
+always @(posedge clk_sys) if(ioctl_wr && xl_rom_index) osrom_off <= 14'h3FFF - ioctl_addr;
+always @(posedge clk_sys) if(ioctl_wr && osa_rom_index) osrom2_off <= 14'h3FFF - ioctl_addr;
+always @(posedge clk_sys) if(ioctl_wr && osb_rom_index) osrom3_off <= 14'h3FFF - ioctl_addr;
+
 dpram #(14,8, "rtl/rom/ATARIXL.mif") romxl
 (
 	.clock(clk_sys),
 
 	.address_a(ioctl_addr[13:0]),
 	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && ioctl_index[7:6] == 0),
+	.wren_a(ioctl_wr && xl_rom_index),
 
 	.address_b(rom_addr[13:0] - osrom_off),
 	.q_b(xl_do)
 );
-
-reg [13:0] osrom_off = 0;
-reg [13:0] osrom2_off = 0;
-reg [13:0] osrom3_off = 0;
-always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 0) osrom_off <= 14'h3FFF - ioctl_addr;
-always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 2) osrom2_off <= 14'h3FFF - ioctl_addr;
-always @(posedge clk_sys) if(ioctl_wr && ioctl_index[7:6] == 3) osrom3_off <= 14'h3FFF - ioctl_addr;
 
 dpram #(13,8, "rtl/rom/ATARIBAS.mif") basic
 (
@@ -569,7 +590,7 @@ dpram #(13,8, "rtl/rom/ATARIBAS.mif") basic
 
 	.address_a(ioctl_addr[12:0]),
 	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && ioctl_index[7:6] == 1),
+	.wren_a(ioctl_wr && basic_rom_index),
 
 	.address_b(rom_addr[12:0]),
 	.q_b(bas_do)
@@ -581,7 +602,7 @@ dpram #(14,8, "rtl/rom/ATARIOSA.mif") osa
 
 	.address_a(ioctl_addr[13:0]),
 	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && ioctl_index[7:6] == 2),
+	.wren_a(ioctl_wr && osa_rom_index),
 
 	.address_b(rom_addr[13:0] - osrom2_off),
 	.q_b(osa_do)
@@ -593,14 +614,21 @@ dpram #(14,8, "rtl/rom/ATARIOSB.mif") osb
 
 	.address_a(ioctl_addr[13:0]),
 	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && ioctl_index[7:6] == 3),
+	.wren_a(ioctl_wr && osb_rom_index),
 
 	.address_b(rom_addr[13:0] - osrom3_off),
 	.q_b(osb_do)
 );
 
 reg [1:0] rom_sel = 0;
-always @(posedge clk_sys) if(areset) rom_sel <= status[2:1];
+reg mode800 = 0;
+reg [2:0] ram_config = 0;
+
+always @(posedge clk_sys) if(areset) begin
+	rom_sel <= status[2:1];
+	mode800 <= status[2];
+	ram_config <= (status[2] ? status[37:35] : status[15:13]);
+end
 
 wire [7:0] xl_pad_do = (rom_addr[13:0] >= osrom_off) ? xl_do : 8'hFF;
 wire [7:0] osa_pad_do = (rom_addr[13:0] >= osrom2_off) ? osa_do : 8'hFF;
@@ -609,6 +637,29 @@ wire [7:0] osb_pad_do = (rom_addr[13:0] >= osrom3_off) ? osb_do : 8'hFF;
 wire [7:0] rom_do = (!rom_addr[14:13] && !rom_sel[1:0]) ? bas_do :
                     (rom_addr[14] && !rom_sel[1]) ? xl_pad_do :
                      rom_addr[14] ? (rom_sel[0] ? osb_pad_do : osa_pad_do) : 8'hFF;
+
+reg load_reset = 0;
+always @(posedge clk_sys) begin
+	integer load_reset_timeout = 0;
+	reg old_download = 0;
+	reg load_reset_required = 0;
+
+	if (old_download && !ioctl_download)
+	begin
+		load_reset <= load_reset_required;
+		load_reset_required <= 0;
+		load_reset_timeout <= 0;
+	end
+	else if(load_reset_timeout < 1000)
+		load_reset_timeout <= load_reset_timeout + 1;
+	else
+		load_reset <= 0;
+
+	if (ioctl_download)
+		load_reset_required <= (ioctl_index[5:0] == 4 && (!status[2] || !rom_sel[1])) || (ioctl_index[5:0] == 5 && (!status[2:1] || !rom_sel[1:0])) || ((status[2] || rom_sel[1]) && ((ioctl_index[5:0] == 6 && (!status[1] || !rom_sel[0])) || (ioctl_index[5:0] == 7 && (status[1] || rom_sel[0]))));
+
+	old_download <= ioctl_download & load_sys_rom;
+end
 
 //////////////////   SD   ///////////////////
 
