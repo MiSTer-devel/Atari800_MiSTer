@@ -16,6 +16,7 @@ struct CartDef {
 #define TC_MODE_ATARIMAX1       0x02           // 8k using Atarimax 1MBit compatible banking
 #define TC_MODE_ATARIMAX8       0x03           // 8k using Atarimax 8MBit compatible banking
 #define TC_MODE_ATARIMAX8_2     0x10           // 8k using Atarimax 8MBit compatible banking (new type)
+#define TC_MODE_DCART           0x11           // 512K DCart
 #define TC_MODE_OSS_16          0x04           // 16k OSS cart, M091 banking
 
 #define TC_MODE_SDX64           0x08           // SDX 64k cart, $D5Ex banking
@@ -104,6 +105,7 @@ static struct CartDef cartdef[] =
 	{ 75, "Atarimax 8Mb NT\x00", TC_MODE_ATARIMAX8_2,1024 },
 	{ 76, "Williams 16K   \x00", TC_MODE_WILLIAMS16, 16 },
 	{ 83, "SIC+ 1024K     \x00", TC_MODE_SIC_1024,  1024 },
+	{112, "DCART 512K     \x00", TC_MODE_DCART,     512 },
 	{ 0, "", 0, 0 }
 };
 

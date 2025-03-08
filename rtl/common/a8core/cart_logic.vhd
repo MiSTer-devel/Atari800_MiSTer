@@ -73,7 +73,7 @@ constant cart_mode_williams_32:	cart_mode_type := "001110";
 constant cart_mode_williams_16:	cart_mode_type := "001111";
 
 constant cart_mode_atarimax8n:	cart_mode_type := "010000";
-constant cart_mode_dcart:	cart_mode_type := "010001"; -- TODO
+constant cart_mode_dcart:	cart_mode_type := "010001";
 constant cart_mode_blizzard_4:	cart_mode_type := "010010"; -- TODO
 constant cart_mode_blizzard_32:	cart_mode_type := "010011"; -- TODO
 
@@ -186,6 +186,9 @@ begin
 			-- bit 7 = 0 means flash is write protected
 			cctl_dout <= "0" & (not sic_axxx_enable) & sic_8xxx_enable & cfg_bank(18 downto 14);
 		end if;
+		if (rw = '1') and (cart_mode = cart_mode_dcart) then
+			cctl_dout_enable <= true;
+		end if;
 	end if;
 end process config_io;
 
@@ -287,6 +290,11 @@ begin
 							cfg_bank(19 downto 14) <= d_in(7)&d_in(4 downto 0);
 						end if;
 					end if;
+					-- dcart
+					if (cart_mode = cart_mode_dcart) then
+						cfg_enable <= not a(7);
+						cfg_bank(18 downto 13) <= a(5 downto 0);
+					end if;
 				end if; -- rw = 0
 				
 				-- cart config using addresses, ignore read/write
@@ -377,7 +385,8 @@ begin
 
 	case cart_mode is
 	when cart_mode_8k |
-	     cart_mode_atarimax1 | cart_mode_atarimax8 | cart_mode_atarimax8n | 
+	     cart_mode_atarimax1 | cart_mode_atarimax8 | cart_mode_atarimax8n |
+	     cart_mode_dcart | 
 	     cart_mode_atrax_128 | cart_mode_williams_64 | cart_mode_williams_32 | cart_mode_williams_16 |
 	     cart_mode_sdx64 | cart_mode_diamond64 | cart_mode_express64 =>
 		null;

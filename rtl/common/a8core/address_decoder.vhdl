@@ -880,11 +880,21 @@ end generate;
 						else
 							-- read only from emulated
 							if emu_cart_cctl_dout_enable then
-								MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
+								if cart_select = "010001" then -- DCART special case
+									SDRAM_ADDR <= SDRAM_CART_ADDR;
+									-- read from B5xx
+									SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
+									MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+									request_complete <= sdram_request_COMPLETE;
+									sdram_chip_select <= start_request;
+								else
+									MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
+									request_complete <= '1';
+								end if;
 							else
 								MEMORY_DATA_INT(7 downto 0) <= x"ff";
+								request_complete <= '1';
 							end if;
-							request_complete <= '1';
 						end if;
 					end if;
 					
