@@ -57,21 +57,44 @@ constant cart_mode_off:		cart_mode_type := "000000";
 constant cart_mode_8k:		cart_mode_type := "000001";
 constant cart_mode_atarimax1:	cart_mode_type := "000010";
 constant cart_mode_atarimax8:	cart_mode_type := "000011";
-constant cart_mode_oss:		cart_mode_type := "000100";
+constant cart_mode_oss_16k:	cart_mode_type := "000100";
+constant cart_mode_oss_8k:	cart_mode_type := "000101"; -- TODO
+constant cart_mode_oss_043M:	cart_mode_type := "000110"; -- TODO
+constant cart_mode_oss_034M:	cart_mode_type := "000111"; -- TODO
 
 constant cart_mode_sdx64:	cart_mode_type := "001000";
-constant cart_mode_diamond64:	cart_mode_type := "001001";
-constant cart_mode_express64:	cart_mode_type := "001010";
+constant cart_mode_sdx128:	cart_mode_type := "001001"; -- TODO
+constant cart_mode_diamond64:	cart_mode_type := "001010";
+constant cart_mode_express64:	cart_mode_type := "001011";
 
 constant cart_mode_atrax_128:	cart_mode_type := "001100";
 constant cart_mode_williams_64:	cart_mode_type := "001101";
+constant cart_mode_williams_32:	cart_mode_type := "001110";
+constant cart_mode_williams_16:	cart_mode_type := "001111";
+
+constant cart_mode_atarimax8n:	cart_mode_type := "010000";
+constant cart_mode_dcart:	cart_mode_type := "010001"; -- TODO
+constant cart_mode_blizzard_4:	cart_mode_type := "010010"; -- TODO
+constant cart_mode_blizzard_32:	cart_mode_type := "010011"; -- TODO
+
+constant cart_mode_jatari_8:	cart_mode_type := "011000"; -- TODO
+constant cart_mode_jatari_16:	cart_mode_type := "011001"; -- TODO
+constant cart_mode_jatari_32:	cart_mode_type := "011010"; -- TODO
+constant cart_mode_jatari_64:	cart_mode_type := "011011"; -- TODO
+constant cart_mode_jatari_128:	cart_mode_type := "011100"; -- TODO
+constant cart_mode_jatari_256:	cart_mode_type := "011101"; -- TODO
+constant cart_mode_jatari_512:	cart_mode_type := "011110"; -- TODO
+constant cart_mode_jatari_1024:	cart_mode_type := "011111"; -- TODO
 
 -- 16k modes
 --constant cart_mode_flexi:	cart_mode_type := "100000";
 constant cart_mode_16k:		cart_mode_type := "100001";
 constant cart_mode_megamax16:	cart_mode_type := "100010";
 constant cart_mode_blizzard_16:	cart_mode_type := "100011";
-constant cart_mode_sic:		cart_mode_type := "100100";
+constant cart_mode_sic_128:	cart_mode_type := "100100";
+constant cart_mode_sic_256:	cart_mode_type := "100101";
+constant cart_mode_sic_512:	cart_mode_type := "100110";
+constant cart_mode_sic_1024:	cart_mode_type := "100111";
 
 constant cart_mode_mega_16:	cart_mode_type := "101000";
 constant cart_mode_mega_32:	cart_mode_type := "101001";
@@ -88,6 +111,7 @@ constant cart_mode_xegs_128:	cart_mode_type := "110010";
 constant cart_mode_xegs_256:	cart_mode_type := "110011";
 constant cart_mode_xegs_512:	cart_mode_type := "110100";
 constant cart_mode_xegs_1024:	cart_mode_type := "110101";
+constant cart_mode_xegs_64_2:	cart_mode_type := "110110";
 
 constant cart_mode_sxegs_32:	cart_mode_type := "111000";
 constant cart_mode_sxegs_64:	cart_mode_type := "111001";
@@ -104,6 +128,7 @@ signal oss_bank: std_logic_vector(1 downto 0) := "00";
 -- sic cart 8xxx/axxx enable
 signal sic_8xxx_enable: std_logic := '0';
 signal sic_axxx_enable: std_logic := '1';
+signal disable_rom: std_logic := '0';
 
 signal access_8xxx: boolean;
 signal access_axxx: boolean;
@@ -156,7 +181,7 @@ begin
 
 	if (cctl_n = '0') then
 		-- sic register readback at $D500-$D51F
-		if (rw = '1') and (cart_mode = cart_mode_sic) and (a(7 downto 5) = "000") then
+		if (rw = '1') and (cart_mode(5 downto 2) = "1001") and ((a(7 downto 5) = "000") or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
 			cctl_dout_enable <= true;
 			-- bit 7 = 0 means flash is write protected
 			cctl_dout <= "0" & (not sic_axxx_enable) & sic_8xxx_enable & cfg_bank(18 downto 14);
@@ -173,6 +198,7 @@ begin
 			oss_bank <= "01";
 			sic_8xxx_enable <= '0';
 			sic_axxx_enable <= '1';
+			disable_rom <= '0';
 
 			-- cart specific initialization
 			case cart_mode is
@@ -191,10 +217,14 @@ begin
 						if (cart_mode(3) = '1') then
 							cfg_enable <= not d_in(7);
 						end if;
+						if (cart_mode = cart_mode_xegs_64_2) then
+							disable_rom <= not d_in(3);
+						end if;
+
 						case cart_mode is
 						when cart_mode_xegs_32 | cart_mode_sxegs_32 =>
 							cfg_bank(14 downto 13) <= d_in(1 downto 0);
-						when cart_mode_xegs_64 | cart_mode_sxegs_64 =>
+						when cart_mode_xegs_64 | cart_mode_sxegs_64 | cart_mode_xegs_64_2 =>
 							cfg_bank(15 downto 13) <= d_in(2 downto 0);
 						when cart_mode_xegs_128 | cart_mode_sxegs_128 =>
 							cfg_bank(16 downto 13) <= d_in(3 downto 0);
@@ -241,16 +271,27 @@ begin
 						cfg_enable <= '0';
 					end if;
 					-- sic
-					if (cart_mode = cart_mode_sic) and (a(7 downto 5) = "000") then
+					if (cart_mode(5 downto 2) = "1001") and ((a(7 downto 5) = "000")  or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
 						sic_8xxx_enable <= d_in(5);
 						sic_axxx_enable <= not d_in(6);
-						cfg_bank(18 downto 14) <= d_in(4 downto 0);
+						if (cart_mode = cart_mode_sic_128) then
+							cfg_bank(16 downto 14) <= d_in(2 downto 0);
+						end if;
+						if (cart_mode = cart_mode_sic_256) then
+							cfg_bank(17 downto 14) <= d_in(3 downto 0);
+						end if;
+						if (cart_mode = cart_mode_sic_512) then
+							cfg_bank(18 downto 14) <= d_in(4 downto 0);
+						end if;
+						if (cart_mode = cart_mode_sic_1024) then
+							cfg_bank(19 downto 14) <= d_in(7)&d_in(4 downto 0);
+						end if;
 					end if;
 				end if; -- rw = 0
 				
 				-- cart config using addresses, ignore read/write
 				case cart_mode is
-				when cart_mode_oss =>
+				when cart_mode_oss_16k =>
 					oss_bank <= a(0) & NOT a(3);
 				when cart_mode_atarimax1 =>
 					-- D500-D50F: set bank, enable
@@ -262,7 +303,7 @@ begin
 					if (a(7 downto 4) = x"1") then
 						cfg_enable <= '0';
 					end if;
-				when cart_mode_atarimax8 =>
+				when cart_mode_atarimax8 | cart_mode_atarimax8n =>
 					-- D500-D57F: set bank, enable
 					if (a(7) = '0') then
 						cfg_bank(19 downto 13) <= a(6 downto 0);
@@ -279,10 +320,18 @@ begin
 					else
 						cfg_enable <= '0';
 					end if;
-				when cart_mode_williams_64 =>
+				when cart_mode_williams_64 | cart_mode_williams_32 | cart_mode_williams_16 =>
 					if (a(7 downto 4) = x"0") then
-						cfg_enable <= not a(3);
-						cfg_bank(15 downto 13) <= a(2 downto 0);
+						cfg_enable <= not a(3) ;
+						if ((cart_mode = cart_mode_williams_16) and (a(2 downto 1) = "00")) then
+							cfg_bank(13) <= a(0);
+						end if;
+						if ((cart_mode = cart_mode_williams_32) and (a(2) = '0')) then
+							cfg_bank(14 downto 13) <= a(1 downto 0);
+						end if;
+						if (cart_mode = cart_mode_williams_64) then
+							cfg_bank(15 downto 13) <= a(2 downto 0);
+						end if;
 					end if;
 				when cart_mode_sdx64 =>
 					if (a(7 downto 4) = x"E") then
@@ -323,13 +372,13 @@ begin
 
 	if (cart_mode(5) = '1') then	-- default for 16k carts
 		bool_rd4 := (cfg_enable = '1');
-		cart_address_enable <= (cfg_enable = '1') and (access_8xxx or access_axxx);
+		cart_address_enable <= (cfg_enable = '1') and (access_8xxx or access_axxx) and (disable_rom = '0');
 	end if;
 
 	case cart_mode is
 	when cart_mode_8k |
-	     cart_mode_atarimax1 | cart_mode_atarimax8 | 
-	     cart_mode_atrax_128 | cart_mode_williams_64 |
+	     cart_mode_atarimax1 | cart_mode_atarimax8 | cart_mode_atarimax8n | 
+	     cart_mode_atrax_128 | cart_mode_williams_64 | cart_mode_williams_32 | cart_mode_williams_16 |
 	     cart_mode_sdx64 | cart_mode_diamond64 | cart_mode_express64 =>
 		null;
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
@@ -338,7 +387,7 @@ begin
 		else
 			cart_address(13) <= '1';
 		end if;
-	when cart_mode_oss =>
+	when cart_mode_oss_16k =>
 		if (oss_bank = "00") then
 			bool_rd5 := false;
 			cart_address_enable <= false;
@@ -350,7 +399,7 @@ begin
 		if (access_axxx) then
 			cart_address(14 downto 13) <= (others => '1');
 		end if;
-	when cart_mode_xegs_64 | cart_mode_sxegs_64 =>
+	when cart_mode_xegs_64 | cart_mode_sxegs_64 | cart_mode_xegs_64_2 =>
 		if (access_axxx) then
 			cart_address(15 downto 13) <= (others => '1');
 		end if;
@@ -377,7 +426,7 @@ begin
 		else
 			cart_address(13) <= '1';
 		end if;
-	when cart_mode_sic =>
+	when cart_mode_sic_128 | cart_mode_sic_256 | cart_mode_sic_512 | cart_mode_sic_1024 =>
 		bool_rd4 := (cfg_enable = '1') and (sic_8xxx_enable = '1');
 		bool_rd5 := (cfg_enable = '1') and (sic_axxx_enable = '1');
 		cart_address_enable <= (access_8xxx and (cfg_enable = '1') and (sic_8xxx_enable = '1'))
