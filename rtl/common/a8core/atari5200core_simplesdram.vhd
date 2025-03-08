@@ -56,6 +56,8 @@ ENTITY atari5200core_simplesdram is
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
 
+		CLIP_SIDES : IN STD_LOGIC;
+
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
@@ -276,6 +278,8 @@ PORT MAP
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
+
+	CLIP_SIDES => CLIP_SIDES,
 
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,

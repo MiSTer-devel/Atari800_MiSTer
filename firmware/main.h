@@ -56,6 +56,11 @@ BIT_REG(,0x7,8,ram_select,zpu_out1)
 BIT_REG(,0x3f,17,cart_select,zpu_out1)
 // reserve 2 bits for extending cart_select
 BIT_REG(,0x01,25,freezer_enable,zpu_out1)
+#ifndef FIRMWARE_5200
+BIT_REG(,0x01,26,reset_rnmi,zpu_out1)
+BIT_REG(,0x01,27,drive_led,zpu_out1)
+BIT_REG(,0x01,28,option_force,zpu_out1)
+#endif
 
 BIT_REG_RO(,0x1,0,hotkey_f1,zpu_in1)
 BIT_REG_RO(,0x1,1,hotkey_f2,zpu_in1)
@@ -74,7 +79,11 @@ BIT_REG_RO(,0x1,18,mod_win,zpu_in1)
 BIT_REG_RO(,0x3f,12,controls,zpu_in1) // (esc)FLRDU
 
 BIT_REG_RO(,0x7,0,speeddrv,zpu_in2)
-BIT_REG_RO(,0x7,4,xexloc,zpu_in2)
+#ifndef FIRMWARE_5200
+BIT_REG_RO(,0x1,3,mode800,zpu_in2)
+#endif
+BIT_REG_RO(,0x1,4,xexloc,zpu_in2)
+BIT_REG_RO(,0x1,5,atx1050,zpu_in2)
 
 // file i/o registers
 BIT_REG_RO(,0x1,8,sd_done,zpu_in2)
@@ -96,8 +105,9 @@ void
 wait_us(int unsigned num)
 {
 	// pause counter runs at pokey frequency - should be 1.79MHz
-	int unsigned cycles = (num*230)>>7;
-	*zpu_pause = cycles;
+	//int unsigned cycles = (num*230)>>7;
+	//*zpu_pause = cycles;
+	*zpu_pause = num;
 }
 
 int debug_pos;
@@ -186,24 +196,9 @@ void clear_main_ram()
 }
 
 struct SimpleFile *xex_file;
-int xex_cart;
-
-void try_remove_xex_cart(char hard)
-{
-	if(hard)
-	{
-		xex_file = 0;
-	}
-
-	if(xex_cart)
-	{
-		xex_cart = 0;
-		set_cart_select(0);
-	}
-}
 
 void
-reboot(int cold)
+reboot(int cold, int pause)
 {
 	set_pause_6502(1);
 	if (cold)
@@ -214,15 +209,47 @@ reboot(int cold)
 	else
 	{
 		// Clean up XEX loader stuff in case of soft reset during loading
-		try_remove_xex_cart(1);
+		xex_file = 0;
 	}
-	set_reset_6502(1);
+#ifndef FIRMWARE_5200
+	int rnmi_reset;
+	// Both cold==1 and pause==1 is a special case when 
+	// the XEX loader performs a cold/warm boot to push 
+	// in the loader, in this case on the 800 we just want
+	// the same effect as pressing the RESET (so soft)
+	// while we actually mean a power cycle with forced
+	// OS initialization. (In other words, on 800 a power
+	// cycle does not allow to pre-init the OS to do a warm
+	// start, it will always be cold).
+
+	rnmi_reset = get_mode800() && (!cold || pause);
+
+	if(rnmi_reset)
+	{
+		set_reset_rnmi(1);		
+	}
+	else
+	{
+#endif
+		set_reset_6502(1);
+#ifndef FIRMWARE_5200
+	}
 	// Do nothing in here - this resets the memory controller!
-	set_reset_6502(0);
-	set_pause_6502(0);
+	if(rnmi_reset)
+	{
+		set_reset_rnmi(0);		
+	}
+	else
+	{
+#endif
+		set_reset_6502(0);
+#ifndef FIRMWARE_5200
+	}
+#endif
+	set_pause_6502(pause);
 }
 
-#define NUM_FILES 8
+#define NUM_FILES 7
 struct SimpleFile files[NUM_FILES];
 
 int last_mount;
@@ -255,7 +282,6 @@ int main(void)
 
 	last_mount = 0;
 	xex_file = 0;
-	xex_cart = 0;
 	mainloop();
 	return 0;
 }

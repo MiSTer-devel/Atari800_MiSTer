@@ -155,6 +155,9 @@ ENTITY atari800core_simple_sdram is
 		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
 		EXT_ANTIC : in STD_LOGIC;
+		CLIP_SIDES : in STD_LOGIC;
+		RESET_RNMI : in STD_LOGIC;
+		ATARI800MODE : in STD_LOGIC := '0';
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
 		emulated_cartridge_select: in std_logic_vector(5 downto 0);
@@ -218,7 +221,7 @@ CA2_IN <= CA2_OUT when CA2_DIR_OUT='1' else '1';
 CB2_IN <= CB2_OUT when CB2_DIR_OUT='1' else '1';
 SIO_COMMAND <= CB2_OUT;
 SIO_MOTOR <= CA2_OUT;
-PORTA_IN <= ((JOY2_n(3)&JOY2_n(2)&JOY2_n(1)&JOY2_n(0)&JOY1_n(3)&JOY1_n(2)&JOY1_n(1)&JOY1_n(0)) and not (porta_dir_out)) or (porta_dir_out and porta_out);
+PORTA_IN <= (not(PORTA_DIR_OUT) or PORTA_OUT) and (JOY2_n(3)&JOY2_n(2)&JOY2_n(1)&JOY2_n(0)&JOY1_n(3)&JOY1_n(2)&JOY1_n(1)&JOY1_n(0));
 PORTB_IN <= PORTB_OUT;
 
 -- ANTIC lightpen
@@ -413,6 +416,7 @@ PORT MAP
 	
 	ANTIC_LIGHTPEN => ANTIC_LIGHTPEN,
 	ANTIC_REFRESH => SDRAM_REFRESH,
+	ANTIC_RNMI_N => not(RESET_RNMI),
 
 	SDRAM_REQUEST => SDRAM_REQUEST,
 	SDRAM_REQUEST_COMPLETE => SDRAM_REQUEST_COMPLETE,
@@ -446,6 +450,8 @@ PORT MAP
 	CART_EMULATION_SELECT => emulated_cartridge_select,
 	PAL => PAL,
 	EXT_ANTIC => EXT_ANTIC,
+	CLIP_SIDES => CLIP_SIDES,
+	ATARI800MODE => ATARI800MODE,
 	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT,

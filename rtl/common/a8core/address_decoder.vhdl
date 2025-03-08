@@ -786,6 +786,7 @@ end generate;
 				request_complete <= ram_request_COMPLETE;
 			end if;
 		else
+			-- last_bus_reg seems to be the way to go here afterall
 			MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 			request_complete <= '1';
 		end if;

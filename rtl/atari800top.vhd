@@ -21,6 +21,7 @@ PORT
 
 	PAL        : IN  STD_LOGIC;
 	EXT_ANTIC  : IN  STD_LOGIC;
+	CLIP_SIDES : IN  STD_LOGIC;
 	VGA_VS     : OUT STD_LOGIC;
 	VGA_HS     : OUT STD_LOGIC;
 	VGA_BLANK  : OUT STD_LOGIC;
@@ -52,7 +53,12 @@ PORT
 	CPU_SPEED  : IN  STD_LOGIC_VECTOR(5 downto 0);
 	RAM_SIZE   : IN  STD_LOGIC_VECTOR(2 downto 0);
 	DRV_SPEED  : IN  STD_LOGIC_VECTOR(2 downto 0);
-	XEX_LOC    : IN  STD_LOGIC_VECTOR(2 downto 0);
+	XEX_LOC    : IN  STD_LOGIC;
+	OS_MODE_800   : IN  STD_LOGIC;
+	ATX_MODE   : IN  STD_LOGIC;
+	DRIVE_LED  : OUT STD_LOGIC;
+	WARM_RESET_MENU : IN STD_LOGIC;
+	COLD_RESET_MENU : IN STD_LOGIC;
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -155,6 +161,8 @@ signal end_command : std_logic;
 
 -- system control from zpu
 signal reset_atari : std_logic;
+signal reset_rnmi_atari : std_logic;
+signal option_force : std_logic;
 signal pause_atari : std_logic;
 signal emulated_cartridge_select: std_logic_vector(5 downto 0);
 
@@ -171,6 +179,8 @@ signal paddle_2 : std_logic_vector(2 downto 0);
 
 signal areset_n   : std_logic;
 signal option_tmp : std_logic;
+signal warm_reset_request : std_logic;
+signal cold_reset_request : std_logic;
 
 signal RAM_DATA : std_logic_vector(31 downto 0);
 
@@ -190,6 +200,8 @@ begin
 			paddle_2 <= "000";
 			cnt := 0;
 			option_tmp <= '0';
+			warm_reset_request <= '0';
+			cold_reset_request <= '0';
 		else
 			if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
 			if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
@@ -203,10 +215,12 @@ begin
 			
 			if cnt < 150000000 then
 				cnt := cnt + 1;
-				option_tmp <= option_tmp or JOY(5);
+				option_tmp <= option_tmp or option_force or JOY(5);
 			else
 				option_tmp <= '0';
 			end if;
+			warm_reset_request <= not(reset_rnmi_atari) and (warm_reset_request or warm_reset_menu);
+			cold_reset_request <= cold_reset_request or cold_reset_menu;
 		end if;
 
 		old_reset := areset_n;
@@ -325,6 +339,9 @@ PORT MAP
 	RAM_SELECT => RAM_SIZE,
 	PAL => PAL,
 	EXT_ANTIC => EXT_ANTIC,
+	CLIP_SIDES => CLIP_SIDES,
+	RESET_RNMI => reset_rnmi_atari,
+	ATARI800MODE => OS_MODE_800,
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
 	emulated_cartridge_select => emulated_cartridge_select,
@@ -429,8 +446,8 @@ PORT MAP
 	ZPU_IN1 => X"000"&
 			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&FKEYS(9 downto 0),
-	ZPU_IN2 => X"0000"& ZPU_IN2 & '0' & XEX_LOC & '0' & DRV_SPEED,
+			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&(FKEYS(9) or cold_reset_request)&(FKEYS(8) or warm_reset_request)&FKEYS(7 downto 0),
+	ZPU_IN2 => X"0000"& ZPU_IN2 & "00" & ATX_MODE & XEX_LOC & OS_MODE_800 & DRV_SPEED,
 	ZPU_IN3 => ZPU_IN3,
 	ZPU_IN4 => X"00000000",
 	
@@ -447,6 +464,9 @@ pause_atari <= zpu_out1(0);
 reset_atari <= zpu_out1(1);
 emulated_cartridge_select <= zpu_out1(22 downto 17);
 freezer_enable <= zpu_out1(25);
+reset_rnmi_atari <= zpu_out1(26);
+DRIVE_LED <= zpu_out1(27);
+option_force <= zpu_out1(28);
 
 CPU_HALT <= pause_atari;
 

@@ -45,6 +45,8 @@ ENTITY atari5200core IS
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
 
+		CLIP_SIDES : IN STD_LOGIC;
+
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
@@ -424,6 +426,7 @@ PORT MAP(CLK => CLK,
 		 CPU_ENABLE_ORIGINAL => ENABLE_179_MEMWAIT, -- for subsequent pmg fetches
 		 RESET_N => RESET_N,
 		 PAL => '0',
+		 CLIP_SIDES => CLIP_SIDES,
 		 ENABLE_179 => ANTIC_ENABLE_179,
 		 COLOUR_CLOCK_ORIGINAL => ANTIC_ORIGINAL_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK => ANTIC_COLOUR_CLOCK_OUT,
