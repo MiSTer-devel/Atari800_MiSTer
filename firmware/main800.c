@@ -18,9 +18,10 @@ struct CartDef {
 #define TC_MODE_ATARIMAX8_2     0x10           // 8k using Atarimax 8MBit compatible banking (new type)
 #define TC_MODE_DCART           0x11           // 512K DCart
 #define TC_MODE_OSS_16          0x04           // 16k OSS cart, M091 banking
+#define TC_MODE_OSS_8           0x05           // 8k OSS cart, M091 banking
 
 #define TC_MODE_SDX64           0x08           // SDX 64k cart, $D5Ex banking
-//#define TC_MODE_SDX128           0x09           // SDX 128k cart, $D5Ex banking
+#define TC_MODE_SDX128          0x09           // SDX 128k cart, $D5Ex banking
 #define TC_MODE_DIAMOND64       0x0A           // Diamond GOS 64k cart, $D5Dx banking
 #define TC_MODE_EXPRESS64       0x0B           // Express 64k cart, $D57x banking
 
@@ -70,7 +71,7 @@ static struct CartDef cartdef[] =
 	{ 8,  "Williams 64K   \x00", TC_MODE_WILLIAMS64, 64 },
 	{ 9,  "Express 64K    \x00", TC_MODE_EXPRESS64,  64 },
 	{ 10, "Diamond 64K    \x00", TC_MODE_DIAMOND64,  64 },
-	{ 11, "SpartaDOS X 64K\x00", TC_MODE_SDX64,      64 },
+	{ 11, "SpartaDOSX 64K \x00", TC_MODE_SDX64,      64 },
 	{ 12, "XEGS 32K       \x00", TC_MODE_XEGS_32,    32 },
 	{ 13, "XEGS 64K (0-7) \x00", TC_MODE_XEGS_64,    64 },
 	{ 14, "XEGS 128K      \x00", TC_MODE_XEGS_128,  128 },
@@ -96,6 +97,8 @@ static struct CartDef cartdef[] =
 	{ 40, "Blizzard 16K   \x00", TC_MODE_BLIZZARD,   16 },
 	{ 41, "Atarimax 128K  \x00", TC_MODE_ATARIMAX1, 128 },
 	{ 42, "Atarimax 1024K \x00", TC_MODE_ATARIMAX8,1024 },
+	{ 43, "SpartaDOSX 128K\x00", TC_MODE_SDX128,    128 },
+	{ 44, "OSS 1 Chip 8K  \x00", TC_MODE_OSS_8,       8 },
 	{ 54, "SIC 128K       \x00", TC_MODE_SIC_128,   128 },
 	{ 55, "SIC 256K       \x00", TC_MODE_SIC_256,   256 },
 	{ 56, "SIC 512K       x00", TC_MODE_SIC_512,   512 },

@@ -58,12 +58,12 @@ constant cart_mode_8k:		cart_mode_type := "000001";
 constant cart_mode_atarimax1:	cart_mode_type := "000010";
 constant cart_mode_atarimax8:	cart_mode_type := "000011";
 constant cart_mode_oss_16k:	cart_mode_type := "000100";
-constant cart_mode_oss_8k:	cart_mode_type := "000101"; -- TODO
+constant cart_mode_oss_8k:	cart_mode_type := "000101";
 constant cart_mode_oss_043M:	cart_mode_type := "000110"; -- TODO
-constant cart_mode_oss_034M:	cart_mode_type := "000111"; -- TODO
+constant cart_mode_oss_034M:	cart_mode_type := "000111"; -- TODO Fake it and repair in FW?
 
 constant cart_mode_sdx64:	cart_mode_type := "001000";
-constant cart_mode_sdx128:	cart_mode_type := "001001"; -- TODO
+constant cart_mode_sdx128:	cart_mode_type := "001001";
 constant cart_mode_diamond64:	cart_mode_type := "001010";
 constant cart_mode_express64:	cart_mode_type := "001011";
 
@@ -123,7 +123,7 @@ constant cart_mode_sxegs_1024:	cart_mode_type := "111101";
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
 
 -- OSS cart emulation
-signal oss_bank: std_logic_vector(1 downto 0) := "00";
+signal oss_bank: std_logic_vector(2 downto 0) := "000";
 
 -- sic cart 8xxx/axxx enable
 signal sic_8xxx_enable: std_logic := '0';
@@ -198,7 +198,7 @@ begin
 		if (reset_n = '0') then
 			cfg_bank <= (others => '0');
 			cfg_enable <= '1';
-			oss_bank <= "01";
+			oss_bank <= "001";
 			sic_8xxx_enable <= '0';
 			sic_axxx_enable <= '1';
 			disable_rom <= '0';
@@ -207,6 +207,8 @@ begin
 			case cart_mode is
 			when cart_mode_atarimax8 =>
 				cfg_bank <= x"7F"; -- startup in last bank
+			when cart_mode_oss_043M =>
+				oss_bank <= "000";
 			when others => null;
 			end case;
 		else
@@ -299,8 +301,8 @@ begin
 				
 				-- cart config using addresses, ignore read/write
 				case cart_mode is
-				when cart_mode_oss_16k =>
-					oss_bank <= a(0) & NOT a(3);
+				when cart_mode_oss_16k | cart_mode_oss_8k =>
+					oss_bank(1 downto 0) <= a(0) & NOT a(3);
 				when cart_mode_atarimax1 =>
 					-- D500-D50F: set bank, enable
 					if (a(7 downto 4) = x"0") then
@@ -342,10 +344,17 @@ begin
 						end if;
 					end if;
 				when cart_mode_sdx64 =>
+					-- enable the other cartridge - not a(2) and a(3)
 					if (a(7 downto 4) = x"E") then
 						cfg_enable <= not a(3);
 						cfg_bank(15 downto 13) <= not a(2 downto 0);
 					end if;
+				when cart_mode_sdx128 =>
+					-- enable the other cartridge - not a(2) and a(3)
+					if (a(7 downto 5) = "111") then
+						cfg_enable <= not a(3);
+						cfg_bank(16 downto 13) <= not a(4) & not a(2 downto 0);
+					end if;				
 				when cart_mode_diamond64 =>
 					if (a(7 downto 4) = x"D") then
 						cfg_enable <= not a(3);
@@ -388,7 +397,7 @@ begin
 	     cart_mode_atarimax1 | cart_mode_atarimax8 | cart_mode_atarimax8n |
 	     cart_mode_dcart | 
 	     cart_mode_atrax_128 | cart_mode_williams_64 | cart_mode_williams_32 | cart_mode_williams_16 |
-	     cart_mode_sdx64 | cart_mode_diamond64 | cart_mode_express64 =>
+	     cart_mode_sdx64 | cart_mode_sdx128 | cart_mode_diamond64 | cart_mode_express64 =>
 		null;
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
 		if (access_8xxx) then
@@ -396,12 +405,14 @@ begin
 		else
 			cart_address(13) <= '1';
 		end if;
-	when cart_mode_oss_16k =>
-		if (oss_bank = "00") then
+	when cart_mode_oss_16k | cart_mode_oss_8k =>
+		if (oss_bank(1 downto 0) = "00") then
 			bool_rd5 := false;
 			cart_address_enable <= false;
 		else
-			cart_address(13) <= oss_bank(1) and (not a(12));
+			if (cart_mode = cart_mode_oss_16k) then
+				cart_address(13) <= oss_bank(1) and (not a(12));
+			end if;
 			cart_address(12) <= oss_bank(0) and (not a(12));
 		end if;
 	when cart_mode_xegs_32 |cart_mode_sxegs_32 =>
