@@ -59,8 +59,8 @@ constant cart_mode_atarimax1:	cart_mode_type := "000010";
 constant cart_mode_atarimax8:	cart_mode_type := "000011";
 constant cart_mode_oss_16k:	cart_mode_type := "000100";
 constant cart_mode_oss_8k:	cart_mode_type := "000101";
-constant cart_mode_oss_043M:	cart_mode_type := "000110"; -- TODO
-constant cart_mode_oss_034M:	cart_mode_type := "000111"; -- TODO Fake it and repair in FW?
+constant cart_mode_oss_043M:	cart_mode_type := "000110";
+--constant cart_mode_oss_034M:	cart_mode_type := "000111";
 
 constant cart_mode_sdx64:	cart_mode_type := "001000";
 constant cart_mode_sdx128:	cart_mode_type := "001001";
@@ -301,6 +301,28 @@ begin
 				
 				-- cart config using addresses, ignore read/write
 				case cart_mode is
+				when cart_mode_oss_043M =>
+					if a(3) = '1' then
+						-- disable everything
+						oss_bank <= "111";
+					else
+						case a(1 downto 0) is
+						when "10" =>
+							-- lower bank floats
+							oss_bank <= "110";
+						-- valid bank from 0 to 5 (3 never used)
+						when "01" =>
+							-- unuseful banks that are AND-ed
+							-- #4 & #5 - firmware is responsible for prepping these
+							oss_bank <= "10" & a(2);
+						when "00" =>
+							-- banks 0 or 1
+							oss_bank <= "00" & a(2);
+						when "11" =>
+							-- bank 2
+							oss_bank <= "010";
+						end case;
+					end if;
 				when cart_mode_oss_16k | cart_mode_oss_8k =>
 					oss_bank(1 downto 0) <= a(0) & NOT a(3);
 				when cart_mode_atarimax1 =>
@@ -404,6 +426,23 @@ begin
 			cart_address(13) <= '0';
 		else
 			cart_address(13) <= '1';
+		end if;
+	when cart_mode_oss_043M =>
+		if (oss_bank = "111") then
+			bool_rd5 := false;
+			cart_address_enable <= false;
+		else
+			if (a(12) = '1') then
+				-- always bank 3
+				cart_address(13 downto 12) <= "11";
+			else
+				if (oss_bank(2 downto 1) = "11") then
+					-- ROM disconnected
+					cart_address_enable <= false;
+				else
+					cart_address(14 downto 12) <= oss_bank;
+				end if;
+			end if;
 		end if;
 	when cart_mode_oss_16k | cart_mode_oss_8k =>
 		if (oss_bank(1 downto 0) = "00") then

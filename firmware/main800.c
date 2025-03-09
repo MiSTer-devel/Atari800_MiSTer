@@ -19,6 +19,7 @@ struct CartDef {
 #define TC_MODE_DCART           0x11           // 512K DCart
 #define TC_MODE_OSS_16          0x04           // 16k OSS cart, M091 banking
 #define TC_MODE_OSS_8           0x05           // 8k OSS cart, M091 banking
+#define TC_MODE_OSS_043M        0x06           // 16k OSS cart, 043M banking
 
 #define TC_MODE_SDX64           0x08           // SDX 64k cart, $D5Ex banking
 #define TC_MODE_SDX128          0x09           // SDX 128k cart, $D5Ex banking
@@ -68,6 +69,10 @@ static struct CartDef cartdef[] =
 {
 	{ 1,  "Standard 8K    \x00", TC_MODE_8K,          8 },
 	{ 2,  "Standard 16K   \x00", TC_MODE_16K,        16 },
+	// This below is intentional, for 034M carts we fix them
+	// (we also need to add 2 extra fake AND-ed banks for 
+	// both 043M and 034M)
+	{ 3,  "OSS 2 Chip 034M\x00", TC_MODE_OSS_043M,   16 },
 	{ 8,  "Williams 64K   \x00", TC_MODE_WILLIAMS64, 64 },
 	{ 9,  "Express 64K    \x00", TC_MODE_EXPRESS64,  64 },
 	{ 10, "Diamond 64K    \x00", TC_MODE_DIAMOND64,  64 },
@@ -99,9 +104,10 @@ static struct CartDef cartdef[] =
 	{ 42, "Atarimax 1024K \x00", TC_MODE_ATARIMAX8,1024 },
 	{ 43, "SpartaDOSX 128K\x00", TC_MODE_SDX128,    128 },
 	{ 44, "OSS 1 Chip 8K  \x00", TC_MODE_OSS_8,       8 },
+	{ 45, "OSS 2 Chip 043M\x00", TC_MODE_OSS_043M,   16 },
 	{ 54, "SIC 128K       \x00", TC_MODE_SIC_128,   128 },
 	{ 55, "SIC 256K       \x00", TC_MODE_SIC_256,   256 },
-	{ 56, "SIC 512K       x00", TC_MODE_SIC_512,   512 },
+	{ 56, "SIC 512K       \x00", TC_MODE_SIC_512,   512 },
 	{ 61, "MegaMax 2048K  \x00", TC_MODE_MEGAMAX16,2048 },
 	{ 64, "MegaCart 2048K \x00", TC_MODE_MEGA_2048,2048 },
 	{ 67, "XEGS 64K (8-15)\x00", TC_MODE_XEGS_64_2,  64 },
@@ -116,6 +122,7 @@ char comp[sizeof(cartdef)/sizeof(cartdef[0])];
 
 int load_car(struct SimpleFile* file)
 {
+	int i;
 	if (CARTRIDGE_MEM == 0)
 	{
 		//LOG("no cartridge memory\n");
@@ -127,18 +134,20 @@ int load_car(struct SimpleFile* file)
 
 	enum SimpleFileStatus ok;
 	unsigned char mode = TC_MODE_OFF;
+	unsigned char carttype;
 	int len;
 	
 	unsigned int byte_len = file_size(file);
 	if(!(byte_len & 0x3FF))
 	{
-		int i, sel, n = 0;
+		int sel, n = 0;
 		unsigned int sz = (byte_len>>10);
 		
 		for(i=0;i<sizeof(cartdef)/sizeof(cartdef[0]); i++) if(sz == cartdef[i].size)
 		{
 			comp[n++] = i;
 			mode = cartdef[i].mode;
+			carttype = cartdef[i].carttype;
 		}
 		
 		if(!n) return 0;
@@ -172,6 +181,7 @@ int load_car(struct SimpleFile* file)
 				if (joy.fire_)
 				{
 					mode = cartdef[comp[sel]].mode;
+					carttype = cartdef[comp[sel]].carttype;
 					break;
 				}
 				
@@ -189,7 +199,7 @@ int load_car(struct SimpleFile* file)
 			//LOG("cannot read cart header\n");
 			return 0;
 		}
-		unsigned char carttype = header[7];
+		carttype = header[7];
 
 		// search for cartridge definition
 		struct CartDef* def = cartdef;
@@ -212,6 +222,25 @@ int load_car(struct SimpleFile* file)
 		return 0;
 	}
 
+	// OSS 034M -> fix the broken bank layout to make it 043M
+	if(carttype == 3)
+	{
+		memcp8((unsigned char *)(CARTRIDGE_MEM+0x1000), (unsigned char *)(CARTRIDGE_MEM+0x4000), 0, 0x1000);
+		memcp8((unsigned char *)(CARTRIDGE_MEM+0x2000), (unsigned char *)(CARTRIDGE_MEM+0x1000), 0, 0x1000);
+		memcp8((unsigned char *)(CARTRIDGE_MEM+0x4000), (unsigned char *)(CARTRIDGE_MEM+0x2000), 0, 0x1000);
+		carttype = 45;
+	}
+	
+	// OSS 043M -> we fake two AND blocks here, there is probably no SW 
+	// that relies on this, but this is what the spec says
+	if(carttype == 45)
+	{
+		for(i=0; i < 0x1000; i++)
+		{
+			*((unsigned char *)(CARTRIDGE_MEM+0x4000+i)) = *((unsigned char *)(CARTRIDGE_MEM+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM+0x0000+i));
+			*((unsigned char *)(CARTRIDGE_MEM+0x5000+i)) = *((unsigned char *)(CARTRIDGE_MEM+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM+0x1000+i));
+		}
+	}
 	//LOG("cart type: %d size: %dk\n", def->mode, def->size);
 	return mode;
 }
