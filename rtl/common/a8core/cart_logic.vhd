@@ -74,7 +74,7 @@ constant cart_mode_williams_16:	cart_mode_type := "001111";
 
 constant cart_mode_atarimax8n:	cart_mode_type := "010000";
 constant cart_mode_dcart:	cart_mode_type := "010001";
-constant cart_mode_blizzard_4:	cart_mode_type := "010010"; -- TODO
+constant cart_mode_blizzard_4:	cart_mode_type := "010010";
 constant cart_mode_blizzard_32:	cart_mode_type := "010011"; -- TODO
 
 constant cart_mode_jatari_8:	cart_mode_type := "011000"; -- TODO
@@ -272,7 +272,7 @@ begin
 						cfg_bank(16 downto 13)<= d_in(3 downto 0);
 					end if;
 					-- blizzard
-					if (cart_mode = cart_mode_blizzard_16) then
+					if (cart_mode = cart_mode_blizzard_16) or (cart_mode = cart_mode_blizzard_4) then
 						cfg_enable <= '0';
 					end if;
 					-- sic
@@ -421,6 +421,8 @@ begin
 	     cart_mode_atrax_128 | cart_mode_williams_64 | cart_mode_williams_32 | cart_mode_williams_16 |
 	     cart_mode_sdx64 | cart_mode_sdx128 | cart_mode_diamond64 | cart_mode_express64 =>
 		null;
+	when cart_mode_blizzard_4 =>
+		cart_address(12) <= '0';
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
 		if (access_8xxx) then
 			cart_address(13) <= '0';

@@ -41,6 +41,8 @@ struct CartDef {
 #define TC_MODE_SIC_512         0x26           // Sic!Cart 512k
 #define TC_MODE_SIC_1024        0x27           // Sic!Cart+ 1024k
 
+#define TC_MODE_BLIZZARD_4      0x12           // Blizzard 4k
+
 #define TC_MODE_MEGA_16         0x28           // switchable MegaCarts
 #define TC_MODE_MEGA_32         0x29
 #define TC_MODE_MEGA_64         0x2A
@@ -105,6 +107,7 @@ static struct CartDef cartdef[] =
 	{ 43, "SpartaDOSX 128K\x00", TC_MODE_SDX128,    128 },
 	{ 44, "OSS 1 Chip 8K  \x00", TC_MODE_OSS_8,       8 },
 	{ 45, "OSS 2 Chip 043M\x00", TC_MODE_OSS_043M,   16 },
+	{ 46, "Blizzard 4K    \x00", TC_MODE_BLIZZARD_4,  4 },
 	{ 54, "SIC 128K       \x00", TC_MODE_SIC_128,   128 },
 	{ 55, "SIC 256K       \x00", TC_MODE_SIC_256,   256 },
 	{ 56, "SIC 512K       \x00", TC_MODE_SIC_512,   512 },
