@@ -164,7 +164,7 @@ signal reset_atari : std_logic;
 signal reset_rnmi_atari : std_logic;
 signal option_force : std_logic;
 signal pause_atari : std_logic;
-signal emulated_cartridge_select: std_logic_vector(5 downto 0);
+signal emulated_cartridge_select: std_logic_vector(7 downto 0);
 
 -- ps2
 signal PS2_KEYS : STD_LOGIC_VECTOR(511 downto 0);
@@ -462,7 +462,7 @@ PORT MAP
 
 pause_atari <= zpu_out1(0);
 reset_atari <= zpu_out1(1);
-emulated_cartridge_select <= zpu_out1(22 downto 17);
+emulated_cartridge_select <= zpu_out1(24 downto 17);
 freezer_enable <= zpu_out1(25);
 reset_rnmi_atari <= zpu_out1(26);
 DRIVE_LED <= zpu_out1(27);

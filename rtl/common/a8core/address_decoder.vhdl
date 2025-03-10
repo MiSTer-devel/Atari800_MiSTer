@@ -73,7 +73,7 @@ PORT
 
 	atari800mode : in std_logic := '0';
 	
-	cart_select : in std_logic_vector(5 downto 0);
+	cart_select : in std_logic_vector(7 downto 0);
 	
 	ram_select : in std_logic_vector(2 downto 0);
 	
@@ -224,14 +224,14 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart_rw: std_logic;
 	signal emu_cart_s4_n: std_logic;
 	signal emu_cart_s5_n: std_logic;
-	signal emu_cart_s4_n_out: std_logic;
-	signal emu_cart_s5_n_out: std_logic;
+	--signal emu_cart_s4_n_out: std_logic;
+	--signal emu_cart_s5_n_out: std_logic;
 	signal emu_cart_rd4: std_logic;
 	signal emu_cart_rd5: std_logic;
 	signal emu_cart_address: std_logic_vector(20 downto 0);
 	signal emu_cart_address_enable: boolean;
 	signal emu_cart_cctl_dout: std_logic_vector(7 downto 0);
-	signal emu_cart_cctl_dout_enable: boolean;
+	signal emu_cart_cctl_dout_enable: std_logic_vector(1 downto 0);
 
 	signal atari_clk_enable: std_logic;
 	signal freezer_disable_atari: boolean;
@@ -329,7 +329,7 @@ BEGIN
 	emu_cart: entity work.CartLogic
 	port map (clk => clk,
 		clk_enable => atari_clk_enable,
-		cart_mode => cart_select(5 downto 0),
+		cart_mode => cart_select(7 downto 0),
 		a => addr_next(12 downto 0),
 		cctl_n => emu_cart_cctl_n,
 		d_in => data_write_next(7 downto 0),
@@ -348,7 +348,7 @@ BEGIN
 
 	process(cart_select)
 	begin
-		if (cart_select(5 downto 0) = "000000") then
+		if (cart_select(7 downto 0) = "00000000") then
 			emu_cart_enable <= '0';
 		else
 			emu_cart_enable <= '1';
@@ -879,8 +879,8 @@ end generate;
 							request_complete <= '1';
 						else
 							-- read only from emulated
-							if emu_cart_cctl_dout_enable then
-								if cart_select = "010001" then -- DCART special case
+							if emu_cart_cctl_dout_enable /= "00" then
+								if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
 									SDRAM_ADDR <= SDRAM_CART_ADDR;
 									-- read from B5xx
 									SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);

@@ -190,7 +190,7 @@ ENTITY atari800core IS
    		RAM_SELECT : in std_logic_vector(2 downto 0); 
 			-- XL/XE mode  : 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 			-- 400/800 mode: 16K,32K,48K,52K,...? 
-		CART_EMULATION_SELECT : in std_logic_vector(5 downto 0);
+		CART_EMULATION_SELECT : in std_logic_vector(7 downto 0);
 		PAL :  in STD_LOGIC;
 		EXT_ANTIC :  in STD_LOGIC;
 		CLIP_SIDES : in STD_LOGIC;

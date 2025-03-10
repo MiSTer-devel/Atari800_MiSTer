@@ -42,6 +42,17 @@ struct CartDef {
 #define TC_MODE_SIC_1024        0x27           // Sic!Cart+ 1024k
 
 #define TC_MODE_BLIZZARD_4      0x12           // Blizzard 4k
+#define TC_MODE_BLIZZARD_32     0x13           // Blizzard 32k
+
+// J(atari)Cart versions
+#define TC_MODE_JATARI_8	0x18
+#define TC_MODE_JATARI_16	0x19
+#define TC_MODE_JATARI_32	0x1A
+#define TC_MODE_JATARI_64	0x1B
+#define TC_MODE_JATARI_128	0x1C
+#define TC_MODE_JATARI_256	0x1D
+#define TC_MODE_JATARI_512	0x1E
+#define TC_MODE_JATARI_1024	0x1F
 
 #define TC_MODE_MEGA_16         0x28           // switchable MegaCarts
 #define TC_MODE_MEGA_32         0x29
@@ -111,12 +122,21 @@ static struct CartDef cartdef[] =
 	{ 54, "SIC 128K       \x00", TC_MODE_SIC_128,   128 },
 	{ 55, "SIC 256K       \x00", TC_MODE_SIC_256,   256 },
 	{ 56, "SIC 512K       \x00", TC_MODE_SIC_512,   512 },
+	{ 60, "Blizzard 32K   \x00", TC_MODE_BLIZZARD_32,32 },
 	{ 61, "MegaMax 2048K  \x00", TC_MODE_MEGAMAX16,2048 },
 	{ 64, "MegaCart 2048K \x00", TC_MODE_MEGA_2048,2048 },
 	{ 67, "XEGS 64K (8-15)\x00", TC_MODE_XEGS_64_2,  64 },
 	{ 75, "Atarimax 8Mb NT\x00", TC_MODE_ATARIMAX8_2,1024 },
 	{ 76, "Williams 16K   \x00", TC_MODE_WILLIAMS16, 16 },
 	{ 83, "SIC+ 1024K     \x00", TC_MODE_SIC_1024,  1024 },
+	{104, "J(atari) 8K    \x00", TC_MODE_JATARI_8,   8 },
+	{105, "J(atari) 16K   \x00", TC_MODE_JATARI_16,  16 },
+	{106, "J(atari) 32K   \x00", TC_MODE_JATARI_32,  32 },
+	{107, "J(atari) 64K   \x00", TC_MODE_JATARI_64,  64 },
+	{108, "J(atari) 128K  \x00", TC_MODE_JATARI_128,128 },
+	{109, "J(atari) 256K  \x00", TC_MODE_JATARI_256,256 },
+	{110, "J(atari) 512K  \x00", TC_MODE_JATARI_512,512 },
+	{111, "J(atari) 1MB   \x00", TC_MODE_JATARI_1024,1024 },
 	{112, "DCART 512K     \x00", TC_MODE_DCART,     512 },
 	{ 0, "", 0, 0 }
 };

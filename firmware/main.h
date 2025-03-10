@@ -50,11 +50,12 @@ int get_ ## name() \
 
 BIT_REG(,0x1,0,pause_6502,zpu_out1)
 BIT_REG(,0x1,1,reset_6502,zpu_out1)
-BIT_REG(,0x3f,2,turbo_6502,zpu_out1)
-BIT_REG(,0x7,8,ram_select,zpu_out1)
+// Seems all these can be reused (idea - for an emulated stack cartridge!)
+//BIT_REG(,0x3f,2,turbo_6502,zpu_out1)
+//BIT_REG(,0x7,8,ram_select,zpu_out1)
 //BIT_REG(,0x3f,11,rom_select,zpu_out1)
-BIT_REG(,0x3f,17,cart_select,zpu_out1)
-// reserve 2 bits for extending cart_select
+BIT_REG(,0xff,17,cart_select,zpu_out1)
+// reserve 2 bits for extending cart_select - now taken!
 BIT_REG(,0x01,25,freezer_enable,zpu_out1)
 #ifndef FIRMWARE_5200
 BIT_REG(,0x01,26,reset_rnmi,zpu_out1)
@@ -265,11 +266,14 @@ int main(void)
 	set_pause_6502(1);
 	set_reset_6502(1);
 	set_reset_6502(0);
+	// This seems to be unconnected in MiSTer
+	/*
 	if(!get_turbo_6502())
 	{
 		set_turbo_6502(1);
 		set_ram_select(2);
 	}
+	*/
 	set_cart_select(0);
 	set_freezer_enable(0);
 
