@@ -120,14 +120,24 @@ constant cart_mode_sxegs_256:	cart_mode_type := "00111011";
 constant cart_mode_sxegs_512:	cart_mode_type := "00111100";
 constant cart_mode_sxegs_1024:	cart_mode_type := "00111101";
 
+constant cart_mode_xemulti_8:	cart_mode_type := "01101000";
+constant cart_mode_xemulti_16:	cart_mode_type := "01101001";
+constant cart_mode_xemulti_32:	cart_mode_type := "01101010";
+constant cart_mode_xemulti_64:	cart_mode_type := "01101011";
+constant cart_mode_xemulti_128:	cart_mode_type := "01101100";
+constant cart_mode_xemulti_256:	cart_mode_type := "01101101";
+constant cart_mode_xemulti_512:	cart_mode_type := "01101110";
+constant cart_mode_xemulti_1024:cart_mode_type := "01101111";
+
+
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
 
 -- OSS cart emulation
 signal oss_bank: std_logic_vector(2 downto 0) := "000";
 
--- sic cart 8xxx/axxx enable
-signal sic_8xxx_enable: std_logic := '0';
-signal sic_axxx_enable: std_logic := '1';
+-- for carts that can selectively enable 8xxx/axxx
+signal cart_8xxx_enable: std_logic := '0';
+signal cart_axxx_enable: std_logic := '1';
 signal disable_rom: std_logic := '0';
 
 signal access_8xxx: boolean;
@@ -174,7 +184,7 @@ end process generate_reset;
 config_io: process(a, rw, cctl_n,
 	cfg_bank,
 	cart_mode,
-	sic_8xxx_enable, sic_axxx_enable)
+	cart_8xxx_enable, cart_axxx_enable)
 begin
 	cctl_dout_enable <= "00";
 	cctl_dout <= x"ff";
@@ -184,7 +194,7 @@ begin
 		if (rw = '1') and (cart_mode(7 downto 2) = "001001") and ((a(7 downto 5) = "000") or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
 			cctl_dout_enable(0) <= '1';
 			-- bit 7 = 0 means flash is write protected
-			cctl_dout <= "0" & (not sic_axxx_enable) & sic_8xxx_enable & cfg_bank(18 downto 14);
+			cctl_dout <= "0" & (not cart_axxx_enable) & cart_8xxx_enable & cfg_bank(18 downto 14);
 		end if;
 		if (rw = '1') and (cart_mode = cart_mode_dcart) then
 			cctl_dout_enable <= "11";
@@ -201,8 +211,8 @@ begin
 			blizzard_bank := 0;
 			cfg_enable <= '1';
 			oss_bank <= "001";
-			sic_8xxx_enable <= '0';
-			sic_axxx_enable <= '1';
+			cart_8xxx_enable <= '0';
+			cart_axxx_enable <= '1';
 			disable_rom <= '0';
 
 			-- cart specific initialization
@@ -276,8 +286,8 @@ begin
 					
 					-- sic
 					if (cart_mode(7 downto 2) = "001001") and ((a(7 downto 5) = "000")  or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
-						sic_8xxx_enable <= d_in(5);
-						sic_axxx_enable <= not d_in(6);
+						cart_8xxx_enable <= d_in(5);
+						cart_axxx_enable <= not d_in(6);
 						case cart_mode is
 						when cart_mode_sic_128 =>
 							cfg_bank(16 downto 14) <= d_in(2 downto 0);
@@ -287,6 +297,30 @@ begin
 							cfg_bank(18 downto 14) <= d_in(4 downto 0);
 						when cart_mode_sic_1024 =>
 							cfg_bank(19 downto 14) <= d_in(7)&d_in(4 downto 0);
+						when others =>
+							null;
+						end case;
+					end if;
+
+					-- XE multicart
+					if (cart_mode(7 downto 3) = "01101") then
+						cart_8xxx_enable <= d_in(7) and d_in(0);
+						cart_axxx_enable <= '1';
+						case cart_mode is
+						when cart_mode_xemulti_16 =>
+							cfg_bank(13) <= d_in(0);
+						when cart_mode_xemulti_32 =>
+							cfg_bank(14 downto 13) <= d_in(1 downto 0);
+						when cart_mode_xemulti_64 =>
+							cfg_bank(15 downto 13) <= d_in(2 downto 0);
+						when cart_mode_xemulti_128 =>
+							cfg_bank(16 downto 13) <= d_in(3 downto 0);
+						when cart_mode_xemulti_256 =>
+							cfg_bank(17 downto 13) <= d_in(4 downto 0);
+						when cart_mode_xemulti_512 =>
+							cfg_bank(18 downto 13) <= d_in(5 downto 0);
+						when cart_mode_xemulti_1024 =>
+							cfg_bank(19 downto 13) <= d_in(6 downto 0);
 						when others =>
 							null;
 						end case;
@@ -431,7 +465,7 @@ access_cart_data: process(a, rw, access_8xxx, access_axxx,
 	cfg_bank, cfg_enable,
 	cart_mode,
 	oss_bank,
-	sic_8xxx_enable, sic_axxx_enable)
+	cart_8xxx_enable, cart_axxx_enable)
 
 variable bool_rd4: boolean;
 variable bool_rd5: boolean;
@@ -448,14 +482,6 @@ begin
 	end if;
 
 	case cart_mode is
-	--when cart_mode_8k |
-	--     cart_mode_atarimax1 | cart_mode_atarimax8 | cart_mode_atarimax8n |
-	--     cart_mode_dcart | cart_mode_blizzard_32 |
-	--     cart_mode_jatari_8 | cart_mode_jatari_16 | cart_mode_jatari_32 | cart_mode_jatari_64 |
-	--     cart_mode_jatari_128 | cart_mode_jatari_256 | cart_mode_jatari_512 | cart_mode_jatari_1024
-	--     cart_mode_atrax_128 | cart_mode_williams_64 | cart_mode_williams_32 | cart_mode_williams_16 |
-	--     cart_mode_sdx64 | cart_mode_sdx128 | cart_mode_diamond64 | cart_mode_express64 =>
-	--	null;
 	when cart_mode_blizzard_4 =>
 		cart_address(12) <= '0';
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
@@ -522,16 +548,21 @@ begin
 		else
 			cart_address(13) <= '1';
 		end if;
-	when cart_mode_sic_128 | cart_mode_sic_256 | cart_mode_sic_512 | cart_mode_sic_1024 =>
-		bool_rd4 := (cfg_enable = '1') and (sic_8xxx_enable = '1');
-		bool_rd5 := (cfg_enable = '1') and (sic_axxx_enable = '1');
-		cart_address_enable <= (access_8xxx and (cfg_enable = '1') and (sic_8xxx_enable = '1'))
+	when cart_mode_sic_128 | cart_mode_sic_256 | cart_mode_sic_512 | cart_mode_sic_1024 |
+	     cart_mode_xemulti_16 | cart_mode_xemulti_32 | cart_mode_xemulti_64 | cart_mode_xemulti_128 |
+	     cart_mode_xemulti_256 | cart_mode_xemulti_512 | cart_mode_xemulti_1024 =>
+		bool_rd4 := (cfg_enable = '1') and (cart_8xxx_enable = '1');
+		bool_rd5 := (cfg_enable = '1') and (cart_axxx_enable = '1');
+		cart_address_enable <= (access_8xxx and (cfg_enable = '1') and (cart_8xxx_enable = '1'))
 				or
-			     (access_axxx and (cfg_enable = '1') and (sic_axxx_enable = '1'));
+			     (access_axxx and (cfg_enable = '1') and (cart_axxx_enable = '1'));
 		if (access_8xxx) then
 			cart_address(13) <= '0';
 		else
-			cart_address(13) <= '1';
+			-- either on sic! or xe multicart and cart_8xxx_enable
+			if (cart_mode(7 downto 3) /= "01101") or (cart_8xxx_enable = '1') then
+				cart_address(13) <= '1';
+			end if;
 		end if;
 	when cart_mode_off =>
 		bool_rd4 := false;

@@ -78,6 +78,16 @@ struct CartDef {
 #define TC_MODE_SXEGS_512       0x3C
 #define TC_MODE_SXEGS_1024      0x3D
 
+// XE Multicart versions
+#define TC_MODE_XEMULTI_8	0x68
+#define TC_MODE_XEMULTI_16	0x69
+#define TC_MODE_XEMULTI_32	0x6A
+#define TC_MODE_XEMULTI_64	0x6B
+#define TC_MODE_XEMULTI_128	0x6C
+#define TC_MODE_XEMULTI_256	0x6D
+#define TC_MODE_XEMULTI_512	0x6E
+#define TC_MODE_XEMULTI_1024	0x6F
+
 static struct CartDef cartdef[] =
 {
 	{ 1,  "Standard 8K    \x00", TC_MODE_8K,          8 },
@@ -129,6 +139,14 @@ static struct CartDef cartdef[] =
 	{ 75, "Atarimax 8Mb NT\x00", TC_MODE_ATARIMAX8_2,1024 },
 	{ 76, "Williams 16K   \x00", TC_MODE_WILLIAMS16, 16 },
 	{ 83, "SIC+ 1024K     \x00", TC_MODE_SIC_1024,  1024 },
+	{ 86, "XE Multi 8K    \x00", TC_MODE_XEMULTI_8,   8 },
+	{ 87, "XE Multi 16K   \x00", TC_MODE_XEMULTI_16, 16 },
+	{ 88, "XE Multi 32K   \x00", TC_MODE_XEMULTI_32, 32 },
+	{ 89, "XE Multi 64K   \x00", TC_MODE_XEMULTI_64, 64 },
+	{ 90, "XE Multi 128K  \x00", TC_MODE_XEMULTI_128,128 },
+	{ 91, "XE Multi 256K  \x00", TC_MODE_XEMULTI_256,256 },
+	{ 92, "XE Multi 512K  \x00", TC_MODE_XEMULTI_512,512 },
+	{ 93, "XE Multi 1MB   \x00", TC_MODE_XEMULTI_1024,1024 },
 	{104, "J(atari) 8K    \x00", TC_MODE_JATARI_8,   8 },
 	{105, "J(atari) 16K   \x00", TC_MODE_JATARI_16,  16 },
 	{106, "J(atari) 32K   \x00", TC_MODE_JATARI_32,  32 },
