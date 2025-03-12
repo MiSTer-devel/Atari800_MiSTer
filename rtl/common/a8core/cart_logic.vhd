@@ -76,6 +76,8 @@ constant cart_mode_atarimax8n:	cart_mode_type := "00010000";
 constant cart_mode_dcart:	cart_mode_type := "00010001";
 constant cart_mode_blizzard_4:	cart_mode_type := "00010010";
 constant cart_mode_blizzard_32:	cart_mode_type := "00010011";
+constant cart_mode_right_8k:	cart_mode_type := "00010100";
+constant cart_mode_right_4k:	cart_mode_type := "00010101";
 
 constant cart_mode_jatari_8:	cart_mode_type := "00011000";
 constant cart_mode_jatari_16:	cart_mode_type := "00011001";
@@ -484,6 +486,15 @@ begin
 	case cart_mode is
 	when cart_mode_blizzard_4 =>
 		cart_address(12) <= '0';
+	when cart_mode_right_4k =>
+		bool_rd5 := false;
+		bool_rd4 := true;
+		cart_address(12) <= '0';
+		cart_address_enable <= access_8xxx and (a(12) = '1');
+	when cart_mode_right_8k =>
+		bool_rd5 := false;
+		bool_rd4 := true;
+		cart_address_enable <= access_8xxx;
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
 		if (access_8xxx) then
 			cart_address(13) <= '0';

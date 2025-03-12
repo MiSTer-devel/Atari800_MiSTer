@@ -43,6 +43,8 @@ struct CartDef {
 
 #define TC_MODE_BLIZZARD_4      0x12           // Blizzard 4k
 #define TC_MODE_BLIZZARD_32     0x13           // Blizzard 32k
+#define TC_MODE_RIGHT_8K	0x14
+#define TC_MODE_RIGHT_4K	0x15
 
 // J(atari)Cart versions
 #define TC_MODE_JATARI_8	0x18
@@ -105,6 +107,7 @@ static struct CartDef cartdef[] =
 	{ 14, "XEGS 128K      \x00", TC_MODE_XEGS_128,  128 },
 	{ 15, "OSS 1 Chip 16K \x00", TC_MODE_OSS_16,     16 },
 	{ 17, "Atrax 128K     \x00", TC_MODE_ATRAX128,  128 },
+	{ 21, "Right 8K       \x00", TC_MODE_RIGHT_8K,    8 },
 	{ 22, "Williams 32K   \x00", TC_MODE_WILLIAMS32, 32 },
 	{ 23, "XEGS 256K      \x00", TC_MODE_XEGS_256,  256 },
 	{ 24, "XEGS 512K      \x00", TC_MODE_XEGS_512,  512 },
@@ -129,9 +132,11 @@ static struct CartDef cartdef[] =
 	{ 44, "OSS 1 Chip 8K  \x00", TC_MODE_OSS_8,       8 },
 	{ 45, "OSS 2 Chip 043M\x00", TC_MODE_OSS_043M,   16 },
 	{ 46, "Blizzard 4K    \x00", TC_MODE_BLIZZARD_4,  4 },
+	{ 53, "Low Bank XL 8K \x00", TC_MODE_RIGHT_8K,    8 },
 	{ 54, "SIC 128K       \x00", TC_MODE_SIC_128,   128 },
 	{ 55, "SIC 256K       \x00", TC_MODE_SIC_256,   256 },
 	{ 56, "SIC 512K       \x00", TC_MODE_SIC_512,   512 },
+	{ 59, "Right 4K       \x00", TC_MODE_RIGHT_4K,    4 },
 	{ 60, "Blizzard 32K   \x00", TC_MODE_BLIZZARD_32,32 },
 	{ 61, "MegaMax 2048K  \x00", TC_MODE_MEGAMAX16,2048 },
 	{ 64, "MegaCart 2048K \x00", TC_MODE_MEGA_2048,2048 },
