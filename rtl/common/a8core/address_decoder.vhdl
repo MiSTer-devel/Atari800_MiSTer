@@ -231,7 +231,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart_address: std_logic_vector(20 downto 0);
 	signal emu_cart_address_enable: boolean;
 	signal emu_cart_cctl_dout: std_logic_vector(7 downto 0);
-	signal emu_cart_cctl_dout_enable: std_logic_vector(1 downto 0);
+	signal emu_cart_cctl_dout_enable: std_logic_vector(2 downto 0);
 
 	signal atari_clk_enable: std_logic;
 	signal freezer_disable_atari: boolean;
@@ -879,17 +879,22 @@ end generate;
 							request_complete <= '1';
 						else
 							-- read only from emulated
-							if emu_cart_cctl_dout_enable /= "00" then
-								if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
+							if emu_cart_cctl_dout_enable /= "000" then
+								if emu_cart_cctl_dout_enable(2 downto 1) = "00" then
+									MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
+									request_complete <= '1';
+								else
 									SDRAM_ADDR <= SDRAM_CART_ADDR;
-									-- read from B5xx
-									SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
+									if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
+										-- read from B5xx
+										SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
+									end if;
+									if emu_cart_cctl_dout_enable(2) = '1' then -- AST 32 special case
+										SDRAM_ADDR(7 downto 0) <= ADDR_next(7 downto 0);
+									end if;
 									MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
 									request_complete <= sdram_request_COMPLETE;
 									sdram_chip_select <= start_request;
-								else
-									MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
-									request_complete <= '1';
 								end if;
 							else
 								MEMORY_DATA_INT(7 downto 0) <= x"ff";

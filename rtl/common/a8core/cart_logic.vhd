@@ -40,7 +40,7 @@ entity CartLogic is
 		cart_address: out std_logic_vector(20 downto 0);
 		cart_address_enable: out boolean;
 		cctl_dout: out std_logic_vector(7 downto 0);
-		cctl_dout_enable: out std_logic_vector(1 downto 0)
+		cctl_dout_enable: out std_logic_vector(2 downto 0)
 	);
 		
 end CartLogic;
@@ -78,6 +78,8 @@ constant cart_mode_blizzard_4:	cart_mode_type := "00010010";
 constant cart_mode_blizzard_32:	cart_mode_type := "00010011";
 constant cart_mode_right_8k:	cart_mode_type := "00010100";
 constant cart_mode_right_4k:	cart_mode_type := "00010101";
+constant cart_mode_2k:		cart_mode_type := "00010110";
+constant cart_mode_4k:		cart_mode_type := "00010111";
 
 constant cart_mode_jatari_8:	cart_mode_type := "00011000";
 constant cart_mode_jatari_16:	cart_mode_type := "00011001";
@@ -131,6 +133,8 @@ constant cart_mode_xemulti_256:	cart_mode_type := "01101101";
 constant cart_mode_xemulti_512:	cart_mode_type := "01101110";
 constant cart_mode_xemulti_1024:cart_mode_type := "01101111";
 
+constant cart_mode_phoenix:	cart_mode_type := "01000000";
+constant cart_mode_ast_32:	cart_mode_type := "01000001";
 
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
 
@@ -188,29 +192,32 @@ config_io: process(a, rw, cctl_n,
 	cart_mode,
 	cart_8xxx_enable, cart_axxx_enable)
 begin
-	cctl_dout_enable <= "00";
+	cctl_dout_enable <= "000";
 	cctl_dout <= x"ff";
 
-	if (cctl_n = '0') then
+	if (cctl_n = '0') and (rw = '1') then
 		-- sic register readback at $D500-$D51F
-		if (rw = '1') and (cart_mode(7 downto 2) = "001001") and ((a(7 downto 5) = "000") or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
+		if (cart_mode(7 downto 2) = "001001") and ((a(7 downto 5) = "000") or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
 			cctl_dout_enable(0) <= '1';
 			-- bit 7 = 0 means flash is write protected
 			cctl_dout <= "0" & (not cart_axxx_enable) & cart_8xxx_enable & cfg_bank(18 downto 14);
 		end if;
-		if (rw = '1') and (cart_mode = cart_mode_dcart) then
-			cctl_dout_enable <= "11";
+		if (cart_mode = cart_mode_dcart) then
+			cctl_dout_enable(1 downto 0) <= "11";
+		end if;
+		if (cart_mode = cart_mode_ast_32) then
+			cctl_dout_enable(2 downto 0) <= "101";
 		end if;
 	end if;
 end process config_io;
 
 set_config: process(clk)
-	variable blizzard_bank : integer range 0 to 3 := 0;
+	variable bank_counter : integer range 0 to 127 := 0;
 begin
 	if rising_edge(clk) then
 		if (reset_n = '0') then
 			cfg_bank <= (others => '0');
-			blizzard_bank := 0;
+			bank_counter := 0;
 			cfg_enable <= '1';
 			oss_bank <= "001";
 			cart_8xxx_enable <= '0';
@@ -350,25 +357,27 @@ begin
 							null;
 						end case;
 					end if;
+
+					-- ast 32
+					if (cart_mode = cart_mode_ast_32) then
+						cfg_enable <= '0';
+						bank_counter := bank_counter + 1;
+						cfg_bank(19 downto 13) <= std_logic_vector(to_unsigned(bank_counter,7));
+					end if;
 				end if; -- rw = 0
 
 				-- cart config using addresses, ignore read/write
 				case cart_mode is
-				-- blizzard 16 / 4
-				when cart_mode_blizzard_16 | cart_mode_blizzard_4 =>
+				-- blizzard 16 / 4, phoenix
+				when cart_mode_blizzard_16 | cart_mode_blizzard_4 | cart_mode_phoenix =>
 					cfg_enable <= '0';
 				-- blizzard 32
 				when cart_mode_blizzard_32 =>
-				 	if (blizzard_bank = 3) then
+				 	if (bank_counter = 3) then
 						cfg_enable <= '0';
 					else
-						blizzard_bank := blizzard_bank + 1;
-						case blizzard_bank is
-						when 0 => cfg_bank(14 downto 13) <= "00";
-						when 1 => cfg_bank(14 downto 13) <= "01";
-						when 2 => cfg_bank(14 downto 13) <= "10";
-						when 3 => cfg_bank(14 downto 13) <= "11";
-						end case;
+						bank_counter := bank_counter + 1;
+						cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter,2));
 					end if;
 				when cart_mode_oss_043M =>
 					if a(3) = '1' then
@@ -484,6 +493,12 @@ begin
 	end if;
 
 	case cart_mode is
+	when cart_mode_2k =>
+		cart_address(12 downto 11) <= "00";
+		cart_address_enable <= (a(12) = '1') and (a(11) = '1');
+	when cart_mode_4k =>
+		cart_address(12) <= '0';
+		cart_address_enable <= (a(12) = '1');
 	when cart_mode_blizzard_4 =>
 		cart_address(12) <= '0';
 	when cart_mode_right_4k =>
@@ -495,6 +510,8 @@ begin
 		bool_rd5 := false;
 		bool_rd4 := true;
 		cart_address_enable <= access_8xxx;
+	when cart_mode_ast_32 =>
+		cart_address <= "000000" & cfg_bank(19 downto 13) & a(7 downto 0);
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
 		if (access_8xxx) then
 			cart_address(13) <= '0';
