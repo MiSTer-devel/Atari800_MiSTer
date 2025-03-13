@@ -188,7 +188,8 @@ begin
 	case cart_mode is
 	when cart_mode_atrax_int_128 =>
 		int_d_out <= int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5);
-		--int_d_out <= int_d_in(6) & int_d_in(1) & int_d_in(0) & int_d_in(3) & int_d_in(7) & int_d_in(2) & int_d_in(5) & int_d_in(4);
+	when cart_mode_atrax_sdx_64 | cart_mode_atrax_sdx_128 =>
+		int_d_out <= int_d_in(2) & int_d_in(3) & int_d_in(6) & int_d_in(7) & int_d_in(1) & int_d_in(5) & int_d_in(0) & int_d_in(4);
 	when others =>
 		int_d_out <= int_d_in;
 	end case;
@@ -506,13 +507,13 @@ begin
 							cfg_bank(15 downto 13) <= a(2 downto 0);
 						end if;
 					end if;
-				when cart_mode_sdx64 =>
+				when cart_mode_sdx64 | cart_mode_atrax_sdx_64 =>
 					-- enable the other cartridge - not a(2) and a(3)
 					if (a(7 downto 4) = x"E") then
 						cfg_enable <= not a(3);
 						cfg_bank(15 downto 13) <= not a(2 downto 0);
 					end if;
-				when cart_mode_sdx128 =>
+				when cart_mode_sdx128 | cart_mode_atrax_sdx_128 =>
 					-- enable the other cartridge - not a(2) and a(3)
 					if (a(7 downto 5) = "111") then
 						cfg_enable <= not a(3);
@@ -547,10 +548,11 @@ begin
 	cart_address <= cfg_bank & a(12 downto 0);
 	
 	if (cart_mode = cart_mode_atrax_int_128) then
-		--cart_address <= cfg_bank & a(9) & a(11) & a(10) & a(8) & a(4) & a(3) & a(2) & a(1) & a(0) & a(12) & a(7) & a(6) & a(5);
 		cart_address <= cfg_bank & a(3) & a(11) & a(10) & a(12) & a(9) & a(2) & a(1) & a(0) & a(8) & a(7) & a(6) & a(5) & a(4);
 	end if;
-
+	if (cart_mode = cart_mode_atrax_sdx_64) or (cart_mode = cart_mode_atrax_sdx_128) then
+		cart_address(15 downto 0) <= a(3) & a(4) & a(5) & a(2) & cfg_bank(14) & cfg_bank(15) & cfg_bank(13) & a(6) & a(1) & a(0) & a(7) & a(8) & a(9) & a(12) & a(11) & a(10);
+	end if;
 	bool_rd4 := false;
 	bool_rd5 := (cfg_enable = '1');
 	cart_address_enable <= (cfg_enable = '1') and access_axxx;

@@ -151,6 +151,8 @@ static struct CartDef cartdef[] =
 	{ 45, "OSS 2 Chip 043M\x00", TC_MODE_OSS_043M,   16 },
 	{ 46, "Blizzard 4K    \x00", TC_MODE_BLIZZARD_4,  4 },
 	{ 47, "AST 32K        \x00", TC_MODE_AST_32,     32 },
+	{ 48, "Atrax SDX 64K  \x00", TC_MODE_ATRAX_SDX64,64 },
+	{ 49, "Atrax SDX 128K \x00", TC_MODE_ATRAX_SDX128,128 },
 	{ 50, "TurboSoft 64K  \x00", TC_MODE_TSOFT_64,   64 },
 	{ 51, "TurboSoft 128K \x00", TC_MODE_TSOFT_128, 128 },
 	{ 52, "UltraCart 32K  \x00", TC_MODE_ULTRA_32,   32 },
