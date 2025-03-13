@@ -232,6 +232,8 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart_address_enable: boolean;
 	signal emu_cart_cctl_dout: std_logic_vector(7 downto 0);
 	signal emu_cart_cctl_dout_enable: std_logic_vector(2 downto 0);
+	signal emu_cart_int_d_in: std_logic_vector(7 downto 0);
+	signal emu_cart_int_d_out: std_logic_vector(7 downto 0);
 
 	signal atari_clk_enable: std_logic;
 	signal freezer_disable_atari: boolean;
@@ -343,7 +345,9 @@ BEGIN
 		cart_address => emu_cart_address,
 		cart_address_enable => emu_cart_address_enable,
 		cctl_dout => emu_cart_cctl_dout,
-		cctl_dout_enable => emu_cart_cctl_dout_enable
+		cctl_dout_enable => emu_cart_cctl_dout_enable,
+		int_d_in => emu_cart_int_d_in,
+		int_d_out => emu_cart_int_d_out
 	);
 
 	process(cart_select)
@@ -973,8 +977,9 @@ end generate;
 						-- remap to SDRAM
 						if (emu_cart_address_enable) then
 							SDRAM_ADDR <= SDRAM_CART_ADDR;
-							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
-							request_complete <= sdram_request_COMPLETE;							
+							emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
+							MEMORY_DATA_INT(7 downto 0) <= emu_cart_int_d_out;
+							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;
 							ram_chip_select <= '0';
 						else

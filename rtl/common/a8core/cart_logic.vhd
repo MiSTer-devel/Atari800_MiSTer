@@ -40,7 +40,9 @@ entity CartLogic is
 		cart_address: out std_logic_vector(20 downto 0);
 		cart_address_enable: out boolean;
 		cctl_dout: out std_logic_vector(7 downto 0);
-		cctl_dout_enable: out std_logic_vector(2 downto 0)
+		cctl_dout_enable: out std_logic_vector(2 downto 0);
+		int_d_in : in std_logic_vector(7 downto 0);
+		int_d_out : out std_logic_vector(7 downto 0)
 	);
 		
 end CartLogic;
@@ -124,17 +126,30 @@ constant cart_mode_sxegs_256:	cart_mode_type := "00111011";
 constant cart_mode_sxegs_512:	cart_mode_type := "00111100";
 constant cart_mode_sxegs_1024:	cart_mode_type := "00111101";
 
-constant cart_mode_xemulti_8:	cart_mode_type := "01101000";
+
+constant cart_mode_xemulti_8:		cart_mode_type := "01101000";
 constant cart_mode_xemulti_16:	cart_mode_type := "01101001";
 constant cart_mode_xemulti_32:	cart_mode_type := "01101010";
 constant cart_mode_xemulti_64:	cart_mode_type := "01101011";
 constant cart_mode_xemulti_128:	cart_mode_type := "01101100";
 constant cart_mode_xemulti_256:	cart_mode_type := "01101101";
 constant cart_mode_xemulti_512:	cart_mode_type := "01101110";
-constant cart_mode_xemulti_1024:cart_mode_type := "01101111";
+constant cart_mode_xemulti_1024:	cart_mode_type := "01101111";
 
-constant cart_mode_phoenix:	cart_mode_type := "01000000";
-constant cart_mode_ast_32:	cart_mode_type := "01000001";
+constant cart_mode_phoenix:			cart_mode_type := "01000000";
+constant cart_mode_ast_32:				cart_mode_type := "01000001";
+constant cart_mode_atrax_int_128:	cart_mode_type := "01000010";
+constant cart_mode_atrax_sdx_64:		cart_mode_type := "01000011"; -- TODO
+constant cart_mode_atrax_sdx_128:	cart_mode_type := "01000100"; -- TODO
+constant cart_mode_turbosoft_64:		cart_mode_type := "01000101";
+constant cart_mode_turbosoft_128:		cart_mode_type := "01000110";
+constant cart_mode_ultracart_32:		cart_mode_type := "01000111";
+constant cart_mode_dawli_32:			cart_mode_type := "01001000";
+constant cart_mode_dawli_64:			cart_mode_type := "01001001";
+constant cart_mode_jrc_lin_64:		cart_mode_type := "01001010";
+constant cart_mode_jrc_int_64:		cart_mode_type := "01001011";
+
+constant cart_mode_db_32:			cart_mode_type := "01110000";
 
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
 
@@ -167,6 +182,17 @@ access_axxx <= ( s5_n = '0');
 --		s5_n_out <= '1';
 --	end if;
 --end process set_passthrough;
+
+deinterleave_data: process(int_d_in, cart_mode)
+begin
+	case cart_mode is
+	when cart_mode_atrax_int_128 =>
+		int_d_out <= int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5);
+		--int_d_out <= int_d_in(6) & int_d_in(1) & int_d_in(0) & int_d_in(3) & int_d_in(7) & int_d_in(2) & int_d_in(5) & int_d_in(4);
+	when others =>
+		int_d_out <= int_d_in;
+	end case;
+end process deinterleave_data;
 
 -- remember previous cartridge mode
 set_cart_mode_prev: process(clk)
@@ -230,6 +256,8 @@ begin
 				cfg_bank <= x"7F"; -- startup in last bank
 			when cart_mode_oss_043M =>
 				oss_bank <= "000";
+			when cart_mode_jrc_int_64 => 
+				cfg_bank <= "00000111";
 			when others => null;
 			end case;
 		else
@@ -287,10 +315,20 @@ begin
 							null;
 						end case;
 					end if;
+					
 					-- atrax 128
-					if (cart_mode = cart_mode_atrax_128) then
+					if (cart_mode = cart_mode_atrax_128) or (cart_mode = cart_mode_atrax_int_128) then
 						cfg_enable <= not d_in(7);
 						cfg_bank(16 downto 13) <= d_in(3 downto 0);
+					end if;
+
+					if ((cart_mode = cart_mode_jrc_lin_64) or (cart_mode = cart_mode_jrc_int_64)) and (a(7) = '0') then
+						cfg_enable <= not d_in(7);
+						if (cart_mode = cart_mode_jrc_int_64) then
+							cfg_bank(15 downto 13) <= not(d_in(4)) & not(d_in(5)) & not(d_in(6));
+						else 
+							cfg_bank(15 downto 13) <= d_in(6 downto 4);
+						end if;
 					end if;
 					
 					-- sic
@@ -371,6 +409,23 @@ begin
 				-- blizzard 16 / 4, phoenix
 				when cart_mode_blizzard_16 | cart_mode_blizzard_4 | cart_mode_phoenix =>
 					cfg_enable <= '0';
+				-- ultracart 32
+				when cart_mode_ultracart_32 =>
+					bank_counter := bank_counter + 1;
+				 	if (bank_counter = 4) then
+						cfg_enable <= '0';
+						bank_counter := 127;
+					else
+						cfg_enable <= '1';
+						cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter,2));
+					end if;
+				-- adawliah 32/64
+				when cart_mode_dawli_32 =>
+					bank_counter := bank_counter + 1;
+					cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter,2));
+				when cart_mode_dawli_64 =>
+					bank_counter := bank_counter + 1;
+					cfg_bank(15 downto 13) <= std_logic_vector(to_unsigned(bank_counter,3));
 				-- blizzard 32
 				when cart_mode_blizzard_32 =>
 				 	if (bank_counter = 3) then
@@ -379,6 +434,8 @@ begin
 						bank_counter := bank_counter + 1;
 						cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter,2));
 					end if;
+				when cart_mode_db_32 =>
+					cfg_bank(14 downto 13) <= a(1 downto 0);
 				when cart_mode_oss_043M =>
 					if a(3) = '1' then
 						-- disable everything
@@ -403,6 +460,12 @@ begin
 					end if;
 				when cart_mode_oss_16k | cart_mode_oss_8k =>
 					oss_bank(1 downto 0) <= a(0) & NOT a(3);
+				when cart_mode_turbosoft_64 =>
+						cfg_bank(15 downto 13) <= a(2 downto 0);
+						cfg_enable <= not(a(4));
+				when cart_mode_turbosoft_128 =>
+						cfg_bank(16 downto 13) <= a(3 downto 0);
+						cfg_enable <= not(a(4));
 				when cart_mode_atarimax1 =>
 					-- D500-D50F: set bank, enable
 					if (a(7 downto 4) = x"0") then
@@ -482,6 +545,11 @@ variable bool_rd4: boolean;
 variable bool_rd5: boolean;
 begin
 	cart_address <= cfg_bank & a(12 downto 0);
+	
+	if (cart_mode = cart_mode_atrax_int_128) then
+		--cart_address <= cfg_bank & a(9) & a(11) & a(10) & a(8) & a(4) & a(3) & a(2) & a(1) & a(0) & a(12) & a(7) & a(6) & a(5);
+		cart_address <= cfg_bank & a(3) & a(11) & a(10) & a(12) & a(9) & a(2) & a(1) & a(0) & a(8) & a(7) & a(6) & a(5) & a(4);
+	end if;
 
 	bool_rd4 := false;
 	bool_rd5 := (cfg_enable = '1');
@@ -545,7 +613,7 @@ begin
 			end if;
 			cart_address(12) <= oss_bank(0) and (not a(12));
 		end if;
-	when cart_mode_xegs_32 |cart_mode_sxegs_32 =>
+	when cart_mode_xegs_32 | cart_mode_sxegs_32 | cart_mode_db_32 =>
 		if (access_axxx) then
 			cart_address(14 downto 13) <= (others => '1');
 		end if;

@@ -94,6 +94,17 @@ struct CartDef {
 
 #define TC_MODE_PHOENIX		0x40
 #define TC_MODE_AST_32		0x41
+#define TC_MODE_ATRAX_INT128	0x42
+#define TC_MODE_ATRAX_SDX64	0x43
+#define TC_MODE_ATRAX_SDX128	0x44
+#define TC_MODE_TSOFT_64	0x45
+#define TC_MODE_TSOFT_128	0x46
+#define TC_MODE_ULTRA_32	0x47
+#define TC_MODE_DAWLI_32	0x48
+#define TC_MODE_DAWLI_64	0x49
+#define TC_MODE_JRC_LIN_64	0x4A
+#define TC_MODE_JRC_INT_64	0x4B
+#define TC_MODE_DB_32		0x70
 
 static struct CartDef cartdef[] =
 {
@@ -103,6 +114,7 @@ static struct CartDef cartdef[] =
 	// (we also need to add 2 extra fake AND-ed banks for 
 	// both 043M and 034M)
 	{ 3,  "OSS 2 Chip 034M\x00", TC_MODE_OSS_043M,   16 },
+	{ 5,  "DB 32K         \x00", TC_MODE_DB_32,      32 },
 	{ 8,  "Williams 64K   \x00", TC_MODE_WILLIAMS64, 64 },
 	{ 9,  "Express 64K    \x00", TC_MODE_EXPRESS64,  64 },
 	{ 10, "Diamond 64K    \x00", TC_MODE_DIAMOND64,  64 },
@@ -111,7 +123,7 @@ static struct CartDef cartdef[] =
 	{ 13, "XEGS 64K (0-7) \x00", TC_MODE_XEGS_64,    64 },
 	{ 14, "XEGS 128K      \x00", TC_MODE_XEGS_128,  128 },
 	{ 15, "OSS 1 Chip 16K \x00", TC_MODE_OSS_16,     16 },
-	{ 17, "Atrax 128K     \x00", TC_MODE_ATRAX128,  128 },
+	{ 17, "Atrax DEC 128K \x00", TC_MODE_ATRAX128,  128 },
 	{ 21, "Right 8K       \x00", TC_MODE_RIGHT_8K,    8 },
 	{ 22, "Williams 32K   \x00", TC_MODE_WILLIAMS32, 32 },
 	{ 23, "XEGS 256K      \x00", TC_MODE_XEGS_256,  256 },
@@ -133,12 +145,15 @@ static struct CartDef cartdef[] =
 	{ 39, "Phoenix 8K     \x00", TC_MODE_PHOENIX,     8 },
 	{ 40, "Blizzard 16K   \x00", TC_MODE_BLIZZARD,   16 },
 	{ 41, "Atarimax 128K  \x00", TC_MODE_ATARIMAX1, 128 },
-	{ 42, "Atarimax 1024K \x00", TC_MODE_ATARIMAX8,1024 },
+	{ 42, "Atarimax 1MB   \x00", TC_MODE_ATARIMAX8,1024 },
 	{ 43, "SpartaDOSX 128K\x00", TC_MODE_SDX128,    128 },
 	{ 44, "OSS 1 Chip 8K  \x00", TC_MODE_OSS_8,       8 },
 	{ 45, "OSS 2 Chip 043M\x00", TC_MODE_OSS_043M,   16 },
 	{ 46, "Blizzard 4K    \x00", TC_MODE_BLIZZARD_4,  4 },
 	{ 47, "AST 32K        \x00", TC_MODE_AST_32,     32 },
+	{ 50, "TurboSoft 64K  \x00", TC_MODE_TSOFT_64,   64 },
+	{ 51, "TurboSoft 128K \x00", TC_MODE_TSOFT_128, 128 },
+	{ 52, "UltraCart 32K  \x00", TC_MODE_ULTRA_32,   32 },
 	{ 53, "Low Bank XL 8K \x00", TC_MODE_RIGHT_8K,    8 },
 	{ 54, "SIC 128K       \x00", TC_MODE_SIC_128,   128 },
 	{ 55, "SIC 256K       \x00", TC_MODE_SIC_256,   256 },
@@ -150,8 +165,12 @@ static struct CartDef cartdef[] =
 	{ 61, "MegaMax 2048K  \x00", TC_MODE_MEGAMAX16,2048 },
 	{ 64, "MegaCart 2048K \x00", TC_MODE_MEGA_2048,2048 },
 	{ 67, "XEGS 64K (8-15)\x00", TC_MODE_XEGS_64_2,  64 },
-	{ 75, "Atarimax 8Mb NT\x00", TC_MODE_ATARIMAX8_2,1024 },
+	{ 68, "Atrax ENC 128K \x00", TC_MODE_ATRAX_INT128, 128 },
+	{ 69, "aDawliah 32K   \x00", TC_MODE_DAWLI_32,   32 },
+	{ 70, "aDawliah 64K   \x00", TC_MODE_DAWLI_64,   64 },
+	{ 75, "Atarimax 1MB NT\x00", TC_MODE_ATARIMAX8_2,1024 },
 	{ 76, "Williams 16K   \x00", TC_MODE_WILLIAMS16, 16 },
+	{ 80, "JRC 64K (LIN)  \x00", TC_MODE_JRC_LIN_64, 64 },
 	{ 83, "SIC+ 1024K     \x00", TC_MODE_SIC_1024,  1024 },
 	{ 86, "XE Multi 8K    \x00", TC_MODE_XEMULTI_8,   8 },
 	{ 87, "XE Multi 16K   \x00", TC_MODE_XEMULTI_16, 16 },
@@ -170,6 +189,7 @@ static struct CartDef cartdef[] =
 	{110, "J(atari) 512K  \x00", TC_MODE_JATARI_512,512 },
 	{111, "J(atari) 1MB   \x00", TC_MODE_JATARI_1024,1024 },
 	{112, "DCART 512K     \x00", TC_MODE_DCART,     512 },
+	{160, "JRC 64K (INT)  \x00", TC_MODE_JRC_INT_64, 64 },
 	{ 0, "", 0, 0 }
 };
 
