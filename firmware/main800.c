@@ -105,6 +105,9 @@ struct CartDef {
 #define TC_MODE_JRC_LIN_64	0x4A
 #define TC_MODE_JRC_INT_64	0x4B
 #define TC_MODE_DB_32		0x70
+#define TC_MODE_CORINA_512	0x71
+#define TC_MODE_CORINA_1024	0x72
+#define TC_MODE_BOUNTY_40	0x73
 
 static struct CartDef cartdef[] =
 {
@@ -124,6 +127,7 @@ static struct CartDef cartdef[] =
 	{ 14, "XEGS 128K      \x00", TC_MODE_XEGS_128,  128 },
 	{ 15, "OSS 1 Chip 16K \x00", TC_MODE_OSS_16,     16 },
 	{ 17, "Atrax DEC 128K \x00", TC_MODE_ATRAX128,  128 },
+	{ 18, "Bounty Bob     \x00", TC_MODE_BOUNTY_40,  40 },
 	{ 21, "Right 8K       \x00", TC_MODE_RIGHT_8K,    8 },
 	{ 22, "Williams 32K   \x00", TC_MODE_WILLIAMS32, 32 },
 	{ 23, "XEGS 256K      \x00", TC_MODE_XEGS_256,  256 },
@@ -174,6 +178,8 @@ static struct CartDef cartdef[] =
 	{ 76, "Williams 16K   \x00", TC_MODE_WILLIAMS16, 16 },
 	{ 80, "JRC 64K (LIN)  \x00", TC_MODE_JRC_LIN_64, 64 },
 	{ 83, "SIC+ 1024K     \x00", TC_MODE_SIC_1024,  1024 },
+	{ 84, "Corina 1MB     \x00", TC_MODE_CORINA_1024, 1032 },
+	{ 85, "Corina 512K    \x00", TC_MODE_CORINA_512, 520 },
 	{ 86, "XE Multi 8K    \x00", TC_MODE_XEMULTI_8,   8 },
 	{ 87, "XE Multi 16K   \x00", TC_MODE_XEMULTI_16, 16 },
 	{ 88, "XE Multi 32K   \x00", TC_MODE_XEMULTI_32, 32 },
@@ -317,6 +323,13 @@ int load_car(struct SimpleFile* file)
 			*((unsigned char *)(CARTRIDGE_MEM+0x4000+i)) = *((unsigned char *)(CARTRIDGE_MEM+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM+0x0000+i));
 			*((unsigned char *)(CARTRIDGE_MEM+0x5000+i)) = *((unsigned char *)(CARTRIDGE_MEM+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM+0x1000+i));
 		}
+	}
+	// Corina 512K cart, move the last 8K EEPROM data to the 1024K boundary
+	// clean the SRAM part
+	if(carttype == 85)
+	{
+		memcp8((unsigned char *)(CARTRIDGE_MEM+0x80000), (unsigned char *)(CARTRIDGE_MEM+0x100000), 0, 0x2000);
+		memset32((unsigned char *)(CARTRIDGE_MEM+0x80000), 0, 0x20000);
 	}
 	//LOG("cart type: %d size: %dk\n", def->mode, def->size);
 	return mode;

@@ -150,6 +150,9 @@ constant cart_mode_jrc_lin_64:		cart_mode_type := "01001010";
 constant cart_mode_jrc_int_64:		cart_mode_type := "01001011";
 
 constant cart_mode_db_32:			cart_mode_type := "01110000";
+constant cart_mode_corina_512:		cart_mode_type := "01110001";
+constant cart_mode_corina_1024:		cart_mode_type := "01110010";
+constant cart_mode_bounty_bob:		cart_mode_type := "01110011";
 
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
 
@@ -159,10 +162,15 @@ signal oss_bank: std_logic_vector(2 downto 0) := "000";
 -- for carts that can selectively enable 8xxx/axxx
 signal cart_8xxx_enable: std_logic := '0';
 signal cart_axxx_enable: std_logic := '1';
-signal disable_rom: std_logic := '0';
+signal disable_rom: std_logic := '0'; -- for XEGS 8-15 bank cart
+signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
+signal cart_write_enable: std_logic := '0'; -- let's try making the SRAM part of the Corina cart work
 
 signal access_8xxx: boolean;
 signal access_axxx: boolean;
+
+signal bb_bank_8x: std_logic_vector(1 downto 0) := "00";
+signal bb_bank_9x: std_logic_vector(1 downto 0) := "00";
 
 signal reset_n: std_logic := '1';
 
@@ -250,6 +258,10 @@ begin
 			cart_8xxx_enable <= '0';
 			cart_axxx_enable <= '1';
 			disable_rom <= '0';
+			mirror_8a <= '0';
+			cart_write_enable <= '0';
+			bb_bank_8x <= "00";
+			bb_bank_9x <= "00";
 
 			-- cart specific initialization
 			case cart_mode is
@@ -262,7 +274,8 @@ begin
 			when others => null;
 			end case;
 		else
-			if (clk_enable = '1') and (cctl_n = '0') then
+			if (clk_enable = '1') then 
+			 if (cctl_n = '0') then
 				if (rw = '0') then
 					-- modes using data lines to switch banks
 					
@@ -273,6 +286,7 @@ begin
 							cfg_enable <= not d_in(7);
 						end if;
 						if (cart_mode = cart_mode_xegs_64_2) then
+							-- mark the rom to float (unconnected)
 							disable_rom <= not d_in(3);
 						end if;
 
@@ -329,6 +343,16 @@ begin
 							cfg_bank(15 downto 13) <= not(d_in(4)) & not(d_in(5)) & not(d_in(6));
 						else 
 							cfg_bank(15 downto 13) <= d_in(6 downto 4);
+						end if;
+					end if;
+
+					-- Corina
+					if (cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024) then
+						cfg_enable <= not(d_in(7));
+						cfg_bank(19 downto 14) <= d_in(5 downto 0);
+						mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
+						if (cart_mode = cart_mode_corina_512) then
+							cart_write_enable <= d_in(5); -- try to imitate the SRAM 
 						end if;
 					end if;
 					
@@ -531,6 +555,20 @@ begin
 					end if;
 				when others => null;
 				end case;
+			 end if;
+			 if (cart_mode = cart_mode_bounty_bob) and (s4_n = '0') then
+              case a is
+                 when "0111111110110" => bb_bank_8x <= "00";
+                 when "0111111110111" => bb_bank_8x <= "01";
+                 when "0111111111000" => bb_bank_8x <= "10";
+                 when "0111111111001" => bb_bank_8x <= "11";
+                 when "1111111110110" => bb_bank_9x <= "00";
+                 when "1111111110111" => bb_bank_9x <= "01";
+                 when "1111111111000" => bb_bank_9x <= "10";
+                 when "1111111111001" => bb_bank_9x <= "11";
+                 when others => null;
+              end case;
+			 end if;
 			end if;
 		end if;
 	end if;
@@ -565,7 +603,7 @@ begin
 	case cart_mode is
 	when cart_mode_2k =>
 		cart_address(12 downto 11) <= "00";
-		cart_address_enable <= (a(12) = '1') and (a(11) = '1');
+		cart_address_enable <= (a(12 downto 11) = "11");
 	when cart_mode_4k =>
 		cart_address(12) <= '0';
 		cart_address_enable <= (a(12) = '1');
@@ -646,6 +684,11 @@ begin
 		else
 			cart_address(13) <= '1';
 		end if;
+	when cart_mode_corina_512 | cart_mode_corina_1024 =>
+		cart_address(13) <= '0';
+		if(mirror_8a = '0' and access_axxx) then
+			cart_address(13) <= '1';
+		end if;
 	when cart_mode_sic_128 | cart_mode_sic_256 | cart_mode_sic_512 | cart_mode_sic_1024 |
 	     cart_mode_xemulti_16 | cart_mode_xemulti_32 | cart_mode_xemulti_64 | cart_mode_xemulti_128 |
 	     cart_mode_xemulti_256 | cart_mode_xemulti_512 | cart_mode_xemulti_1024 =>
@@ -660,6 +703,16 @@ begin
 			-- either on sic! or xe multicart and cart_8xxx_enable
 			if (cart_mode(7 downto 3) /= "01101") or (cart_8xxx_enable = '1') then
 				cart_address(13) <= '1';
+			end if;
+		end if;
+	when cart_mode_bounty_bob =>
+		if access_axxx then
+			cart_address(15 downto 13) <= "100";
+		else
+			if a(12) = '1' then
+				cart_address(14 downto 12) <= '1' & bb_bank_9x;
+			else
+				cart_address(14 downto 12) <= '0' & bb_bank_8x;
 			end if;
 		end if;
 	when cart_mode_off =>
@@ -683,7 +736,7 @@ begin
 	end if;
 
 	-- disable writes
-	if  (rw = '0') then
+	if  (rw = '0' and cart_write_enable = '0') then
 		cart_address_enable <= false;
 	end if;
 
