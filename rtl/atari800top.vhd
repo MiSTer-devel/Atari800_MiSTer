@@ -228,12 +228,12 @@ begin
 end process;
 
 JOY1_n <= '1'&not(JOY1(8)&JOY1(7))&"11" when paddle_1(0) = '1' else not(JOY1(4)&JOY1(0)&JOY1(1)&JOY1(2)&JOY1(3)); --FRLDU
-JOY1_X <= JOY1X when paddle_1(0) = '1' else X"00" when paddle_1(1) = '0' else X"70" when JOY1(5) = '0' else X"90";
-JOY1_Y <= JOY1Y when paddle_1(0) = '1' else X"00" when paddle_1(2) = '0' else X"70" when JOY1(6) = '0' else X"90";
+JOY1_X <= JOY1X when paddle_1(0) = '1' else X"80" when (paddle_1(1) = '0' or JOY1(5) = '1') else X"70";
+JOY1_Y <= JOY1Y when paddle_1(0) = '1' else X"80" when (paddle_1(2) = '0' or JOY1(6) = '1') else X"70";
 
 JOY2_n <= '1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
-JOY2_X <= JOY2X when paddle_2(0) = '1' else X"00" when paddle_2(1) = '0' else X"70" when JOY2(5) = '0' else X"90";
-JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"00" when paddle_2(2) = '0' else X"70" when JOY2(6) = '0' else X"90";
+JOY2_X <= JOY2X when paddle_2(0) = '1' else X"80" when (paddle_2(1) = '0' or JOY2(5) = '1') else X"70";
+JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"80" when (paddle_2(2) = '0' or JOY2(6) = '1') else X"70";
 
 -- PS2 to pokey
 keyboard_map1 : entity work.ps2_to_atari800
