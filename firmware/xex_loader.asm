@@ -14,7 +14,7 @@ init_go
 	dec magic : reloc04 = *-1
 	jmp ($2e0)
 
-loader_len = *-$700
+loader_len = *-magic
 
 init1
 	ldx #0 : stx $09
@@ -24,6 +24,6 @@ init1
 
 	ldy #loader_len-1
 copy_loader_loop
-	lda $700,y : sta $100,y : reloc05 = *-1
+	lda magic,y : sta $100,y : reloc05 = *-1
 	dey : bpl copy_loader_loop
 	jmp $101 : reloc06 = *-1

@@ -1,5 +1,7 @@
 static const int main_ram_size=65536;
 
+#define XEX_LOADER_LOC 7 // XEX Loader is at $x00 by default
+
 #include "main.h" //!!!
 #include "atari_drive_emulator.h"
 
@@ -403,14 +405,16 @@ void actions()
 
 				// Clean reboot, but hold it for now
 				reboot(1, 1);
+				// Reinitialize the whole memory to 0 rather than the DRAM pattern
+				memset32(SDRAM_BASE, 0x00, main_ram_size/4);
 
-				xex_reloc = get_xexloc() ? 1 : 7;
+				xex_reloc = get_xexloc() ? 1 : XEX_LOADER_LOC;
 
 				xex_loader_base = (unsigned char volatile *)(atari_regbase + xex_reloc*0x100);
-				memcp8(xex_loader, (unsigned char *)(atari_regbase + 0x700), 0, XEX_LOADER_SIZE);
-				if(xex_reloc != 7)
+				memcp8(xex_loader, (unsigned char *)(atari_regbase + (XEX_LOADER_LOC << 8)), 0, XEX_LOADER_SIZE);
+				if(xex_reloc != XEX_LOADER_LOC)
 				{
-					((unsigned char volatile *)(atari_regbase+0x700))[XEX_STACK_FLAG] = xex_reloc;
+					((unsigned char volatile *)(atari_regbase+(XEX_LOADER_LOC << 8)))[XEX_STACK_FLAG] = xex_reloc;
 				}
 
 				*atari_coldst = 0;
@@ -507,8 +511,9 @@ void actions()
 				to_read = ((len_buf[0] & 0xFF) | ((len_buf[1] << 8) & 0xFF00)) + 1 - read_offset;
 				if(to_read < 1)
 					goto xex_eof;
-				
+
 				ok = file_read(xex_file, (unsigned char *)(atari_regbase + read_offset), to_read, &mounted);
+
 				if(ok != SimpleFile_OK || mounted != to_read)
 					goto xex_eof;
 
