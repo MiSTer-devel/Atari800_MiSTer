@@ -42,7 +42,9 @@ entity CartLogic is
 		cctl_dout: out std_logic_vector(7 downto 0);
 		cctl_dout_enable: out std_logic_vector(2 downto 0);
 		int_d_in : in std_logic_vector(7 downto 0);
-		int_d_out : out std_logic_vector(7 downto 0)
+		int_d_out : out std_logic_vector(7 downto 0);
+		master : in std_logic;
+		passthru : out std_logic
 	);
 		
 end CartLogic;
@@ -139,8 +141,8 @@ constant cart_mode_xemulti_1024:	cart_mode_type := "01101111";
 constant cart_mode_phoenix:			cart_mode_type := "01000000";
 constant cart_mode_ast_32:				cart_mode_type := "01000001";
 constant cart_mode_atrax_int_128:	cart_mode_type := "01000010";
-constant cart_mode_atrax_sdx_64:		cart_mode_type := "01000011"; -- TODO
-constant cart_mode_atrax_sdx_128:	cart_mode_type := "01000100"; -- TODO
+constant cart_mode_atrax_sdx_64:		cart_mode_type := "01000011";
+constant cart_mode_atrax_sdx_128:	cart_mode_type := "01000100";
 constant cart_mode_turbosoft_64:		cart_mode_type := "01000101";
 constant cart_mode_turbosoft_128:		cart_mode_type := "01000110";
 constant cart_mode_ultracart_32:		cart_mode_type := "01000111";
@@ -165,6 +167,7 @@ signal cart_axxx_enable: std_logic := '1';
 signal disable_rom: std_logic := '0'; -- for XEGS 8-15 bank cart
 signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
 signal cart_write_enable: std_logic := '0'; -- let's try making the SRAM part of the Corina cart work
+signal cart_passthru: std_logic := '0';
 
 signal access_8xxx: boolean;
 signal access_axxx: boolean;
@@ -262,6 +265,7 @@ begin
 			cart_write_enable <= '0';
 			bb_bank_8x <= "00";
 			bb_bank_9x <= "00";
+			cart_passthru <= '0';
 
 			-- cart specific initialization
 			case cart_mode is
@@ -542,12 +546,14 @@ begin
 				when cart_mode_sdx64 | cart_mode_atrax_sdx_64 =>
 					-- enable the other cartridge - not a(2) and a(3)
 					if (a(7 downto 4) = x"E") then
+						cart_passthru <= not(a(2)) and a(3);
 						cfg_enable <= not a(3);
 						cfg_bank(15 downto 13) <= not a(2 downto 0);
 					end if;
 				when cart_mode_sdx128 | cart_mode_atrax_sdx_128 =>
 					-- enable the other cartridge - not a(2) and a(3)
 					if (a(7 downto 5) = "111") then
+						cart_passthru <= not(a(2)) and a(3);
 						cfg_enable <= not a(3);
 						cfg_bank(16 downto 13) <= not a(4) & not a(2 downto 0);
 					end if;				
@@ -586,11 +592,14 @@ access_cart_data: process(a, rw, access_8xxx, access_axxx,
 	cfg_bank, cfg_enable,
 	cart_mode,
 	oss_bank,
-	cart_8xxx_enable, cart_axxx_enable)
+	cart_8xxx_enable, cart_axxx_enable,
+	cart_passthru,
+	master)
 
 variable bool_rd4: boolean;
 variable bool_rd5: boolean;
 begin
+	passthru <= '0';
 	cart_address <= cfg_bank & a(12 downto 0);
 	
 	if (cart_mode = cart_mode_atrax_int_128) then
@@ -731,6 +740,10 @@ begin
 		null;
 	end case;
 
+	if (master = '0') then
+		cart_address(20) <= '1';
+	end if;
+	
 	if (bool_rd4) then
 		rd4 <= '1';
 	else
@@ -746,6 +759,10 @@ begin
 	-- disable writes
 	if  (rw = '0' and cart_write_enable = '0') then
 		cart_address_enable <= false;
+	end if;
+	
+	if cart_passthru = '1' then
+		passthru <= '1';
 	end if;
 
 end process access_cart_data;

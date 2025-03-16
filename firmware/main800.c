@@ -205,7 +205,7 @@ static struct CartDef cartdef[] =
 
 char comp[sizeof(cartdef)/sizeof(cartdef[0])];
 
-int load_car(struct SimpleFile* file)
+int load_car(struct SimpleFile* file, u08 stacked)
 {
 	int i;
 	if (CARTRIDGE_MEM == 0)
@@ -299,8 +299,12 @@ int load_car(struct SimpleFile* file)
 		byte_len = (unsigned int) def->size << 10;
 		mode = def->mode;
 	}
+	if(stacked && (byte_len > 0x100000 || carttype == 85))
+	{
+		return 0;
+	}
 
-	ok = file_read(file, CARTRIDGE_MEM, byte_len, &len);
+	ok = file_read(file, CARTRIDGE_MEM + (stacked ? 0x100000 : 0), byte_len, &len);
 	if (ok != SimpleFile_OK || len != byte_len)
 	{
 		//LOG("cannot read cart data\n");
@@ -310,9 +314,9 @@ int load_car(struct SimpleFile* file)
 	// OSS 034M -> fix the broken bank layout to make it 043M
 	if(carttype == 3)
 	{
-		memcp8((unsigned char *)(CARTRIDGE_MEM+0x1000), (unsigned char *)(CARTRIDGE_MEM+0x4000), 0, 0x1000);
-		memcp8((unsigned char *)(CARTRIDGE_MEM+0x2000), (unsigned char *)(CARTRIDGE_MEM+0x1000), 0, 0x1000);
-		memcp8((unsigned char *)(CARTRIDGE_MEM+0x4000), (unsigned char *)(CARTRIDGE_MEM+0x2000), 0, 0x1000);
+		memcp8((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x1000), (unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x4000), 0, 0x1000);
+		memcp8((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x2000), (unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x1000), 0, 0x1000);
+		memcp8((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x4000), (unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x2000), 0, 0x1000);
 		carttype = 45;
 	}
 	
@@ -322,8 +326,8 @@ int load_car(struct SimpleFile* file)
 	{
 		for(i=0; i < 0x1000; i++)
 		{
-			*((unsigned char *)(CARTRIDGE_MEM+0x4000+i)) = *((unsigned char *)(CARTRIDGE_MEM+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM+0x0000+i));
-			*((unsigned char *)(CARTRIDGE_MEM+0x5000+i)) = *((unsigned char *)(CARTRIDGE_MEM+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM+0x1000+i));
+			*((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x4000+i)) = *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x0000+i));
+			*((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x5000+i)) = *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x1000+i));
 		}
 	}
 	// Corina 512K cart, move the last 8K EEPROM data to the 1024K boundary
@@ -435,8 +439,9 @@ void actions()
 				set_pause_6502(0);
 			}
 		}
-		else if(num == 4)
+		else if(num == 4 || num == 7)
 		{
+			u08 stacked = num == 4 ? 0 : 1;
 			set_pause_6502(1);
 			freeze();
 
@@ -446,12 +451,25 @@ void actions()
 			}
 			if(!file->size)
 			{
-				set_cart_select(0);
+				if(stacked)
+				{
+					set_cart2_select(0);	
+				}
+				else
+				{
+					set_cart_select(0);
+				}
 			}
 			else
 			{
-				int type = load_car(file);
+				int type = load_car(file, stacked);
+				int type_save = get_cart_select();
+
 				set_cart_select(0);
+				if(stacked)
+				{
+					set_cart2_select(0);	
+				}
 				if(!type)
 				{
 					clearscreen();
@@ -459,10 +477,22 @@ void actions()
 					debug_adjust = 0;
 					printf("Unknown cart type!");
 					wait_us(2000000);
+					if(stacked)
+					{
+						set_cart_select(type_save);						
+					}
 				}
 				else
 				{
-					set_cart_select(type);
+					if(stacked)
+					{
+						set_cart2_select(type);	
+						set_cart_select(type_save);	
+					}
+					else
+					{
+						set_cart_select(type);
+					}
 				}
 			}
 

@@ -74,6 +74,7 @@ PORT
 	atari800mode : in std_logic := '0';
 	
 	cart_select : in std_logic_vector(7 downto 0);
+	cart2_select : in std_logic_vector(7 downto 0);
 	
 	ram_select : in std_logic_vector(2 downto 0);
 	
@@ -234,7 +235,31 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart_cctl_dout_enable: std_logic_vector(2 downto 0);
 	signal emu_cart_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart_int_d_out: std_logic_vector(7 downto 0);
+	signal emu_cart_passthru : std_logic;
 
+	signal emu_cart1_s4_n: std_logic;
+	signal emu_cart1_s5_n: std_logic;
+	signal emu_cart1_rd4: std_logic;
+	signal emu_cart1_rd5: std_logic;
+	signal emu_cart1_address: std_logic_vector(20 downto 0);
+	signal emu_cart1_address_enable: boolean;
+	signal emu_cart1_cctl_dout: std_logic_vector(7 downto 0);
+	signal emu_cart1_cctl_dout_enable: std_logic_vector(2 downto 0);
+	signal emu_cart1_int_d_in: std_logic_vector(7 downto 0);
+	signal emu_cart1_int_d_out: std_logic_vector(7 downto 0);
+
+	signal emu_cart2_s4_n: std_logic;
+	signal emu_cart2_s5_n: std_logic;
+	signal emu_cart2_rd4: std_logic;
+	signal emu_cart2_rd5: std_logic;
+	signal emu_cart2_address: std_logic_vector(20 downto 0);
+	signal emu_cart2_address_enable: boolean;
+	signal emu_cart2_cctl_dout: std_logic_vector(7 downto 0);
+	signal emu_cart2_cctl_dout_enable: std_logic_vector(2 downto 0);
+	signal emu_cart2_int_d_in: std_logic_vector(7 downto 0);
+	signal emu_cart2_int_d_out: std_logic_vector(7 downto 0);
+
+	
 	signal atari_clk_enable: std_logic;
 	signal freezer_disable_atari: boolean;
 	signal freezer_access_type: std_logic_vector(1 downto 0);
@@ -327,8 +352,8 @@ BEGIN
 		end if;
 	end process;
 
-	-- emulated cart
-	emu_cart: entity work.CartLogic
+	-- emulated cart #1, master
+	emu_cart1: entity work.CartLogic
 	port map (clk => clk,
 		clk_enable => atari_clk_enable,
 		cart_mode => cart_select(7 downto 0),
@@ -336,20 +361,73 @@ BEGIN
 		cctl_n => emu_cart_cctl_n,
 		d_in => data_write_next(7 downto 0),
 		rw => emu_cart_rw,
-		s4_n => emu_cart_s4_n,
-		s5_n => emu_cart_s5_n,
+		s4_n => emu_cart1_s4_n,
+		s5_n => emu_cart1_s5_n,
 		--s4_n_out => emu_cart_s4_n_out,
 		--s5_n_out => emu_cart_s5_n_out,
-		rd4 => emu_cart_rd4,
-		rd5 => emu_cart_rd5,
-		cart_address => emu_cart_address,
-		cart_address_enable => emu_cart_address_enable,
-		cctl_dout => emu_cart_cctl_dout,
-		cctl_dout_enable => emu_cart_cctl_dout_enable,
-		int_d_in => emu_cart_int_d_in,
-		int_d_out => emu_cart_int_d_out
+		rd4 => emu_cart1_rd4,
+		rd5 => emu_cart1_rd5,
+		cart_address => emu_cart1_address,
+		cart_address_enable => emu_cart1_address_enable,
+		cctl_dout => emu_cart1_cctl_dout,
+		cctl_dout_enable => emu_cart1_cctl_dout_enable,
+		int_d_in => emu_cart1_int_d_in,
+		int_d_out => emu_cart1_int_d_out,
+		master => '1',
+		passthru => emu_cart_passthru
 	);
 
+	-- emulated cart #2, slave / stacked
+	emu_cart2: entity work.CartLogic
+	port map (clk => clk,
+		clk_enable => atari_clk_enable,
+		cart_mode => cart2_select(7 downto 0),
+		a => addr_next(12 downto 0),
+		cctl_n => emu_cart_cctl_n,
+		d_in => data_write_next(7 downto 0),
+		rw => emu_cart_rw,
+		s4_n => emu_cart2_s4_n,
+		s5_n => emu_cart2_s5_n,
+		rd4 => emu_cart2_rd4,
+		rd5 => emu_cart2_rd5,
+		cart_address => emu_cart2_address,
+		cart_address_enable => emu_cart2_address_enable,
+		cctl_dout => emu_cart2_cctl_dout,
+		cctl_dout_enable => emu_cart2_cctl_dout_enable,
+		int_d_in => emu_cart2_int_d_in,
+		int_d_out => emu_cart2_int_d_out,
+		master => '0'
+	);	
+	
+	process(emu_cart_passthru,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,
+		emu_cart1_address,emu_cart2_address,emu_cart1_address_enable,emu_cart2_address_enable,emu_cart1_cctl_dout,emu_cart2_cctl_dout,
+		emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
+	begin
+		if emu_cart_passthru = '1' then
+			emu_cart2_s4_n <= emu_cart_s4_n;
+			emu_cart2_s5_n <= emu_cart_s5_n;
+			emu_cart_rd4 <= emu_cart2_rd4;
+			emu_cart_rd5 <= emu_cart2_rd5;
+			emu_cart_address <= emu_cart2_address;
+			emu_cart_address_enable <= emu_cart2_address_enable;
+			emu_cart_cctl_dout <= emu_cart2_cctl_dout;
+			emu_cart_cctl_dout_enable <= emu_cart2_cctl_dout_enable;
+			emu_cart2_int_d_in <= emu_cart_int_d_in;
+			emu_cart_int_d_out <= emu_cart2_int_d_out;
+		else
+			emu_cart1_s4_n <= emu_cart_s4_n;
+			emu_cart1_s5_n <= emu_cart_s5_n;
+			emu_cart_rd4 <= emu_cart1_rd4;
+			emu_cart_rd5 <= emu_cart1_rd5;
+			emu_cart_address <= emu_cart1_address;
+			emu_cart_address_enable <= emu_cart1_address_enable;
+			emu_cart_cctl_dout <= emu_cart1_cctl_dout;
+			emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
+			emu_cart1_int_d_in <= emu_cart_int_d_in;
+			emu_cart_int_d_out <= emu_cart1_int_d_out;
+		end if;
+	end process;
+	
 	process(cart_select)
 	begin
 		if (cart_select(7 downto 0) = "00000000") then

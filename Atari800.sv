@@ -234,6 +234,7 @@ localparam CONF_STR = {
 	"S5,XEXCOMEXE,Load XEX;",
 	"-;",
 	"S4,CARROMBIN,Load Cart;",
+	"S7,CARROMBIN,Stack Cart;",
 	"-;",
 	"P1,Drives & Loader;",
 	"P1-;",
@@ -323,14 +324,14 @@ wire        forced_scandoubler;
 wire [21:0] gamma_bus;
 
 reg  [31:0] sd_lba;
-reg   [6:0] sd_rd;
-reg   [6:0] sd_wr;
-wire  [6:0] sd_ack;
+reg   [7:0] sd_rd;
+reg   [7:0] sd_wr;
+wire  [7:0] sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
 wire  [7:0] sd_buff_din;
 wire        sd_buff_wr;
-wire  [6:0] img_mounted;
+wire  [7:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
 wire [13:0] ioctl_addr;
@@ -339,7 +340,7 @@ wire        ioctl_wr;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
 
-hps_io #(.CONF_STR(CONF_STR), .VDNUM(7)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -358,13 +359,13 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(7)) hps_io
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
-	.sd_lba('{sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba}),
+	.sd_lba('{sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba}),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din}),
+	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din}),
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
@@ -745,6 +746,7 @@ always @(posedge clk_sys) begin
 		if(img_mounted[4]) zpu_fileno <= 4;
 		if(img_mounted[5]) zpu_fileno <= 5;
 		if(img_mounted[6]) zpu_fileno <= 6;
+		if(img_mounted[7]) zpu_fileno <= 7;
 
 		zpu_filetype <= ioctl_index[7:6];
 		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5];

@@ -191,6 +191,7 @@ ENTITY atari800core IS
 			-- XL/XE mode  : 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 			-- 400/800 mode: 16K,32K,48K,52K,...? 
 		CART_EMULATION_SELECT : in std_logic_vector(7 downto 0);
+		CART2_EMULATION_SELECT : in std_logic_vector(7 downto 0);
 		PAL :  in STD_LOGIC;
 		EXT_ANTIC :  in STD_LOGIC;
 		CLIP_SIDES : in STD_LOGIC;
@@ -523,6 +524,7 @@ PORT MAP(CLK => CLK,
 		 WRITE_DATA => WRITE_DATA,
 		 d6_wr_enable => covox_write_enable,
 		 cart_select => CART_EMULATION_SELECT,
+		 cart2_select => CART2_EMULATION_SELECT,
 		 rom_in_ram => ROM_IN_RAM,
 		 freezer_enable => freezer_enable,
 		 freezer_activate => freezer_activate,

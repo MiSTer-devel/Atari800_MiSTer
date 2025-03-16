@@ -54,6 +54,7 @@ BIT_REG(,0x1,1,reset_6502,zpu_out1)
 //BIT_REG(,0x3f,2,turbo_6502,zpu_out1)
 //BIT_REG(,0x7,8,ram_select,zpu_out1)
 //BIT_REG(,0x3f,11,rom_select,zpu_out1)
+BIT_REG(,0xff,9,cart2_select,zpu_out1)
 BIT_REG(,0xff,17,cart_select,zpu_out1)
 // reserve 2 bits for extending cart_select - now taken!
 BIT_REG(,0x01,25,freezer_enable,zpu_out1)
@@ -250,7 +251,7 @@ reboot(int cold, int pause)
 	set_pause_6502(pause);
 }
 
-#define NUM_FILES 7
+#define NUM_FILES 8
 struct SimpleFile files[NUM_FILES];
 
 int last_mount;
