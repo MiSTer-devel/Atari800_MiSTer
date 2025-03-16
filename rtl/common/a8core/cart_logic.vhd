@@ -347,12 +347,20 @@ begin
 					end if;
 
 					-- Corina
-					if (cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024) then
-						cfg_enable <= not(d_in(7));
-						cfg_bank(19 downto 14) <= d_in(5 downto 0);
-						mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
-						if (cart_mode = cart_mode_corina_512) then
-							cart_write_enable <= d_in(5); -- try to imitate the SRAM 
+					if ((cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024)) and (a(7 downto 0) = x"00") then
+					   if d_in(7) = '1' then
+							cfg_enable <= '0';
+						else
+							if d_in(6 downto 5) /= "11" then
+								cart_write_enable <= '0';
+								cfg_enable <= '1';
+								cfg_bank(19 downto 14) <= d_in(5 downto 0);
+								mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
+								-- try to imitate the SRAM
+								if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
+									cart_write_enable <= '1';  
+								end if;
+							end if;
 						end if;
 					end if;
 					
