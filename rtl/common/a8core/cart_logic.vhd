@@ -150,6 +150,8 @@ constant cart_mode_dawli_32:			cart_mode_type := "01001000";
 constant cart_mode_dawli_64:			cart_mode_type := "01001001";
 constant cart_mode_jrc_lin_64:		cart_mode_type := "01001010";
 constant cart_mode_jrc_int_64:		cart_mode_type := "01001011";
+constant cart_mode_sdx_side2:			cart_mode_type := "01001100";
+constant cart_mode_sdx_u1mb:			cart_mode_type := "01001101";
 
 constant cart_mode_db_32:			cart_mode_type := "01110000";
 constant cart_mode_corina_512:		cart_mode_type := "01110001";
@@ -245,6 +247,10 @@ begin
 		end if;
 		if (cart_mode = cart_mode_ast_32) then
 			cctl_dout_enable(2 downto 0) <= "101";
+		end if;
+		if (cart_mode = cart_mode_sdx_side2) and (a(7 downto 0) = x"E1") then
+			cctl_dout_enable(0) <= '1';
+			cctl_dout <= (not cfg_enable) & (not cart_passthru) & cfg_bank(18 downto 13);			
 		end if;
 	end if;
 end process config_io;
@@ -439,6 +445,13 @@ begin
 						bank_counter := bank_counter + 1;
 						cfg_bank(19 downto 13) <= std_logic_vector(to_unsigned(bank_counter,7));
 					end if;
+
+					if ((cart_mode = cart_mode_sdx_u1mb) and (a(7 downto 0) = x"E0")) or ((cart_mode = cart_mode_sdx_side2) and (a(7 downto 0) = x"E1"))then
+						cfg_enable <= not(d_in(7));
+						cart_passthru <= d_in(7) and not(d_in(6));
+						cfg_bank(18 downto 13) <= d_in(5 downto 0);
+					end if;
+
 				end if; -- rw = 0
 
 				-- cart config using addresses, ignore read/write
@@ -543,7 +556,7 @@ begin
 							cfg_bank(15 downto 13) <= a(2 downto 0);
 						end if;
 					end if;
-				when cart_mode_sdx64 | cart_mode_atrax_sdx_64 =>
+					when cart_mode_sdx64 | cart_mode_atrax_sdx_64 =>
 					-- enable the other cartridge - not a(2) and a(3)
 					if (a(7 downto 4) = x"E") then
 						cart_passthru <= not(a(2)) and a(3);

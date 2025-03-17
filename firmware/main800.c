@@ -106,6 +106,8 @@ struct CartDef {
 #define TC_MODE_DAWLI_64	0x49
 #define TC_MODE_JRC_LIN_64	0x4A
 #define TC_MODE_JRC_INT_64	0x4B
+#define TC_MODE_SDX_SIDE2	0x4C
+#define TC_MODE_SDX_U1MB	0x4D
 #define TC_MODE_DB_32		0x70
 #define TC_MODE_CORINA_512	0x71
 #define TC_MODE_CORINA_1024	0x72
@@ -219,7 +221,7 @@ int load_car(struct SimpleFile* file, u08 stacked)
 
 	enum SimpleFileStatus ok;
 	unsigned char mode = TC_MODE_OFF;
-	unsigned char carttype;
+	unsigned char carttype = 0;
 	int len;
 	
 	unsigned int byte_len = file_size(file);
@@ -235,8 +237,22 @@ int load_car(struct SimpleFile* file, u08 stacked)
 			carttype = cartdef[i].carttype;
 		}
 		
-		if(!n) return 0;
-
+		if(n != 1)
+		{
+			if(!n && stacked) return 0;
+			unsigned char *one_block = (unsigned char *)(CARTRIDGE_MEM + 0x1FE000);
+			ok = file_read(file, one_block, 0x2000, &len);
+			file_seek(file, 0);
+			if(ok == SimpleFile_OK && len == 0x2000 && one_block[0] == 'S' && one_block[1] == 'D' && one_block[2] == 'X' && (one_block[0x1FF3] == 0xE0 || one_block[0x1FF3] == 0xE1))
+			{
+				mode = (one_block[0x1FF3] == 0xE1) ? TC_MODE_SDX_SIDE2 : TC_MODE_SDX_U1MB;
+				n = 1;
+			}
+			if(!n)
+			{
+				return 0;
+			}
+		}
 		sel = 0;
 		if(n > 1)
 		{
