@@ -457,13 +457,16 @@ void actions()
 		}
 		else if(num == 4 || num == 7)
 		{
-			u08 stacked = num == 4 ? 0 : 1;
+			u08 stacked = (num == 7) ? 1 : 0;
 			set_pause_6502(1);
 			freeze();
 
-			for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
+			if(!stacked)
 			{
-				set_drive_status(mounted, 0);
+				for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
+				{
+					set_drive_status(mounted, 0);
+				}
 			}
 			if(!file->size)
 			{
@@ -479,12 +482,14 @@ void actions()
 			else
 			{
 				int type = load_car(file, stacked);
-				int type_save = get_cart_select();
 
-				set_cart_select(0);
 				if(stacked)
 				{
 					set_cart2_select(0);	
+				}
+				else
+				{
+					set_cart_select(0);					
 				}
 				if(!type)
 				{
@@ -493,17 +498,12 @@ void actions()
 					debug_adjust = 0;
 					printf("Unknown cart type!");
 					wait_us(2000000);
-					if(stacked)
-					{
-						set_cart_select(type_save);						
-					}
 				}
 				else
 				{
 					if(stacked)
 					{
 						set_cart2_select(type);	
-						set_cart_select(type_save);	
 					}
 					else
 					{
@@ -513,7 +513,10 @@ void actions()
 			}
 
 			restore();
-			reboot(1, 0);
+			if(!stacked)
+			{
+				reboot(1, 0);
+			}
 		}
 	}
 

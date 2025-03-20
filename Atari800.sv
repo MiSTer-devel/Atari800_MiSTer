@@ -749,7 +749,7 @@ always @(posedge clk_sys) begin
 		if(img_mounted[7]) zpu_fileno <= 7;
 
 		zpu_filetype <= ioctl_index[7:6];
-		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5];
+		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5] | img_mounted[7];
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end
