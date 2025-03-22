@@ -399,9 +399,7 @@ BEGIN
 		master => '0'
 	);	
 	
-	process(emu_cart_passthru,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,
-		emu_cart1_address,emu_cart2_address,emu_cart1_address_enable,emu_cart2_address_enable,emu_cart1_cctl_dout,emu_cart2_cctl_dout,
-		emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
+	process(emu_cart_passthru)
 	begin
 		if emu_cart_passthru = '1' then
 			emu_cart2_s4_n <= emu_cart_s4_n;

@@ -727,10 +727,10 @@ always @(posedge clk_sys) begin
 	if(zpu_io_wr) zpu_buff_addr <= 0;
 
 	old_blrd <= zpu_block_rd;
-	if(~old_blrd & zpu_block_rd) {zpu_io_done,sd_rd[{zpu_drv_num[2], zpu_drv_num[1], zpu_drv_num[0]}]} <= 1;
+	if(~old_blrd & zpu_block_rd) {zpu_io_done,sd_rd[zpu_drv_num[2:0]]} <= 1;
 
 	old_blwr <= zpu_block_wr;
-	if(~old_blwr & zpu_block_wr) {zpu_io_done,sd_wr[{zpu_drv_num[2], zpu_drv_num[1], zpu_drv_num[0]}]} <= 1;
+	if(~old_blwr & zpu_block_wr) {zpu_io_done,sd_wr[zpu_drv_num[2:0]]} <= 1;
 
 	if(|sd_ack) {sd_rd, sd_wr} <= 0;
 
@@ -746,10 +746,10 @@ always @(posedge clk_sys) begin
 		if(img_mounted[4]) zpu_fileno <= 4;
 		if(img_mounted[5]) zpu_fileno <= 5;
 		if(img_mounted[6]) zpu_fileno <= 6;
-		if(img_mounted[7]) zpu_fileno <= 7;
+		if(img_mounted == 128) zpu_fileno <= 7;
 
 		zpu_filetype <= ioctl_index[7:6];
-		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5] | img_mounted[7];
+		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5];
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end
