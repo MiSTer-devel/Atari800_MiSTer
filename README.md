@@ -35,7 +35,10 @@ A800: There is an entry to directly load the Atari OS executable files (the so c
 If a title does not load, you may want to try to switch the loader location in Atari memory (Standard - it sits at 0x700, Stack - it is located at the bottom of the stack area at 0x100).
 
 ### Classic Atari 800 mode
-When selecting OS-B in the Machine/BIOS menu option, the core works in the classic Atari 800 mode (reset required to take effect), and different memory layouts are available / activated. Note that the 52KB memory layout is not compatible with the stock 800 OS-A/B system, it freezes the boot process. This is not a core bug, but an Atari 800 legacy.
+When selecting OS-B in the Machine/BIOS menu option, the core works in the classic Atari 800 mode (reset required to take effect), and different memory layouts are available / activated. Note that the 52KB memory layout is not compatible with the core built-in 800 OS-A/B system, it freezes the boot process. This is not a core bug, but an Atari 800 legacy. To remedy this you have to use / load the genuine OS-A/B rom file.
+
+### Cartridges
+With the newer version of the core the database of supported cartridge types have been extended and the ability to "stack" cartridges have been added. The stacking is only working or is useful when the first cartridge is a pass-thru type, these are the different kinds of Sparta DOS X cartridges. Moreover, now the selected distributions of SDX provided by the Sparta DOS X project are supported, you can use the rom files for Ultimate 1MB or Super Cart directly with the core. When stacking the size of both cartridges is limited to 1MB (this is only partly checked) when normally cartridges up to 2MB in size are supported. This, however, is not an actual limitation as all SDX releases are under 1MB and so are any useful to stack programming language cartridges, like MAC/65 or Action!. In the classic 800 mode, see above, the stacked cartridge slot doubles as the right cartridge slot of Atari 800 and the actual stacking for SDX is not supported.
 
 ### Differences from original version
 * Joystick/Paddle mode switched by joystick. Press **Paddle1/2** to switch to paddle mode (analog X/Y). Press **Fire** to switch to joystick mode (digital X/Y).

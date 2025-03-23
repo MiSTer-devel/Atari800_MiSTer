@@ -513,7 +513,7 @@ void actions()
 			}
 
 			restore();
-			if(!stacked)
+			if(!stacked || get_mode800())
 			{
 				reboot(1, 0);
 			}

@@ -399,36 +399,62 @@ BEGIN
 		master => '0'
 	);	
 	
-	process(emu_cart_passthru)
+	process(emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n)
 	begin
-		if emu_cart_passthru = '1' then
-			emu_cart2_s4_n <= emu_cart_s4_n;
-			emu_cart2_s5_n <= emu_cart_s5_n;
-			emu_cart_rd4 <= emu_cart2_rd4;
-			emu_cart_rd5 <= emu_cart2_rd5;
-			emu_cart_address <= emu_cart2_address;
-			emu_cart_address_enable <= emu_cart2_address_enable;
-			emu_cart_cctl_dout <= emu_cart2_cctl_dout;
-			emu_cart_cctl_dout_enable <= emu_cart2_cctl_dout_enable;
-			emu_cart2_int_d_in <= emu_cart_int_d_in;
-			emu_cart_int_d_out <= emu_cart2_int_d_out;
-		else
-			emu_cart1_s4_n <= emu_cart_s4_n;
+		if atari800mode = '1' then
 			emu_cart1_s5_n <= emu_cart_s5_n;
-			emu_cart_rd4 <= emu_cart1_rd4;
+			emu_cart2_s5_n <= '1';
+			emu_cart1_s4_n <= emu_cart_s4_n;
+			emu_cart2_s4_n <= emu_cart_s4_n;
 			emu_cart_rd5 <= emu_cart1_rd5;
-			emu_cart_address <= emu_cart1_address;
-			emu_cart_address_enable <= emu_cart1_address_enable;
 			emu_cart_cctl_dout <= emu_cart1_cctl_dout;
 			emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
+			emu_cart_address <= emu_cart1_address;
+			emu_cart_address_enable <= emu_cart1_address_enable;
 			emu_cart1_int_d_in <= emu_cart_int_d_in;
 			emu_cart_int_d_out <= emu_cart1_int_d_out;
+			-- if the second/right cart is mounted line 4 reqests are its responsibility
+			if (cart2_select(7 downto 0) /= "00000000") then
+				emu_cart_rd4 <= emu_cart2_rd4;
+			else
+				emu_cart_rd4 <= emu_cart1_rd4;
+			end if;
+			if ((cart2_select(7 downto 0) /= "00000000") and (emu_cart_s4_n = '0')) then
+				emu_cart_address <= emu_cart2_address;
+				emu_cart_address_enable <= emu_cart2_address_enable;
+				emu_cart2_int_d_in <= emu_cart_int_d_in;
+				emu_cart_int_d_out <= emu_cart2_int_d_out;
+			end if;
+		else
+			if emu_cart_passthru = '1' then
+				emu_cart2_s4_n <= emu_cart_s4_n;
+				emu_cart2_s5_n <= emu_cart_s5_n;
+				emu_cart_rd4 <= emu_cart2_rd4;
+				emu_cart_rd5 <= emu_cart2_rd5;
+				emu_cart_address <= emu_cart2_address;
+				emu_cart_address_enable <= emu_cart2_address_enable;
+				emu_cart_cctl_dout <= emu_cart2_cctl_dout;
+				emu_cart_cctl_dout_enable <= emu_cart2_cctl_dout_enable;
+				emu_cart2_int_d_in <= emu_cart_int_d_in;
+				emu_cart_int_d_out <= emu_cart2_int_d_out;
+			else
+				emu_cart1_s4_n <= emu_cart_s4_n;
+				emu_cart1_s5_n <= emu_cart_s5_n;
+				emu_cart_rd4 <= emu_cart1_rd4;
+				emu_cart_rd5 <= emu_cart1_rd5;
+				emu_cart_address <= emu_cart1_address;
+				emu_cart_address_enable <= emu_cart1_address_enable;
+				emu_cart_cctl_dout <= emu_cart1_cctl_dout;
+				emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
+				emu_cart1_int_d_in <= emu_cart_int_d_in;
+				emu_cart_int_d_out <= emu_cart1_int_d_out;
+			end if;
 		end if;
 	end process;
 	
-	process(cart_select)
+	process(cart_select,atari800mode)
 	begin
-		if (cart_select(7 downto 0) = "00000000") then
+		if (cart_select(7 downto 0) = "00000000") and ((atari800mode = '0') or (cart2_select(7 downto 0) = "00000000")) then
 			emu_cart_enable <= '0';
 		else
 			emu_cart_enable <= '1';
