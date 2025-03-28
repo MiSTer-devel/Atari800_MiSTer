@@ -259,6 +259,14 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart2_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart2_int_d_out: std_logic_vector(7 downto 0);
 
+	signal emu_pbi_enable : std_logic;
+	signal emu_pbi_d1xx : std_logic;
+	signal emu_pbi_d8xx : std_logic;
+	signal emu_pbi_rom_address : std_logic_vector(12 downto 0);
+	signal emu_pbi_rom_address_enable : std_logic;
+	signal emu_pbi_data_out : std_logic_vector(7 downto 0);
+	signal emu_pbi_data_out_enable : std_logic;
+	signal pbi_mpd : std_logic;
 	
 	signal atari_clk_enable: std_logic;
 	signal freezer_disable_atari: boolean;
@@ -399,6 +407,21 @@ BEGIN
 		master => '0'
 	);	
 	
+	emu_pbi_rom: entity work.PBIROM
+	port map (clk => clk,
+		clk_enable => atari_clk_enable,
+		reset_n => reset_n,
+		a => addr_next(10 downto 0),
+		rw => emu_cart_rw, -- OK to reuse?
+		data_in => data_write_next(7 downto 0),
+		d1xx => emu_pbi_d1xx,
+		d8xx => emu_pbi_d8xx,
+		pbi_rom_address => emu_pbi_rom_address,
+		pbi_rom_address_enable => emu_pbi_rom_address_enable,
+		data_out => emu_pbi_data_out,
+		data_out_enable => emu_pbi_data_out_enable
+	);	
+
 	process(emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n)
 	begin
 		if atari800mode = '1' then
@@ -461,6 +484,16 @@ BEGIN
 		end if;
 	end process;
 
+	process(pbi_mpd_n,atari800mode,emu_pbi_rom_address_enable)
+	begin
+			emu_pbi_enable <= '0'; -- TODO from an external config signal (should be latched on reset)
+			pbi_mpd <= not(pbi_mpd_n);
+			if atari800mode = '0' then -- TODO and external PBI emy enable
+				emu_pbi_enable <= '1';
+				pbi_mpd <= emu_pbi_rom_address_enable;
+			end if;
+	end process;
+	
 	-- freezer
 	freezer_activate_n <= not (freezer_enable and freezer_activate);
 	freezer: entity work.FreezerLogic
@@ -789,8 +822,12 @@ end generate;
 		emu_cart_address, emu_cart_address_enable,
 		emu_cart_cctl_dout, emu_cart_cctl_dout_enable,
 
+		-- pbi emu
+		emu_pbi_enable,
+		emu_pbi_rom_address, emu_pbi_rom_address_enable,
+		emu_pbi_data_out, emu_pbi_data_out_enable,
 		-- pbi stuff
-		pbi_mpd_n,
+		pbi_mpd,
 		
 		-- input data from n sources
 		GTIA_DATA,POKEY_DATA,POKEY2_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
@@ -850,7 +887,9 @@ end generate;
 		emu_cart_s5_n <= '1';
 
 		emu_cart_cctl_n <= '1';
-
+		emu_pbi_d1xx <= '0';
+		emu_pbi_d8xx <= '0';
+		
 		if (write_enable_next = '1') then
 			emu_cart_rw <= '0';
 		else
@@ -937,7 +976,14 @@ end generate;
 					ram_chip_select <= '0';	
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
-			
+					-- PBI BIOS rom emulation
+					if (emu_pbi_enable = '1') then
+						emu_pbi_d1xx <= '1';
+						if (write_enable_next = '0') and (emu_pbi_data_out_enable = '1') then
+							MEMORY_DATA_INT(7 downto 0) <= emu_pbi_data_out;
+						end if;
+					end if;
+					
 				-- POKEY
 				when X"D2" =>				
 					if (STEREO = '0' or addr_next(4) = '0') then
@@ -1124,7 +1170,20 @@ end generate;
 				when 
 					X"D8"|X"D9"|X"DA"|X"DB"|X"DC"|X"DD"|X"DE"|X"DF" =>
 					
-					if (atari800mode='1' or (portb(0) = '1' and pbi_mpd_n='1')) then
+					if (emu_pbi_enable = '1') then
+						emu_pbi_d8xx <= '1';
+						-- remap to SDRAM
+						if (emu_pbi_rom_address_enable = '1') then
+							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR;
+							SDRAM_ADDR(13 downto 0) <= '1' & emu_pbi_rom_address;							
+							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+							request_complete <= sdram_request_COMPLETE;
+							sdram_chip_select <= start_request;
+							ram_chip_select <= '0';
+						end if;
+					end if;
+					
+					if (atari800mode='1' or (portb(0) = '1' and pbi_mpd='0')) then
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';																		
 						--request_complete <= ROM_REQUEST_COMPLETE;
