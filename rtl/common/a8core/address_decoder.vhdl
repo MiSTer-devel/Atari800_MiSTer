@@ -265,6 +265,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_pbi_rom_address : std_logic_vector(12 downto 0);
 	signal emu_pbi_rom_address_enable : std_logic;
 	signal emu_pbi_data_out : std_logic_vector(7 downto 0);
+	signal emu_pbi_cache_data_out : std_logic_vector(7 downto 0);
 	signal emu_pbi_data_out_enable : std_logic;
 	signal pbi_mpd : std_logic;
 	
@@ -419,6 +420,7 @@ BEGIN
 		pbi_rom_address => emu_pbi_rom_address,
 		pbi_rom_address_enable => emu_pbi_rom_address_enable,
 		data_out => emu_pbi_data_out,
+		cache_data_out => emu_pbi_cache_data_out,
 		data_out_enable => emu_pbi_data_out_enable
 	);	
 
@@ -826,6 +828,7 @@ end generate;
 		emu_pbi_enable,
 		emu_pbi_rom_address, emu_pbi_rom_address_enable,
 		emu_pbi_data_out, emu_pbi_data_out_enable,
+		emu_pbi_cache_data_out,
 		-- pbi stuff
 		pbi_mpd,
 		
@@ -978,6 +981,7 @@ end generate;
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					-- PBI BIOS rom emulation
 					if (emu_pbi_enable = '1') then
+						MEMORY_DATA_INT(15 downto 8) <= emu_pbi_cache_data_out;
 						emu_pbi_d1xx <= '1';
 						if (write_enable_next = '0') and (emu_pbi_data_out_enable = '1') then
 							MEMORY_DATA_INT(7 downto 0) <= emu_pbi_data_out;
@@ -1175,7 +1179,7 @@ end generate;
 						-- remap to SDRAM
 						if (emu_pbi_rom_address_enable = '1') then
 							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR;
-							SDRAM_ADDR(13 downto 0) <= '1' & emu_pbi_rom_address;							
+							SDRAM_ADDR(13 downto 0) <= '0' & emu_pbi_rom_address;							
 							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
 							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;

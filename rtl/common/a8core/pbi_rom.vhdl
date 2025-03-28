@@ -38,6 +38,7 @@ entity PBIROM is
 		pbi_rom_address: out std_logic_vector(12 downto 0);
 		pbi_rom_address_enable: out std_logic;
 		data_out: out std_logic_vector(7 downto 0);
+		cache_data_out: out std_logic_vector(7 downto 0);
 		data_out_enable: out std_logic
 	);	
 end PBIROM;
@@ -45,51 +46,66 @@ end PBIROM;
 architecture vhdl of PBIROM is
 
 signal pbi_rom_bank: std_logic_vector(12 downto 11) := (others => '0');
+signal pbi_rom_bank_next: std_logic_vector(12 downto 11);
 signal pbi_rom_enable: std_logic := '0';
 type small_ram is array(0 to 253) of std_logic_vector(7 downto 0);
 signal pbi_ram: small_ram;
 
 begin
 
-process(a, rw, d1xx)
+process(a, rw, d1xx, pbi_rom_enable, pbi_ram)
 begin
 	data_out_enable <= '0';
 	data_out <= x"ff";
+	cache_data_out <= x"ff";
 
 	if (d1xx = '1') and (rw = '1') then
-		data_out_enable <= '1';
-		if (a(7 downto 0) = x"FF") then
+		case a(7 downto 0) is 
+		when x"ff" =>
 			-- read out PDVI register
 			data_out <= x"00";
-		elsif (a(7 downto 0) /= x"FE") then
+			data_out_enable <= '1';
+			cache_data_out <= "0000000" & pbi_rom_enable;
+		when x"fe" =>
+			cache_data_out <= "000000" & pbi_rom_bank;
+		when others =>
 			-- read out from D100-D1FD small RAM
 			data_out <= pbi_ram(conv_integer(unsigned(a(7 downto 0))));
-		end if;
+			cache_data_out <= pbi_ram(conv_integer(unsigned(a(7 downto 0))));
+			data_out_enable <= pbi_rom_enable;
+		end case;
 	end if;
 end process;
 
-process(clk)
+process(clk, reset_n, pbi_rom_bank_next)
 begin
 	if rising_edge(clk) then
+		pbi_rom_bank <= pbi_rom_bank_next;
 		if (reset_n = '0') then
 			pbi_rom_bank <= (others => '0');
 			pbi_rom_enable <= '0';
 		else
-			if (clk_enable = '1') and (d1xx = '1') and (rw = '0') then
-				case a(7 downto 0) is
-					when x"FF" =>
-						-- This PBI is ID 0
-						pbi_rom_enable <= data_in(0);
-						-- TODO should the bank be reset to 0 every time
-						-- we select the ROM? Probably yes
-						if (data_in(0) = '1') then
-							pbi_rom_bank <= (others => '0');						
-						end if;
-					when x"FE" =>
-						pbi_rom_bank <= data_in(1 downto 0);
-					when others => 
-						pbi_ram(conv_integer(unsigned(a(7 downto 0)))) <= data_in;
-				end case;
+			if (clk_enable = '1') and (d1xx = '1') and (rw = '0') and (a(7 downto 0) = x"FF") then
+				-- This PBI is ID 0
+				pbi_rom_enable <= data_in(0);
+			end if;
+		end if;
+	end if;
+end process;
+
+process(clk, reset_n, clk_enable, d1xx, rw, pbi_rom_enable, pbi_rom_bank)
+begin
+	if rising_edge(clk) and (clk_enable = '1') and (d1xx = '1') and (rw = '0') and (reset_n = '1') then
+		pbi_rom_bank_next <= pbi_rom_bank;
+		if (pbi_rom_enable = '0') then
+			-- TODO should the bank be reset to 0 every time
+			-- we deselect the ROM? Probably yes
+			pbi_rom_bank_next <= (others => '0');
+		else
+			if (a(7 downto 0) = x"FE") then
+				pbi_rom_bank_next <= data_in(1 downto 0);
+			elsif (a(7 downto 0) /= x"FF") then
+				pbi_ram(conv_integer(unsigned(a(7 downto 0)))) <= data_in;
 			end if;
 		end if;
 	end if;
