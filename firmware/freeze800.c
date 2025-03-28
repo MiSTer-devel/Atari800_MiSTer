@@ -56,8 +56,8 @@ void freeze()
 		//antic
 		memcp8(custom_mirror,store_mem,0xd400,0x10);
 
-		//PBI rom control
-		memcp8(custom_mirror,store_mem,0xd1fe,0x02);
+		//PBI ram and rom control
+		memcp8(custom_mirror,store_mem,0xd100,0x100);
 
 		// Write 0 to custom chip regs
 		memset8(atari_base+0xd000,0,0x20);
@@ -109,10 +109,10 @@ void restore()
 		memcp8(store_mem,atari_base,0xd200,0x20);
 		// antic
 		memcp8(store_mem,atari_base,0xd400,0x10);
+
 		// PBI rom, order is important!
-		
 		atari_base[0xd1ff] = store_mem[0xd1ff];
-		atari_base[0xd1fe] = store_mem[0xd1fe];
+		memcp8(store_mem,atari_base,0xd100,0xFF);
 		
 	}
 

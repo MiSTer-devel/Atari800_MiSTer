@@ -72,6 +72,7 @@ PORT
 	rom_in_ram : in std_logic;
 
 	atari800mode : in std_logic := '0';
+	pbi_rom_mode : in std_logic := '0';
 	
 	cart_select : in std_logic_vector(7 downto 0);
 	cart2_select : in std_logic_vector(7 downto 0);
@@ -486,11 +487,11 @@ BEGIN
 		end if;
 	end process;
 
-	process(pbi_mpd_n,atari800mode,emu_pbi_rom_address_enable)
+	process(pbi_mpd_n,pbi_rom_mode,emu_pbi_rom_address_enable)
 	begin
-			emu_pbi_enable <= '0'; -- TODO from an external config signal (should be latched on reset)
+			emu_pbi_enable <= '0';
 			pbi_mpd <= not(pbi_mpd_n);
-			if atari800mode = '0' then -- TODO and external PBI emy enable
+			if pbi_rom_mode = '1' then
 				emu_pbi_enable <= '1';
 				pbi_mpd <= emu_pbi_rom_address_enable;
 			end if;

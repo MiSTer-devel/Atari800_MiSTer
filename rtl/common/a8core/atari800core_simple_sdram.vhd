@@ -158,6 +158,7 @@ ENTITY atari800core_simple_sdram is
 		CLIP_SIDES : in STD_LOGIC;
 		RESET_RNMI : in STD_LOGIC;
 		ATARI800MODE : in STD_LOGIC := '0';
+		PBI_ROM_MODE : in STD_LOGIC := '0';
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
 		emulated_cartridge_select: in std_logic_vector(7 downto 0);
@@ -454,6 +455,7 @@ PORT MAP
 	EXT_ANTIC => EXT_ANTIC,
 	CLIP_SIDES => CLIP_SIDES,
 	ATARI800MODE => ATARI800MODE,
+	PBI_ROM_MODE => PBI_ROM_MODE,
 	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT,

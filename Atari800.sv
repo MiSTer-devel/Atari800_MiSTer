@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -251,6 +251,7 @@ localparam CONF_STR = {
 	"P2O12,Machine/BIOS,XL+Basic,XL,800/OS-A,800/OS-B;",
 	"H1P2ODF,RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
 	"h1P2o35,RAM 800,8K,16K,32K,48K,52K;",
+	"D1P2oA,PBI BIOS,Disabled,Enabled;",
 	"P2-;",
 	"P2o9,Use bootX.rom,Enabled,Disabled;",
 	"P2-;",
@@ -446,6 +447,7 @@ atari800top atari800top
 	.DRV_SPEED(status[12:10]),
 	.XEX_LOC(status[32]),
 	.OS_MODE_800(mode800),
+	.PBI_MODE(modepbi),
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
 	.WARM_RESET_MENU(status[39]),
@@ -623,11 +625,13 @@ dpram #(14,8, "rtl/rom/ATARIOSB.mif") osb
 
 reg [1:0] rom_sel = 0;
 reg mode800 = 0;
+reg modepbi = 0;
 reg [2:0] ram_config = 0;
 
 always @(posedge clk_sys) if(areset) begin
 	rom_sel <= status[2:1];
 	mode800 <= status[2];
+	modepbi <= ~status[2] & status[42];
 	ram_config <= (status[2] ? status[37:35] : status[15:13]);
 end
 

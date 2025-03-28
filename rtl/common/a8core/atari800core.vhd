@@ -201,6 +201,7 @@ ENTITY atari800core IS
 		freezer_enable: in std_logic;
 		freezer_activate: in std_logic;
 		ATARI800MODE : in std_logic := '0';
+		PBI_ROM_MODE : in std_logic := '0';
 
 		-- debugging
 		freezer_state_out: out std_logic_vector(2 downto 0);
@@ -490,6 +491,7 @@ PORT MAP(CLK => CLK,
 		 RAM_DATA => RAM_DO,
 		 ram_select => RAM_SELECT(2 downto 0),
 		 ATARI800MODE => ATARI800MODE,
+		 PBI_ROM_MODE => PBI_ROM_MODE,
 		 ROM_DATA => ROM_DO,
 		 SDRAM_DATA => SDRAM_DO,
 		 DMA_ADDR => DMA_ADDR,
