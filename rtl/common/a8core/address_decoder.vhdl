@@ -1180,7 +1180,7 @@ end generate;
 						-- remap to SDRAM
 						if (emu_pbi_rom_address_enable = '1') then
 							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR;
-							SDRAM_ADDR(13 downto 0) <= '0' & emu_pbi_rom_address;							
+							SDRAM_ADDR(13 downto 0) <= '1' & emu_pbi_rom_address;
 							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
 							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;

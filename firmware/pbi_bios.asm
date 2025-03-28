@@ -36,3 +36,59 @@
 ;    drive emulator needs to see a flag in the command to know the PBI mode
 ;    and then use the direct Atari memory buffer rather than atari_sector_buffer
 ;    this needs a separate processCommand routine
+
+pdvmsk	= $0247
+pdvrs	= $0248
+colbak	= $d01a
+wsync	= $d40a
+
+	* = $D800
+bios1_start
+	.byte 'M', 'S', 'T'
+	; Magic 1
+	.byte $80
+	.byte $31
+pdior_vec
+	jmp	pdior
+pdint_vec
+	rts
+	nop
+	nop
+	; Magic 2
+	.byte $91
+	.byte $00
+	.word pdint_vec
+	.word pdint_vec
+	.word pdint_vec
+	.word pdint_vec
+	.word pdint_vec
+	.word pdint_vec
+
+pdinit
+	lda pdvmsk : ora pdvrs : sta pdvmsk
+	lda #0
+	ldx #$fe
+	sta $d100-1,x : dex : bne *-4
+	lda #$a5 : sta $d100 : sta $d101
+	ldy #0
+color_loop
+	ldx #0
+	stx colbak : inx : bne *-4
+	iny : bne color_loop
+	rts
+
+pdior
+	clc
+	rts
+bios1_end
+
+.dsb ($800-bios1_end+bios1_start),$ff
+
+	* = $D800
+.dsb $800,$22
+
+	* = $D800
+.dsb $800,$33
+
+	* = $D800
+.dsb $800,$44

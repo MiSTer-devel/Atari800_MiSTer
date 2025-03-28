@@ -561,7 +561,7 @@ video_mixer #(.GAMMA(1)) video_mixer
 ////////////////   ROM   ////////////////////
 
 wire [14:0] rom_addr;
-wire  [7:0] xl_do, bas_do, osa_do, osb_do;
+wire  [7:0] xl_do, bas_do, osa_do, osb_do, pbirom_do;
 
 reg [13:0] osrom_off = 0;
 reg [13:0] osrom2_off = 0;
@@ -623,6 +623,13 @@ dpram #(14,8, "rtl/rom/ATARIOSB.mif") osb
 	.q_b(osb_do)
 );
 
+spram #(13,8, "firmware/PBIBIOS.mif") pbirom
+(
+	.clock(clk_sys),
+	.address(rom_addr[12:0]),
+	.q(pbirom_do)
+);
+
 reg [1:0] rom_sel = 0;
 reg mode800 = 0;
 reg modepbi = 0;
@@ -641,7 +648,8 @@ wire [7:0] osb_pad_do = (rom_addr[13:0] >= osrom3_off) ? osb_do : 8'hFF;
 
 wire [7:0] rom_do = (!rom_addr[14:13] && !rom_sel[1:0]) ? bas_do :
                     (rom_addr[14] && !rom_sel[1]) ? xl_pad_do :
-                     rom_addr[14] ? (rom_sel[0] ? osb_pad_do : osa_pad_do) : 8'hFF;
+                     rom_addr[14] ? (rom_sel[0] ? osb_pad_do : osa_pad_do) : 
+                     ((!rom_addr[14] && rom_addr[13]) ? pbirom_do : 8'hFF);
 
 reg load_reset = 0;
 always @(posedge clk_sys) begin
