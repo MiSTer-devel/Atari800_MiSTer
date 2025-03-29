@@ -40,7 +40,9 @@
 pdvmsk	= $0247
 pdvrs	= $0248
 colbak	= $d01a
-wsync	= $d40a
+;wsync	= $d40a
+ddevic = $300
+dunit = $301
 
 	* = $D800
 bios1_start
@@ -69,7 +71,9 @@ pdinit
 	lda #0
 	ldx #$fe
 	sta $d100-1,x : dex : bne *-4
+	; Marker for the core firmware
 	lda #$a5 : sta $d100 : sta $d101
+	; Silly rainbow effect, to be removed / replaced later
 	ldy #0
 color_loop
 	ldx #0
@@ -77,12 +81,27 @@ color_loop
 	iny : bne color_loop
 	rts
 
+; The main block I/O routine
 pdior
+	lda ddevic : cmp #$31 : bne pdior_bail
+	lda dunit : beq pdior_bail
+	cmp #5 : bcs pdior_bail
+	jsr $dc00 ; TODO or does it return with carry set and we can just jmp?
+	sec
+	rts
+pdior_bail
+	; We are not servicing this block I/O request
 	clc
 	rts
 bios1_end
 
-.dsb ($800-bios1_end+bios1_start),$ff
+.dsb ($400-bios1_end+bios1_start),$ff
+
+hsio_start	; This should be $dc00
+.bin 6,0,"hsio-pbi.xex"
+hsio_end
+
+.dsb ($400-hsio_end+hsio_start),$ff
 
 	* = $D800
 .dsb $800,$22
