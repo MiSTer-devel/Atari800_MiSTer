@@ -1,14 +1,6 @@
 ; Links:
 ; http://atariki.krap.pl/index.php/ROM_PBI
 
-; RAM area D600-D7FF, 512 bytes, in the bios initialize to some id tag (A5A5??) and zero out the rest
-; ROM area D800-DFFF, 2048 bytes, but this can be bank switched
-; Locate all this in SDRAM in between Basic (8K) and the OS ROM (16K), this gives 8K in total.
-; Further RAM cells should be used by the HSIO handler
-; Alternativelly, implement RAM directly as D1xx r/w registers, only a few are needed.
-; This would allow to use one more PBI rom bank, internal core RAM routing would not 
-; be needed, and it could stay active all the time, not only when PBI rom is banked in.
-
 ; [one (?) location in this RAM is a marker for PBI request to the firmware, like with the XEX loader
 ; one location is for the status code, one for whether we service this at all]
 ; condition for servicing:
@@ -49,16 +41,14 @@ bios1_start
 	.byte 'M', 'S', 'T'
 	; Magic 1
 	.byte $80
-	.byte $31
+	.byte $31	; ddevic we are servicing
 pdior_vec
-	jmp	pdior
+	jmp pdior
 pdint_vec
-	rts
-	nop
-	nop
+	rts : nop : nop
 	; Magic 2
 	.byte $91
-	.byte $00
+	.byte $00	; no CIO 
 	.word pdint_vec
 	.word pdint_vec
 	.word pdint_vec
@@ -68,18 +58,40 @@ pdint_vec
 
 pdinit
 	lda pdvmsk : ora pdvrs : sta pdvmsk
-	lda #0
-	ldx #$fe
-	sta $d100-1,x : dex : bne *-4
+	lda #0 : ldx #$fe : sta $d100-1,x : dex : bne *-4
 	; Marker for the core firmware
 	lda #$a5 : sta $d100 : sta $d101
-	; Silly rainbow effect, to be removed / replaced later
-	ldy #0
-color_loop
-	ldx #0
-	stx colbak : inx : bne *-4
-	iny : bne color_loop
+	; ask for init
+	lda #$0c : sta $2c5 ; color 1
+	lda #$e0 : sta $d409 ; chbase
+	lda #<display_list : sta $d402 : lda #>display_list : sta $d403 ; display list
+	lda $14 : cmp $14 : beq *-2 : ldy #$22 : sty $d400 ; dmactl
+	clc : adc #120 : cmp $14 : bne *-2 : stx $d400
+pdinit_ret
 	rts
+
+display_list
+	.byte $70, $70, $70
+	.byte $42 : .word display_text1
+	.byte $10
+	.byte $42 : .word display_text2
+	.byte $70
+	.byte $42 : .word display_text3
+	.byte $41 : .word display_list
+
+display_text1
+	.byte 0,0
+	.byte 'A'-$20,'tari','8'-$20,'0'-$20,'0'-$20,0,'M'-$20,'i','S'-$20,'T'-$20,'er',0,'core',0 
+	.byte 'P'-$20,'B'-$20,'I'-$20,0,'B'-$20,'I'-$20,'O'-$20,'S'-$20,0
+	.byte 'v','0'-$20,'.'-$20,'8'-$20
+display_text1_len = *-display_text1
+	.dsb 40-display_text1_len,0
+display_text2
+	.byte 0,0
+	.byte '('-$20,'C'-$20,')'-$20,0,'2'-$20,'0'-$20,'2'-$20,'5'-$20,0,'woj','@'-$20,'A'-$20,'tari','A'-$20,'ge'
+display_text2_len = *-display_text2
+	.dsb 40-display_text2_len,0
+display_text3 = $d110 
 
 ; The main block I/O routine
 pdior
