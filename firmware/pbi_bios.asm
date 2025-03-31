@@ -62,11 +62,14 @@ pdinit
 	; Marker for the core firmware
 	lda #$a5 : sta $d100 : sta $d101
 	; ask for init
+	inc $d102 : lda $d102 : bne *-3
+	; Do we want the splash?
+	lda $d103 : beq pdinit_ret
 	lda #$0c : sta $2c5 ; color 1
 	lda #$e0 : sta $d409 ; chbase
 	lda #<display_list : sta $d402 : lda #>display_list : sta $d403 ; display list
 	lda $14 : cmp $14 : beq *-2 : ldy #$22 : sty $d400 ; dmactl
-	clc : adc #120 : cmp $14 : bne *-2 : stx $d400
+	clc : adc #100 : cmp $14 : bne *-2 : stx $d400
 pdinit_ret
 	rts
 

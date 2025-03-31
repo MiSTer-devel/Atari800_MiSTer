@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -252,6 +252,7 @@ localparam CONF_STR = {
 	"H1P2ODF,RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB;",
 	"h1P2o35,RAM 800,8K,16K,32K,48K,52K;",
 	"D1P2oA,PBI BIOS,Disabled,Enabled;",
+	"d2P2oB,PBI Splash,Disabled,Enabled;",
 	"P2-;",
 	"P2o9,Use bootX.rom,Enabled,Disabled;",
 	"P2-;",
@@ -353,7 +354,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({status[2],en216p}),
+	.status_menumask({~status[2] & status[42], status[2],en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -448,6 +449,7 @@ atari800top atari800top
 	.XEX_LOC(status[32]),
 	.OS_MODE_800(mode800),
 	.PBI_MODE(modepbi),
+	.PBI_SPLASH(splashpbi),
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
 	.WARM_RESET_MENU(status[39]),
@@ -633,12 +635,14 @@ spram #(13,8, "firmware/PBIBIOS.mif") pbirom
 reg [1:0] rom_sel = 0;
 reg mode800 = 0;
 reg modepbi = 0;
+reg splashpbi = 0;
 reg [2:0] ram_config = 0;
 
 always @(posedge clk_sys) if(areset) begin
 	rom_sel <= status[2:1];
 	mode800 <= status[2];
 	modepbi <= ~status[2] & status[42];
+	splashpbi <= status[43];
 	ram_config <= (status[2] ? status[37:35] : status[15:13]);
 end
 

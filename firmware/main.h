@@ -88,6 +88,7 @@ BIT_REG_RO(,0x1,4,xexloc,zpu_in2)
 BIT_REG_RO(,0x1,5,atx1050,zpu_in2)
 #ifndef FIRMWARE_5200
 BIT_REG_RO(,0x1,6,modepbi,zpu_in2)
+BIT_REG_RO(,0x1,7,splashpbi,zpu_in2)
 #endif
 
 // file i/o registers

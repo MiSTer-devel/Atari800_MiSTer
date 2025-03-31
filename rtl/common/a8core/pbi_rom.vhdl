@@ -21,7 +21,6 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
---use IEEE.NUMERIC_STD.ALL;
 
 library work;
 
@@ -58,7 +57,7 @@ pbi_rom_address_enable <= d8xx and rw and pbi_rom_enable;
 
 process(a, rw, d1xx, pbi_rom_enable, pbi_ram)
 begin
-	data_out_enable <= '0';
+	data_out_enable <= pbi_rom_enable;
 	data_out <= x"ff";
 	cache_data_out <= x"ff";
 
@@ -75,7 +74,6 @@ begin
 			-- read out from D100-D1FD small RAM
 			data_out <= pbi_ram(conv_integer(unsigned(a(7 downto 0))));
 			cache_data_out <= pbi_ram(conv_integer(unsigned(a(7 downto 0))));
-			data_out_enable <= pbi_rom_enable;
 		end case;
 	end if;
 end process;

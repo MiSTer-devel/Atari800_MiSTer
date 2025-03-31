@@ -260,6 +260,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart2_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart2_int_d_out: std_logic_vector(7 downto 0);
 
+	signal emu_pbi_clk_enable : std_logic;
 	signal emu_pbi_enable : std_logic;
 	signal emu_pbi_d1xx : std_logic;
 	signal emu_pbi_d8xx : std_logic;
@@ -348,6 +349,7 @@ BEGIN
 	end process;
 
 	atari_clk_enable <= notify_cpu or notify_antic; -- i.e. we enable cart and freezer on the final cycle of a 6502 or antic access
+	emu_pbi_clk_enable <= notify_cpu or notify_antic or notify_dma;
 
 	-- float bus when no ram
 	process(last_bus_reg,atari_clk_enable,data_write_next,memory_data_int,write_enable_next)
@@ -411,7 +413,7 @@ BEGIN
 	
 	emu_pbi_rom: entity work.PBIROM
 	port map (clk => clk,
-		clk_enable => atari_clk_enable,
+		clk_enable => emu_pbi_clk_enable,
 		reset_n => reset_n,
 		a => addr_next(10 downto 0),
 		rw => emu_cart_rw, -- OK to reuse?

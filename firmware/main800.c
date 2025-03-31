@@ -578,6 +578,27 @@ xex_eof:
 		}
 	}
 
+	volatile unsigned char *pbi_ram_base = (volatile unsigned char *)(atari_regbase+0xD100);
+
+	if(get_modepbi() && pbi_ram_base[0] == 0xa5 && pbi_ram_base[1] == 0xa5)
+	{
+		if(pbi_ram_base[2] == 0x01)
+		{
+			pbi_ram_base[3] = get_splashpbi();
+			for(mounted = 0; mounted < 4; mounted++)
+			{
+				pbi_ram_base[0x12+9*mounted] = 'D'-0x20;
+				pbi_ram_base[0x12+9*mounted+1] = 0x11+mounted;
+				pbi_ram_base[0x12+9*mounted+2] = ':'-0x20;
+				pbi_ram_base[0x12+9*mounted+4] = 'H'-0x20;
+				pbi_ram_base[0x12+9*mounted+5] = 'S'-0x20;
+				pbi_ram_base[0x12+9*mounted+6] = 'I'-0x20;
+				pbi_ram_base[0x12+9*mounted+7] = 'O'-0x20;
+			}
+			pbi_ram_base[2] = 0;
+		}
+	}
+
 	//pause as WIN is held down
 	set_pause_6502(get_mod_win() ? 1 : 0);
 }
