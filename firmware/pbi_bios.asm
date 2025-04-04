@@ -101,7 +101,13 @@ pdior
 	lda ddevic : cmp #$31 : bne pdior_bail
 	lda dunit : beq pdior_bail
 	cmp #5 : bcs pdior_bail
+	inc $d104 : lda $d104 : bne *-3
+	lda $d105 : bmi pdior_bail ; the FW says either no PBI service or ATX (plain SIO)
+	beq pdior_pbi_ok ; the drive was in PBI mode and got serviced
+	; otherwise call HSIO
 	jsr $dc00 ; TODO or does it return with carry set and we can just jmp?
+pdior_pbi_ok
+	ldy $303 ; TODO HSIO already does that, swap things around here
 	sec
 	rts
 pdior_bail

@@ -597,6 +597,15 @@ xex_eof:
 			}
 			pbi_ram_base[2] = 0;
 		}
+		else if(pbi_ram_base[4] == 0x01)
+		{
+			// check what mode the drive is in and if not ATX
+			// set [5] to FF (ATX/off), 1 HSIO, 0 PBI (and service it!)
+			// XEX automatically PBI?
+			processCommandPBI();
+			pbi_ram_base[5] = 0; // PBI mode
+			pbi_ram_base[4] = 0;
+		}
 	}
 
 	//pause as WIN is held down
