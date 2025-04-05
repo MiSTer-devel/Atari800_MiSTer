@@ -1,40 +1,11 @@
 ; Links:
 ; http://atariki.krap.pl/index.php/ROM_PBI
 
-; [one (?) location in this RAM is a marker for PBI request to the firmware, like with the XEX loader
-; one location is for the status code, one for whether we service this at all]
-; condition for servicing:
-; - PBI bios on (already established)
-; - If SIO is connected to user port???
-; - SIO connected internally
-; - DDEVIC+DUNIT-1 is a drive that is mounted, is not an ATX type, and drive is not
-;   configured as Off 
-; - SIO connected externally: or drive is set to HSIO
-;   this is request #1 to the firmware, firmware reports back:
-;   will not service, will service in PBI mode, will service in HSIO mode
-; If it cannot be serviced, clear the carry flag and return
-; If it can be serviced:
-;  - if the drive is in HSIO mode -> call HSIO (check if Y is set by HSIO?), set carry flag
-;    and then return
-;  - if the drive is in PBI mode -> singal firmware to service it DMA style, wait for completion,
-;    check for time-out somehow?, copy DSTAT to Y, set the carry flag 
-
-; In the MiSTer menu each drive can be configured (only active / meaningful when PBI bios is on)
-; to be Off, PBI or (H)SIO
-
-; firmware:
-;    observe request #1 flag in PBI RAM, react accordingly and lower the flag
-;    observe request #2 flag, run the drive emulator in PBI mode
-;    drive emulator needs to see a flag in the command to know the PBI mode
-;    and then use the direct Atari memory buffer rather than atari_sector_buffer
-;    this needs a separate processCommand routine
-
 pdvmsk	= $0247
 pdvrs	= $0248
-colbak	= $d01a
-;wsync	= $d40a
-ddevic = $300
-dunit = $301
+ddevic	= $300
+dunit	= $301
+dstats	= $303
 
 	* = $D800
 bios1_start
@@ -105,11 +76,9 @@ pdior
 	lda $d105 : bmi pdior_bail ; the FW says either no PBI service or ATX (plain SIO)
 	beq pdior_pbi_ok ; the drive was in PBI mode and got serviced
 	; otherwise call HSIO
-	jsr $dc00 ; TODO or does it return with carry set and we can just jmp?
+	jsr $dc00 : sec : rts
 pdior_pbi_ok
-	ldy $303 ; TODO HSIO already does that, swap things around here
-	sec
-	rts
+	ldy dstats : sec : rts
 pdior_bail
 	; We are not servicing this block I/O request
 	clc

@@ -133,7 +133,7 @@ int select_cartridge()
 {
 	// work out the type
 	int type = -1;
-	int size = file_size(&files[4]);
+	int size = files[4].size;
 
 	if (size == 40960) type = 7;
 	else if (size == 32768) type = 4;

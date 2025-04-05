@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -240,7 +240,12 @@ localparam CONF_STR = {
 	"P1-;",
 	"P1OG,SIO Connected to,Emu,USER I/O;",
 	"P1-;",
-	"P1OAC,Drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
+	"d2P1oCD,D1 mode,OS/Stock,PBI,HSIO;",
+	"d2P1oEF,D2 mode,OS/Stock,PBI,HSIO;",
+	"d2P1oGH,D3 mode,OS/Stock,PBI,HSIO;",
+	"d2P1oIJ,D4 mode,OS/Stock,PBI,HSIO;",
+	"P1-;",
+	"P1OAC,SIO Drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1o6,ATX drive timing,1050,810;",
 	"P1-;",
 	"P1o0,XEX loader,Standard,Stack;",
@@ -450,6 +455,7 @@ atari800top atari800top
 	.OS_MODE_800(mode800),
 	.PBI_MODE(modepbi),
 	.PBI_SPLASH(splashpbi),
+	.PBI_DRIVES_MODE(status[51:44]),
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
 	.WARM_RESET_MENU(status[39]),

@@ -62,21 +62,6 @@ void file_reset()
 	cur_offset = -1;
 }
 
-int file_size(struct SimpleFile * file)
-{
-	return file->size;
-}
-
-int file_readonly(struct SimpleFile * file)
-{
-	return file->is_readonly;
-}
-
-int file_type(struct SimpleFile * file)
-{
-	return file->type;
-}
-
 enum SimpleFileStatus file_read(struct SimpleFile *file, unsigned char *buffer, int bytes, int *bytesread)
 {
 	if((file->offset >= 0) && (file->size > file->offset) && (bytes > 0))

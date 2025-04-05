@@ -228,7 +228,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	// file_seek(file, 0);
 	*zpu_uart_debug2 = 0x23;
 	
-	if(file_type(file) == 0) // ATR only
+	if(file->type == 0) // ATR only
 	{
 		file_read(file, (unsigned char *)&atr_header, 16, &read);
 		*zpu_uart_debug2 = 0x33;
@@ -259,23 +259,23 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	drive_infos[driveNumber].custom_loader = 0;
 	drive_infos[driveNumber].atari_sector_status = 0xff;
 
-	if (file_type(file) == 2) // XDF
+	if (file->type == 2) // XDF
 	{
 		//printf("XFD ");
 		drive_infos[driveNumber].offset = 0;
-		drive_infos[driveNumber].sector_count = file_size(file) / 0x80;
+		drive_infos[driveNumber].sector_count = file->size / 0x80;
 		drive_infos[driveNumber].sector_size = 0x80;
 		// temporarily build a fake atr header
 		// atr_header.wMagic = 0x296;
 		//atr_header.wPars = file_size(file)/16;
 		//atr_header.wSecSize = 0x80;
-		if(file_readonly(file))
+		if(file->is_readonly)
 		{
 			info |= INFO_RO;			
 		}
 		//atr_header.btFlags |= file_readonly(file);
 	}
-	if (file_type(file) == 3) // ATX
+	if (file->type == 3) // ATX
 	{
 		drive_infos[driveNumber].custom_loader = 2;
 		gAtxFile = file;
@@ -286,24 +286,24 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		drive_infos[driveNumber].sector_size = (atxType == 2) ? 256 : 128;
 		// info |= atxType;
 	}
-	else if (file_type(file) == 1) // XEX
+	else if (file->type == 1) // XEX
 	{
 		//printf("XEX ");
 		drive_infos[driveNumber].custom_loader = 1;
 		// atr_header.wMagic = 0xffff;
-		drive_infos[driveNumber].sector_count = 0x173+(file_size(file)+(XEX_SECTOR_SIZE-4))/(XEX_SECTOR_SIZE-3);
+		drive_infos[driveNumber].sector_count = 0x173+(file->size+(XEX_SECTOR_SIZE-4))/(XEX_SECTOR_SIZE-3);
 		drive_infos[driveNumber].sector_size = XEX_SECTOR_SIZE;
 		//atr_header.wPars = (drive_infos[driveNumber].sector_count+3+0x170) / 8;
 		//atr_header.wSecSize = XEX_SECTOR_SIZE;
 		// atr_header.btFlags = 1;
 		info |= INFO_RO;
 	}
-	else if (file_type(file) == 0) // ATR
+	else if (file->type == 0) // ATR
 	{
 		//printf("ATR ");
 		drive_infos[driveNumber].offset = 16;
 		// atr_header.btFlags |= file_readonly(file);
-		if(file_readonly(file))
+		if(file->is_readonly)
 		{
 			info |= INFO_RO;			
 		}
@@ -397,37 +397,44 @@ struct sio_action
 };
 
 typedef void (*CommandHandler)(struct command, int, struct SimpleFile *, struct sio_action *);
-CommandHandler  getCommandHandler(struct command);
+CommandHandler  getCommandHandler(struct command, u08);
 
-// return something here?
-void processCommandPBI()
+unsigned char processCommandPBI(unsigned char *drives_config)
 {
 	// We are more or less guranteed to serve the correct device id and 
-	// drive number by now, now need to check
+	// drive number by now, no need to check here
 	// mark a bit in deviceId to indicate this is PBI
 
 	unsigned char volatile *ptr = (unsigned char volatile *)(atari_regbase + 0x300);
+	int drive = ptr[1] - 1;
 	struct command command;
-	command.deviceId = (ptr[0] + ptr[1] - 1) | 0x80; // ddevic + dunit - 1 plus PBI marker
+	command.deviceId = (ptr[0] + (drive & 0xFF)) | 0x80; // ddevic + dunit - 1 plus PBI marker
 
-	int drive = (command.deviceId & 0xf) - 1;
+	unsigned char mode = drives_config[drive];
+
 	struct SimpleFile *file = drives[drive];
-
-	if (!file)
+	
+	if(file)
 	{
-		ptr[3] = 0x8A;
-		return;
+		if(file->type == 3) mode = 0;
+		if(file->type == 1) mode = 1;
+	}
+
+	if(!mode)
+		return 0xFF;
+
+	mode--;
+	if (!file || mode == 1)
+	{
+		if(!mode) ptr[3] = 0x8A;
+		return mode;
 	}
 
 	command.command = ptr[2];
 	command.aux1 = ptr[0xA];
 	command.aux2 = ptr[0xB];
 
-	// TODO 
-	// what about checking the initial dstats (0x80 + 0x40) to 
-	// match the command?
-
-	CommandHandler handleCommand = getCommandHandler(command);
+	CommandHandler handleCommand = getCommandHandler(command, ptr[3]);
 	if (handleCommand)
 	{
 		struct sio_action action;
@@ -448,7 +455,8 @@ void processCommandPBI()
 	else
 	{
 		ptr[3] = 0x8B;
-	}	
+	}
+	return mode;
 }
 
 void processCommand()
@@ -484,7 +492,7 @@ void processCommand()
 		*zpu_uart_debug3 = command.command;
 
 
-		CommandHandler handleCommand = getCommandHandler(command);
+		CommandHandler handleCommand = getCommandHandler(command, 0);
 		// DELAY_T2_MIN;
 		wait_us(pre_an_delay);
 
@@ -561,7 +569,7 @@ void handleFormat(struct command command, int driveNumber, struct  SimpleFile * 
 		int written = 0;
 		i = drive_infos[driveNumber].offset;
 		file_seek(file, i);
-		for (; i != file_size(file); i += 128)
+		for (; i != file->size; i += 128)
 		{
 			file_write(file, &action->sector_buffer[0], 128, &written);
 		}
@@ -639,7 +647,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	int sectorSize = 0;
 	int location =0;
 
-	if (file_readonly(file))
+	if (file->is_readonly)
 	{
 		action->success = 0;
 		return;
@@ -896,16 +904,18 @@ set_number_of_sectors_to_buffer_1_2:
 	//while(1);
 }
 
-CommandHandler getCommandHandler(struct command command)
+CommandHandler getCommandHandler(struct command command, u08 dstats)
 {
 	CommandHandler res = 0;
 	u16 sector = command.aux1 + (command.aux2<<8);
 	int driveNumber = (command.deviceId & 0xf) - 1;
+	u08 pbi = command.deviceId & 0x80;
 
 	switch (command.command)
 	{
 	case 0x3f:
-		res = &handleSpeed;
+		if(!pbi)
+			res = &handleSpeed;
 		break;
 	case 0x21: // format single
 	case 0x22: // format enhanced
@@ -915,15 +925,16 @@ CommandHandler getCommandHandler(struct command command)
 		res = &handleReadPercomBlock;
 		break;
 	case 0x53: // get status
-		res = &handleGetStatus;
+		if(!pbi || dstats == 0x40)
+			res = &handleGetStatus;
 		break;
 	case 0x50: // write
 	case 0x57: // write with verify
-		if (sector > 0 && sector <= drive_infos[driveNumber].sector_count)
+		if ((!pbi || dstats == 0x80) && sector > 0 && sector <= drive_infos[driveNumber].sector_count)
 			res = &handleWrite;
 		break;
 	case 0x52: // read
-		if (sector > 0 && sector <= drive_infos[driveNumber].sector_count)
+		if ((!pbi || dstats == 0x40) && sector > 0 && sector <= drive_infos[driveNumber].sector_count)
 		{
 			if(drive_infos[driveNumber].custom_loader == 2) // ATX!
 			{

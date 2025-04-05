@@ -122,7 +122,7 @@ void restore()
 #if 0
 void freeze_save(struct SimpleFile * file)
 {
-	if (file_size(file)>=65536 && file_readonly(file)==0)
+	if (file->size >= 65536 && !file->is_readonly)
 	{
 		int byteswritten = 0;
 		file_write(file,(void *)store_mem,65536,&byteswritten);
@@ -131,7 +131,7 @@ void freeze_save(struct SimpleFile * file)
 }
 void freeze_load(struct SimpleFile * file)
 {
-	if (file_size(file)>=65536)
+	if (file->size >= 65536)
 	{
 		int bytesread = 0;
 		file_read(file,(void *)store_mem,65536,&bytesread);

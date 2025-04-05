@@ -224,7 +224,7 @@ int load_car(struct SimpleFile* file, u08 stacked)
 	unsigned char carttype = 0;
 	int len;
 	
-	unsigned int byte_len = file_size(file);
+	unsigned int byte_len = file->size;
 	if(!(byte_len & 0x3FF))
 	{
 		int sel, n = 0;
@@ -370,6 +370,7 @@ void mainloop()
 unsigned char volatile *xex_loader_base;
 int xex_file_first_block;
 unsigned char xex_reloc;
+unsigned char pbi_drives_config[4];
 
 void actions()
 {
@@ -584,26 +585,41 @@ xex_eof:
 	{
 		if(pbi_ram_base[2] == 0x01)
 		{
+			
+			pbi_drives_config[0] = (*zpu_in2 >> 16) & 0x3;
+			pbi_drives_config[1] = (*zpu_in2 >> 18) & 0x3;
+			pbi_drives_config[2] = (*zpu_in2 >> 20) & 0x3;
+			pbi_drives_config[3] = (*zpu_in2 >> 22) & 0x3;
 			pbi_ram_base[3] = get_splashpbi();
 			for(mounted = 0; mounted < 4; mounted++)
 			{
 				pbi_ram_base[0x12+9*mounted] = 'D'-0x20;
 				pbi_ram_base[0x12+9*mounted+1] = 0x11+mounted;
 				pbi_ram_base[0x12+9*mounted+2] = ':'-0x20;
-				pbi_ram_base[0x12+9*mounted+4] = 'H'-0x20;
-				pbi_ram_base[0x12+9*mounted+5] = 'S'-0x20;
-				pbi_ram_base[0x12+9*mounted+6] = 'I'-0x20;
-				pbi_ram_base[0x12+9*mounted+7] = 'O'-0x20;
+				switch(pbi_drives_config[mounted]) {
+					case 0:
+						pbi_ram_base[0x12+9*mounted+4] = 'O'-0x20;
+						pbi_ram_base[0x12+9*mounted+5] = 'f';
+						pbi_ram_base[0x12+9*mounted+6] = 'f';
+						break;
+					case 1:
+						pbi_ram_base[0x12+9*mounted+4] = 'P'-0x20;
+						pbi_ram_base[0x12+9*mounted+5] = 'B'-0x20;
+						pbi_ram_base[0x12+9*mounted+6] = 'I'-0x20;
+						break;
+					case 2:
+						pbi_ram_base[0x12+9*mounted+4] = 'H'-0x20;
+						pbi_ram_base[0x12+9*mounted+5] = 'S'-0x20;
+						pbi_ram_base[0x12+9*mounted+6] = 'I'-0x20;
+						pbi_ram_base[0x12+9*mounted+7] = 'O'-0x20;
+						break;
+				}
 			}
 			pbi_ram_base[2] = 0;
 		}
 		else if(pbi_ram_base[4] == 0x01)
 		{
-			// check what mode the drive is in and if not ATX
-			// set [5] to FF (ATX/off), 1 HSIO, 0 PBI (and service it!)
-			// XEX automatically PBI?
-			processCommandPBI();
-			pbi_ram_base[5] = 0; // PBI mode
+			pbi_ram_base[5] = processCommandPBI(pbi_drives_config);
 			pbi_ram_base[4] = 0;
 		}
 	}
