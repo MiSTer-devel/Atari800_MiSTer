@@ -54,6 +54,8 @@ PORT
 	RAM_DATA : IN STD_LOGIC_VECTOR(15 downto 0);
 	PBI_DATA : in std_logic_Vector(7 downto 0);
 	STEREO : in std_logic;
+	ULTIME_DATA : in std_logic_vector(7 downto 0);
+	ULTIME_WR_ENABLE : out std_logic;
 
 	-- pbi external acccess!
 	PBI_TAKEOVER : in std_logic;
@@ -838,7 +840,7 @@ end generate;
 		-- input data from n sources
 		GTIA_DATA,POKEY_DATA,POKEY2_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
 		CACHE_GTIA_DATA,CACHE_POKEY_DATA,CACHE_POKEY2_DATA,CACHE_ANTIC_DATA,
-		LAST_BUS_REG,
+		LAST_BUS_REG,ULTIME_DATA,
 		
 		-- input data from n sources complete?
 		-- hardware regs take 1 cycle, so always complete		
@@ -883,6 +885,7 @@ end generate;
 		ANTIC_WR_ENABLE <= '0';
 		PIA_WR_ENABLE <= '0';
 		PIA_RD_ENABLE <= '0';
+		ULTIME_WR_ENABLE <= '0';
 		D6_WR_ENABLE <= '0';
 		ROM_WR_ENABLE <= '0';
 
@@ -1004,13 +1007,18 @@ end generate;
 					end if;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
-					ram_chip_select <= '0';					
-	
+					ram_chip_select <= '0';
+
 				-- PIA
 				when X"D3" =>
-					PIA_WR_ENABLE <= write_enable_next;
-					PIA_RD_ENABLE <= '1';
-					MEMORY_DATA_INT(7 downto 0) <= PIA_DATA;
+					if addr_next(7 downto 0) = x"E2" then -- Ultimate RT clock emulation
+						ULTIME_WR_ENABLE <= write_enable_next;
+						MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
+					else
+						PIA_WR_ENABLE <= write_enable_next;
+						PIA_RD_ENABLE <= '1';
+						MEMORY_DATA_INT(7 downto 0) <= PIA_DATA;
+					end if;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';					
@@ -1181,8 +1189,7 @@ end generate;
 						emu_pbi_d8xx <= '1';
 						-- remap to SDRAM
 						if (emu_pbi_rom_address_enable = '1') then
-							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR;
-							SDRAM_ADDR(13 downto 0) <= '1' & emu_pbi_rom_address;
+							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR(22 downto 14) & '1' & emu_pbi_rom_address;
 							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
 							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;
