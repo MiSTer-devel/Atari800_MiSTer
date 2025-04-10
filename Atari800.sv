@@ -347,6 +347,8 @@ wire        ioctl_wr;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
 
+wire [64:0] rtc;
+
 hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -382,7 +384,9 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 	.ioctl_wr(ioctl_wr),
-	.ioctl_index(ioctl_index)
+	.ioctl_index(ioctl_index),
+
+	.RTC(rtc)
 );
 
 
@@ -460,6 +464,7 @@ atari800top atari800top
 	.DRIVE_LED(drive_led),
 	.WARM_RESET_MENU(status[39]),
 	.COLD_RESET_MENU(status[40] | load_reset),
+	.RTC(rtc),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
@@ -493,6 +498,7 @@ atari800top atari800top
 
 	.JOY1(status[21] ? joy_1[13:0] : j0),
 	.JOY2(status[21] ? j0 : joy_1[13:0])
+
 );
 
 altddio_out

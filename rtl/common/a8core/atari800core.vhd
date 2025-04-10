@@ -202,6 +202,7 @@ ENTITY atari800core IS
 		freezer_activate: in std_logic;
 		ATARI800MODE : in std_logic := '0';
 		PBI_ROM_MODE : in std_logic := '0';
+		RTC : IN STD_LOGIC_VECTOR(64 DOWNTO 0);
 
 		-- debugging
 		freezer_state_out: out std_logic_vector(2 downto 0);
@@ -460,7 +461,8 @@ PORT MAP(
 	RESET_N => RESET_N,
 	DATA_IN => WRITE_DATA(7 DOWNTO 0),
 	WR_EN => ULTIME_WRITE_ENABLE,
-	DATA_OUT => ULTIME_DO
+	DATA_OUT => ULTIME_DO,
+	RTC_IN => RTC
 );
 
 mmu1 : entity work.address_decoder
