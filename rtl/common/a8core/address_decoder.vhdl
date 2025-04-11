@@ -75,6 +75,7 @@ PORT
 
 	atari800mode : in std_logic := '0';
 	pbi_rom_mode : in std_logic := '0';
+	rtc_mode : in std_logic_vector(1 downto 0) := "00";
 	
 	cart_select : in std_logic_vector(7 downto 0);
 	cart2_select : in std_logic_vector(7 downto 0);
@@ -1011,7 +1012,7 @@ end generate;
 
 				-- PIA
 				when X"D3" =>
-					if addr_next(7 downto 0) = x"E2" then -- Ultimate RT clock emulation
+					if (emu_cart_enable = '1') and (rtc_mode = "01") and (addr_next(7 downto 0) = x"E2") then -- Ultimate RT clock emulation
 						ULTIME_WR_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
 					else
@@ -1021,7 +1022,7 @@ end generate;
 					end if;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
-					ram_chip_select <= '0';					
+					ram_chip_select <= '0';
 					
 				-- ANTIC
 				when X"D4" =>
@@ -1038,34 +1039,39 @@ end generate;
 					ram_chip_select <= '0';	
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
-	
+
 					if (emu_cart_enable = '1') then
-						emu_cart_cctl_n <= '0';
-						if write_enable_next = '1' then
-							-- TODO: write to both emulated and real cart
-							request_complete <= '1';
+						if (rtc_mode = "10") and (addr_next(7 downto 0) = x"E2") then -- SIDE(2) / SuperCart RTC
+							ULTIME_WR_ENABLE <= write_enable_next;
+							MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
 						else
-							-- read only from emulated
-							if emu_cart_cctl_dout_enable /= "000" then
-								if emu_cart_cctl_dout_enable(2 downto 1) = "00" then
-									MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
-									request_complete <= '1';
-								else
-									SDRAM_ADDR <= SDRAM_CART_ADDR;
-									if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
-										-- read from B5xx
-										SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
-									end if;
-									if emu_cart_cctl_dout_enable(2) = '1' then -- AST 32 special case
-										SDRAM_ADDR(7 downto 0) <= ADDR_next(7 downto 0);
-									end if;
-									MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
-									request_complete <= sdram_request_COMPLETE;
-									sdram_chip_select <= start_request;
-								end if;
-							else
-								MEMORY_DATA_INT(7 downto 0) <= x"ff";
+							emu_cart_cctl_n <= '0';
+							if write_enable_next = '1' then
+								-- TODO: write to both emulated and real cart
 								request_complete <= '1';
+							else
+								-- read only from emulated
+								if emu_cart_cctl_dout_enable /= "000" then
+									if emu_cart_cctl_dout_enable(2 downto 1) = "00" then
+										MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
+										request_complete <= '1';
+									else
+										SDRAM_ADDR <= SDRAM_CART_ADDR;
+										if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
+											-- read from B5xx
+											SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
+										end if;
+										if emu_cart_cctl_dout_enable(2) = '1' then -- AST 32 special case
+											SDRAM_ADDR(7 downto 0) <= ADDR_next(7 downto 0);
+										end if;
+										MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+										request_complete <= sdram_request_COMPLETE;
+										sdram_chip_select <= start_request;
+									end if;
+								else
+									MEMORY_DATA_INT(7 downto 0) <= x"ff";
+									request_complete <= '1';
+								end if;
 							end if;
 						end if;
 					end if;
