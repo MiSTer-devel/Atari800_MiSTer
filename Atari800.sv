@@ -218,7 +218,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -258,7 +258,6 @@ localparam CONF_STR = {
 	"h1P2o35,RAM 800,8K,16K,32K,48K,52K;",
 	"D1P2oA,PBI BIOS,Disabled,Enabled;",
 	"d2P2oB,PBI Splash,Disabled,Enabled;",
-	"P2oKL,RT Clock,Disabled,U1MB,SIDE(2);",
 	"P2-;",
 	"P2o9,Use bootX.rom,Enabled,Disabled;",
 	"P2-;",
@@ -460,7 +459,6 @@ atari800top atari800top
 	.OS_MODE_800(mode800),
 	.PBI_MODE(modepbi),
 	.PBI_SPLASH(splashpbi),
-	.RTC_MODE(modertc),
 	.PBI_DRIVES_MODE(status[51:44]),
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
@@ -649,7 +647,6 @@ spram #(13,8, "firmware/PBIBIOS.mif") pbirom
 reg [1:0] rom_sel = 0;
 reg mode800 = 0;
 reg modepbi = 0;
-reg [1:0] modertc = 0;
 reg splashpbi = 0;
 reg [2:0] ram_config = 0;
 
@@ -658,7 +655,6 @@ always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];
 	modepbi <= ~status[2] & status[42];
 	splashpbi <= status[43];
-	modertc <= status[53:52];
 	ram_config <= (status[2] ? status[37:35] : status[15:13]);
 end
 

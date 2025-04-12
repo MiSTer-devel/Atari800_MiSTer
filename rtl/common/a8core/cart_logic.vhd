@@ -44,7 +44,8 @@ entity CartLogic is
 		int_d_in : in std_logic_vector(7 downto 0);
 		int_d_out : out std_logic_vector(7 downto 0);
 		master : in std_logic;
-		passthru : out std_logic
+		passthru : out std_logic;
+		rtc_mode : out std_logic_vector(1 downto 0)
 	);
 		
 end CartLogic;
@@ -183,6 +184,9 @@ begin
 
 access_8xxx <= ( s4_n = '0');
 access_axxx <= ( s5_n = '0');
+
+rtc_mode(0) <= '1' when cart_mode = cart_mode_sdx_u1mb else '0';
+rtc_mode(1) <= '1' when cart_mode = cart_mode_sdx_side2 else '0';
 
 -- pass through s4/s5 if cart mode is off
 --set_passthrough: process(s4_n, s5_n, cart_mode)

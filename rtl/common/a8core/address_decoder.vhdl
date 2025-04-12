@@ -75,8 +75,7 @@ PORT
 
 	atari800mode : in std_logic := '0';
 	pbi_rom_mode : in std_logic := '0';
-	rtc_mode : in std_logic_vector(1 downto 0) := "00";
-	
+
 	cart_select : in std_logic_vector(7 downto 0);
 	cart2_select : in std_logic_vector(7 downto 0);
 	
@@ -240,6 +239,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart_int_d_out: std_logic_vector(7 downto 0);
 	signal emu_cart_passthru : std_logic;
+	signal emu_cart_rtc_mode : std_logic_vector(1 downto 0);
 
 	signal emu_cart1_s4_n: std_logic;
 	signal emu_cart1_s5_n: std_logic;
@@ -389,7 +389,8 @@ BEGIN
 		int_d_in => emu_cart1_int_d_in,
 		int_d_out => emu_cart1_int_d_out,
 		master => '1',
-		passthru => emu_cart_passthru
+		passthru => emu_cart_passthru,
+		rtc_mode => emu_cart_rtc_mode
 	);
 
 	-- emulated cart #2, slave / stacked
@@ -1012,7 +1013,7 @@ end generate;
 
 				-- PIA
 				when X"D3" =>
-					if (emu_cart_enable = '1') and (rtc_mode = "01") and (addr_next(7 downto 0) = x"E2") then -- Ultimate RT clock emulation
+					if (emu_cart_enable = '1') and (emu_cart_rtc_mode = "01") and (addr_next(7 downto 0) = x"E2") then -- Ultimate RT clock emulation
 						ULTIME_WR_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
 					else
@@ -1041,7 +1042,7 @@ end generate;
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 
 					if (emu_cart_enable = '1') then
-						if (rtc_mode = "10") and (addr_next(7 downto 0) = x"E2") then -- SIDE(2) / SuperCart RTC
+						if (emu_cart_rtc_mode = "10") and (addr_next(7 downto 0) = x"E2") then -- SIDE(2) / SuperCart RTC
 							ULTIME_WR_ENABLE <= write_enable_next;
 							MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
 						else
