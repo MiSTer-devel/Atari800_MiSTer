@@ -591,15 +591,33 @@ void handleReadPercomBlock(struct command command, int driveNumber, struct Simpl
 {
 	u16 totalSectors = drive_infos[driveNumber].sector_count;
 	//printf("Stat:");
-
-	action->sector_buffer[0] = 1;
-	action->sector_buffer[1] = 11; // TODO what was that? Check!
+	action->sector_buffer[1] = 0x03;
+	action->sector_buffer[4] = 0;
+	action->sector_buffer[6] = drive_infos[driveNumber].sector_size >> 8;
+	action->sector_buffer[7] = drive_infos[driveNumber].sector_size & 0xff;		
+	action->sector_buffer[8] = 0xff;
+	action->sector_buffer[9] = 0;
+	action->sector_buffer[10] = 0;
+	action->sector_buffer[11] = 0;
+	
+	if(totalSectors == 720 || totalSectors == 1040 || totalSectors == 1440)
+	{
+		totalSectors = totalSectors / 40;
+		if(totalSectors == 36)
+		{
+			totalSectors = totalSectors / 2;
+			action->sector_buffer[4] = 1;
+		}
+		action->sector_buffer[0] = 40;
+		action->sector_buffer[5] = (drive_infos[driveNumber].sector_size == 256 || totalSectors == 26) ? 4 : 0;
+	}
+	else
+	{
+		action->sector_buffer[0] = 1;
+		action->sector_buffer[5] = (drive_infos[driveNumber].sector_size == 128) ? 0 : 4;
+	}
 	action->sector_buffer[2] = totalSectors >> 8;
 	action->sector_buffer[3] = totalSectors & 0xff;
-	action->sector_buffer[5] = (drive_infos[driveNumber].sector_size == 256) ? 4 : 0;
-	action->sector_buffer[6] = drive_infos[driveNumber].sector_size >> 8;
-	action->sector_buffer[7] = drive_infos[driveNumber].sector_size & 0xff;
-	action->sector_buffer[8] = 0xff;
 	//hexdump_pure(atari_sector_buffer,12); // Somehow with this...
 	
 	action->bytes = 12;
