@@ -462,13 +462,14 @@ void actions()
 			set_pause_6502(1);
 			freeze();
 
-			if(!stacked)
-			{
-				for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
-				{
-					set_drive_status(mounted, 0);
-				}
-			}
+			// TODO What should it be? Keep it mounted only for SDX type carts?
+			//if(!stacked)
+			//{
+			//	for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
+			//	{
+			//		set_drive_status(mounted, 0);
+			//	}
+			//}
 			if(!file->size)
 			{
 				if(stacked)

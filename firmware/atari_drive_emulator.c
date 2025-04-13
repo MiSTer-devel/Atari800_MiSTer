@@ -307,7 +307,14 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		{
 			info |= INFO_RO;			
 		}
-		drive_infos[driveNumber].sector_count = 3 + ((atr_header.wPars | (atr_header.btParsHigh << 16))*16 - 128*3) / atr_header.wSecSize;
+		if(atr_header.wSecSize == 512)
+		{
+			drive_infos[driveNumber].sector_count = (atr_header.wPars | (atr_header.btParsHigh << 16)) / 32;	
+		}
+		else
+		{
+			drive_infos[driveNumber].sector_count = 3 + ((atr_header.wPars | (atr_header.btParsHigh << 16))*16 - 128*3) / atr_header.wSecSize;
+		}
 		drive_infos[driveNumber].sector_size = atr_header.wSecSize;
 	}
 	else
@@ -640,7 +647,7 @@ void handleGetStatus(struct command command, int driveNumber, struct SimpleFile 
 	{
 		status |= 0x80; // medium density - or a strange one...
 	}
-	if(drive_infos[driveNumber].sector_size == 256)
+	if(drive_infos[driveNumber].sector_size != 128)
 	{
 		status |= 0x20; // 256 byte sectors		
 	}
@@ -675,10 +682,13 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	action->respond = 0;
 
 	location = drive_infos[driveNumber].offset;
-	if (sector>3)
+	if (sector>3 || drive_infos[driveNumber].sector_size == 512)
 	{
-		sector-=4;
-		location += 128*3;
+		if(drive_infos[driveNumber].sector_size != 512)
+		{
+			sector-=4;
+			location += 128*3;
+		}
 		location += sector*drive_infos[driveNumber].sector_size;
 		sectorSize = drive_infos[driveNumber].sector_size;
 	}
@@ -887,10 +897,13 @@ set_number_of_sectors_to_buffer_1_2:
 	else
 	{
 		location = drive_infos[driveNumber].offset;
-		if (sector>3)
+		if (sector>3 || drive_infos[driveNumber].sector_size == 512)
 		{
-			sector-=4;
-			location += 128*3;
+			if(drive_infos[driveNumber].sector_size != 512)
+			{
+				sector-=4;
+				location += 128*3;
+			}
 			location += sector*drive_infos[driveNumber].sector_size;
 			action->bytes = drive_infos[driveNumber].sector_size;
 		}
