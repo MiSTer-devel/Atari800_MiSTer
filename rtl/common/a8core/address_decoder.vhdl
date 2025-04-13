@@ -186,6 +186,8 @@ ARCHITECTURE vhdl OF address_decoder IS
 
 	signal ram_c000 : std_logic;
 	signal has_ram : std_logic;
+	signal axlon_bank_reg : std_logic_vector(7 downto 0);
+	signal axlon_bank_next : std_logic_vector(7 downto 0);
 	
 	-- even though we have 3 targets (flash, ram, rom) and 3 masters, only allow access to one a a time - simpler.
 	signal state_next : std_logic_vector(1 downto 0);
@@ -302,6 +304,7 @@ BEGIN
 			pbi_cycle_reg <= '0';
 
 			last_bus_reg <= (others=>'0');
+			axlon_bank_reg <= (others=>'0');
 
 			bank0reg <= (others=>'0');
 			bank1reg <= (others=>'0');
@@ -324,6 +327,7 @@ BEGIN
 			pbi_cycle_reg <= pbi_cycle_next;
 
 			last_bus_reg <= last_bus_next;
+			axlon_bank_reg <= axlon_bank_next;
 
 			bank0reg <= bank0next;
 			bank1reg <= bank1next;
@@ -348,6 +352,17 @@ BEGIN
 				last_bus_next <= data_write_next(7 downto 0);
 			else
 				last_bus_next <= memory_data_int(7 downto 0);
+			end if;
+		end if;
+	end process;
+
+	-- Capture Axlon bank register write
+	process(axlon_bank_reg,notify_cpu,notify_antic,notify_dma,data_write_next,addr_next,write_enable_next)
+	begin
+		axlon_bank_next <= axlon_bank_reg;
+		if (notify_cpu = '1') or (notify_antic = '1') or (notify_dma = '1') then
+			if (write_enable_next = '1') and (addr_next(15 downto 4) = x"CFF") then
+				axlon_bank_next <= data_write_next(7 downto 0);
 			end if;
 		end if;
 	end process;
@@ -668,8 +683,15 @@ BEGIN
 				when "011" => -- 48k
 					has_ram <= not(addr_next(15)) or not(addr_next(14));
 				when "100" => -- 52k
+					null;
 					-- yes we have 64k here, but its hidden!
-				--TODO -- 800 memory expansions - axlon??
+				when "101" => -- 4MB Axlon
+					-- 48K Basic RAM
+					has_ram <= not(addr_next(15)) or not(addr_next(14));
+					-- Plus full Axlon extension
+					if (extended_access_addr='1') then
+						extended_bank <= std_logic_vector("000000100" + unsigned('0'&axlon_bank_reg(7 downto 0)));
+					end if;
 				when others =>
 			end case;
 		else
@@ -707,10 +729,9 @@ BEGIN
 						extended_self_test <= '0';
 					end if;
 					basic_latched_when_banking <= '0';
-				when "111" => -- 4MB!	
+				when "111" => -- 4MB Axlon!	
 					if (extended_access_addr='1') then
-						extended_bank <= std_logic_vector("000000100" + unsigned('0'&portb(7 downto 0)));
-						extended_self_test <= '0';
+						extended_bank <= std_logic_vector("000000100" + unsigned('0'&axlon_bank_reg(7 downto 0)));
 					end if;
 				when others =>
 					-- TODO - portc!
@@ -781,6 +802,7 @@ end generate;
 		atari800mode,
 		ram_c000,
 		has_ram,
+		axlon_bank_reg,
 
 		-- cart stuff
 		emu_cart_rd4,emu_cart_rd5,
