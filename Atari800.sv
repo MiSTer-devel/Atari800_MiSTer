@@ -258,6 +258,7 @@ localparam CONF_STR = {
 	"h1P2o35,RAM 800,8K,16K,32K,48K,52K,4MB(Axlon);",
 	"D1P2oA,PBI BIOS,Disabled,Enabled;",
 	"d2P2oB,PBI Splash,Disabled,Enabled;",
+	"d2P2oKM,PBI Boot Drive,Default,D1:,D2:,D3:,D4:;",
 	"P2-;",
 	"P2o9,Use bootX.rom,Enabled,Disabled;",
 	"P2-;",
@@ -459,7 +460,8 @@ atari800top atari800top
 	.OS_MODE_800(mode800),
 	.PBI_MODE(modepbi),
 	.PBI_SPLASH(splashpbi),
-	.PBI_DRIVES_MODE(status[51:44]),
+	.PBI_DRIVES_MODE(drivesmodepbi),
+	.PBI_BOOT(bootpbi),
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
 	.WARM_RESET_MENU(status[39]),
@@ -648,6 +650,8 @@ reg [1:0] rom_sel = 0;
 reg mode800 = 0;
 reg modepbi = 0;
 reg splashpbi = 0;
+reg [7:0] drivesmodepbi = 0;
+reg [2:0] bootpbi = 0;
 reg [2:0] ram_config = 0;
 
 always @(posedge clk_sys) if(areset) begin
@@ -655,6 +659,8 @@ always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];
 	modepbi <= ~status[2] & status[42];
 	splashpbi <= status[43];
+	bootpbi <= status[54:52];
+	drivesmodepbi <= status[51:44];
 	ram_config <= (status[2] ? status[37:35] : status[15:13]);
 end
 

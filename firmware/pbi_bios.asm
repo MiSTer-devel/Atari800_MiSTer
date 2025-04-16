@@ -1,11 +1,14 @@
 ; Links:
 ; http://atariki.krap.pl/index.php/ROM_PBI
 
-pdvmsk	= $0247
-pdvrs	= $0248
+pdvmsk	= $247
+pdvrs	= $248
 ddevic	= $300
 dunit	= $301
 dstats	= $303
+dtimlo	= $306
+cdtma1	= $226
+setvbv	= $e45c
 
 	* = $D800
 bios1_start
@@ -72,7 +75,12 @@ pdior
 	lda ddevic : cmp #$31 : bne pdior_bail
 	lda dunit : beq pdior_bail
 	cmp #5 : bcs pdior_bail
+	tsx : stx $d106
+	lda dtimlo : ror : ror : tay : and #$3f : tax : tya : ror : and #$c0 : tay : lda #1
+	jsr setvbv
+	lda #<pbi_time_out : sta cdtma1 : lda #>pbi_time_out : sta cdtma1+1
 	inc $d104 : lda $d104 : bne *-3
+	ldx #0 : ldy #0 : lda #1 : jsr setvbv 
 	lda $d105 : bmi pdior_bail ; the FW says either no PBI service or ATX (plain SIO)
 	beq pdior_pbi_ok ; the drive was in PBI mode and got serviced
 	; otherwise call HSIO
@@ -81,8 +89,9 @@ pdior_pbi_ok
 	ldy dstats : sec : rts
 pdior_bail
 	; We are not servicing this block I/O request
-	clc
-	rts
+	clc : rts
+pbi_time_out
+	lda #0 : sta $d104 : ldx $d106 : txs : lda #$8a : sta dstats : bne pdior_pbi_ok
 bios1_end
 
 .dsb ($400-bios1_end+bios1_start),$ff

@@ -303,10 +303,6 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		//printf("ATR ");
 		drive_infos[driveNumber].offset = 16;
 		// atr_header.btFlags |= file_readonly(file);
-		if(file->is_readonly)
-		{
-			info |= INFO_RO;			
-		}
 		if(atr_header.wSecSize == 512)
 		{
 			drive_infos[driveNumber].sector_count = (atr_header.wPars | (atr_header.btParsHigh << 16)) / 32;	
@@ -316,6 +312,10 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 			drive_infos[driveNumber].sector_count = 3 + ((atr_header.wPars | (atr_header.btParsHigh << 16))*16 - 128*3) / atr_header.wSecSize;
 		}
 		drive_infos[driveNumber].sector_size = atr_header.wSecSize;
+		if(file->is_readonly)
+		{
+			info |= INFO_RO;			
+		}
 	}
 	else
 	{
@@ -427,7 +427,7 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 		if(file->type == 1) mode = 1;
 	}
 
-	if(!mode)
+	if(!mode || (file && mode == 2 && drive_infos[drive].sector_size == 512))
 		return 0xFF;
 
 	mode--;
@@ -472,9 +472,9 @@ void processCommand()
 
 	getCommand(&command);
 
-	if (command.deviceId >= 0x31 && command.deviceId <= 0x34)
+	int drive = (command.deviceId&0xf) -1;
+	if (command.deviceId >= 0x31 && command.deviceId <= 0x34 && drive_infos[drive].sector_size != 512)
 	{
-		int drive = (command.deviceId&0xf) -1;
 		struct SimpleFile * file = drives[drive];
 
 	//	printf("Drive:");

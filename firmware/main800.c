@@ -462,14 +462,6 @@ void actions()
 			set_pause_6502(1);
 			freeze();
 
-			// TODO What should it be? Keep it mounted only for SDX type carts?
-			//if(!stacked)
-			//{
-			//	for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
-			//	{
-			//		set_drive_status(mounted, 0);
-			//	}
-			//}
 			if(!file->size)
 			{
 				if(stacked)
@@ -509,6 +501,15 @@ void actions()
 					}
 					else
 					{
+						if(type != TC_MODE_SDX64 && type != TC_MODE_SDX128 &&
+							type != TC_MODE_ATRAX_SDX64 && type != TC_MODE_ATRAX_SDX128 && 
+							type != TC_MODE_SDX_U1MB && type != TC_MODE_SDX_SIDE2)
+						{
+							for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
+							{
+								set_drive_status(mounted, 0);
+							}
+						}
 						set_cart_select(type);
 					}
 				}
@@ -617,6 +618,11 @@ xex_eof:
 				}
 			}
 			pbi_ram_base[2] = 0;
+			unsigned char boot_drv = get_bootpbi();
+			if(boot_drv)
+			{
+				*((volatile unsigned char *)(atari_regbase+0x0301)) = boot_drv; 
+			}
 		}
 		else if(pbi_ram_base[4] == 0x01)
 		{
