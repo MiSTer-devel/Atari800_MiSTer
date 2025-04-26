@@ -74,7 +74,7 @@ display_text3 = $d110
 pdior
 	lda ddevic : cmp #$31 : bne pdior_bail
 	lda dunit : beq pdior_bail
-	cmp #5 : bcs pdior_bail
+	cmp #$10 : bcs pdior_bail
 	tsx : stx $d106
 	lda dtimlo : ror : ror : tay : and #$3f : tax : tya : ror : and #$c0 : tay : lda #1
 	jsr setvbv

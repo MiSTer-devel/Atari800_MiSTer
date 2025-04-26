@@ -36,25 +36,28 @@ int turbo_div();
 
 #define XEX_SECTOR_SIZE 128
 
-struct SimpleFile * drives[MAX_DRIVES];
+// struct SimpleFile * drives[MAX_DRIVES];
 
 struct drive_info
 {
+	struct SimpleFile *file;
 	u08 info;
 	char custom_loader;
-	int offset;
-	u16 sector_count;
+	u32 offset;
+	u32 sector_count;
 	u16 sector_size;
 	u08 atari_sector_status;	
 }
-drive_infos[MAX_DRIVES];
+drive_infos[MAX_DRIVES+1];
 
 char speed;
 
 u32 pre_ce_delay;
 u32 pre_an_delay;
 
-#define INFO_RO 0x04
+#define INFO_RO 0x40
+#define INFO_HDD 0x80
+#define INFO_META 0x20
 
 // enum DriveInfo {DI_XD=0,DI_SD=1,DI_MD=2,DI_DD=3,DI_BITS=3,DI_RO=4};
 
@@ -149,9 +152,9 @@ void getCommand(struct command * cmd)
 		for (i=0;i!=5;++i)
 		{
 			u32 data = USART_Receive_Byte(); // Timeout?
-			*zpu_uart_debug = i;
-			*zpu_uart_debug = 1&(data>>8);
-			*zpu_uart_debug = data&0xff;
+			//*zpu_uart_debug = i;
+			//*zpu_uart_debug = 1&(data>>8);
+			//*zpu_uart_debug = data&0xff;
 			if (USART_Framing_Error() | ((data>>8)!=(i+1)))
 			{
 				prob = 1;
@@ -167,16 +170,16 @@ void getCommand(struct command * cmd)
 		{
 			prob = 0;
 
-			*zpu_uart_debug2 = 0xf0;
+			//*zpu_uart_debug2 = 0xf0;
 			// error
 			continue;
 		}
 
-		*zpu_uart_debug = 0xba;
+		//*zpu_uart_debug = 0xba;
 		USART_Receive_Byte();
-		*zpu_uart_debug = 0xda;
+		//*zpu_uart_debug = 0xda;
 
-		*zpu_uart_debug = *zpu_uart_divisor;
+		//*zpu_uart_debug = *zpu_uart_divisor;
 
 		atari_sector_buffer[0] = cmd->deviceId;
 		atari_sector_buffer[1] = cmd->command;
@@ -188,13 +191,13 @@ void getCommand(struct command * cmd)
 		//*zpu_uart_debug2 = cmd->chksum;
 
 		if (expchk==cmd->chksum) {
-			*zpu_uart_debug2 = 0x44;
+			//*zpu_uart_debug2 = 0x44;
 			// got a command frame
 			//
 			switch_speed();
 			break;
 		} else {
-			*zpu_uart_debug2 = 0xff;
+			//*zpu_uart_debug2 = 0xff;
 			// just an invalid checksum, switch speed anyways
 		}
 	}
@@ -209,14 +212,39 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	unsigned char info = 0;
 	struct ATRHeader atr_header;
 
-	drives[driveNumber] = 0;
-	drive_infos[driveNumber].info = 0;
+	//*zpu_uart_debug2 = 0x11;
 
-	*zpu_uart_debug2 = 0x11;
+	if (!file)
+	{
+		if(driveNumber > 1 && drive_infos[MAX_DRIVES].file)
+		{
+			for(read = 0; read <= MAX_DRIVES; read++)
+			{
+				if(drive_infos[read].info & INFO_HDD)
+				{
+					drive_infos[read].file = 0;
+				}
+			}
+		}
+		else
+		{
+			drive_infos[driveNumber].file = 0;	
+		}
+		return;
+	}
+	
+	if(driveNumber > 1 && file->type == 3)
+	{
+		driveNumber = MAX_DRIVES;
+	}
+	//drive_infos[driveNumber].info = 0;
+	//drive_infos[driveNumber].file = 0;
+	if(file->is_readonly)
+	{
+		info |= INFO_RO;			
+	}
 
-	if (!file) return;
-
-	*zpu_uart_debug2 = 0x12;
+	//*zpu_uart_debug2 = 0x12;
 
 	//printf("WTF:%d %x\n",driveNumber, file);
 
@@ -226,18 +254,18 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 	// set_drive_status should be only called once on file loading
 	// the position should be 0 then and this is obsolete
 	// file_seek(file, 0);
-	*zpu_uart_debug2 = 0x23;
+	//*zpu_uart_debug2 = 0x23;
 	
 	if(file->type == 0) // ATR only
 	{
 		file_read(file, (unsigned char *)&atr_header, 16, &read);
-		*zpu_uart_debug2 = 0x33;
+		//*zpu_uart_debug2 = 0x33;
 		if (read != 16)
 		{
 			return;
 		}
 		
-		*zpu_uart_debug2 = 0x13;
+		//*zpu_uart_debug2 = 0x13;
 		
 		byteswap(&atr_header.wMagic);
 		byteswap(&atr_header.wPars);
@@ -269,22 +297,119 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		// atr_header.wMagic = 0x296;
 		//atr_header.wPars = file_size(file)/16;
 		//atr_header.wSecSize = 0x80;
-		if(file->is_readonly)
-		{
-			info |= INFO_RO;			
-		}
 		//atr_header.btFlags |= file_readonly(file);
 	}
-	if (file->type == 3) // ATX
+	if (file->type == 3) // ATX or HDD image
 	{
-		drive_infos[driveNumber].custom_loader = 2;
-		gAtxFile = file;
-		// atr_header.btFlags = 1;
-		info |= INFO_RO;
-		u08 atxType = loadAtxFile(driveNumber);
-		drive_infos[driveNumber].sector_count = (atxType == 1) ? 1040 : 720;
-		drive_infos[driveNumber].sector_size = (atxType == 2) ? 256 : 128;
-		// info |= atxType;
+		if(driveNumber < MAX_DRIVES)
+		{
+			drive_infos[driveNumber].custom_loader = 2;
+			gAtxFile = file;
+			// atr_header.btFlags = 1;
+			info |= INFO_RO;
+			u08 atxType = loadAtxFile(driveNumber);
+			drive_infos[driveNumber].sector_count = (atxType == 1) ? 1040 : 720;
+			drive_infos[driveNumber].sector_size = (atxType == 2) ? 256 : 128;
+		}
+		else
+		{
+			info |= INFO_HDD;
+
+			// map all the volumes to the corresponding drives
+			// Also, probably do this in a procedure, so that 
+			// parition reread can call the same code
+
+			drive_infos[driveNumber].sector_size = 512;
+			drive_infos[driveNumber].sector_count = file->size / 0x200; // TODO Not for VHDs!!!
+
+			file_seek(file, 0);
+			file_read(file, atari_sector_buffer, 256, &read);
+			if(read != 256) return;
+			drive_infos[driveNumber].offset = 0;
+			if(atari_sector_buffer[1] != 'A' || atari_sector_buffer[2] != 'P' || atari_sector_buffer[3] != 'T')
+			{
+				file_read(file, atari_sector_buffer, 256, &read);
+				if(read != 256) return;
+				read = 0xC2;
+				while(read < 0x100)
+				{
+					if(atari_sector_buffer[read] == 0x7F)
+					{
+						read = ((atari_sector_buffer[read+4]) |
+							((atari_sector_buffer[read+5] << 8)) | 
+							((atari_sector_buffer[read+6] << 16)) | 
+							((atari_sector_buffer[read+7] << 24))) << 9; 
+						file_seek(file, read);
+						drive_infos[driveNumber].offset = read;
+						file_read(file, atari_sector_buffer, 256, &read);
+						if(read != 256 || atari_sector_buffer[1] != 'A' || atari_sector_buffer[2] != 'P' || atari_sector_buffer[3] != 'T') return;
+						break;
+					}
+					read += 16;
+				}
+			}
+			if(atari_sector_buffer[0] == 0x10)
+			{
+				info |= INFO_META;
+			}
+			else if(atari_sector_buffer[0]) return;
+			info |= (atari_sector_buffer[4] & 0xF);
+			// TODO If HDD and sector_size < 512 skip bytes on sector reading/writing
+			// TODO XDCB aux3 & aux4
+			// TODO Boot drive
+			for(read = 0; read < 15; read++)
+			{
+				int i = (read+1)*16;
+				if(!atari_sector_buffer[i])
+				{
+					// empty slot
+					if(drive_infos[read].file && (drive_infos[read].info & INFO_HDD))
+					{
+						drive_infos[read].file = 0;
+						drive_infos[read].info = 0; // TODO ???
+					}
+				}
+				else
+				{
+					drive_infos[read].info = (info & 0xC0) | (atari_sector_buffer[i] & 0x40 ? INFO_META : 0) |
+						((atari_sector_buffer[i] & 0x30) || (atari_sector_buffer[i+12] & 0x80) ? INFO_RO : 0);
+					atari_sector_buffer[i] &= 0x8F;
+					if(atari_sector_buffer[i] > 3 || (atari_sector_buffer[i+1] != 0x00 && atari_sector_buffer[i+1] != 0x03) || !(atari_sector_buffer[i+12] & 0x40))
+					{
+						drive_infos[read].file = 0;												
+					}
+					else
+					{
+						switch(atari_sector_buffer[i])
+						{
+							case 1:
+								drive_infos[read].sector_size = 128;
+								break;
+							case 2:
+								drive_infos[read].sector_size = 256;
+								break;
+							case 3:
+								drive_infos[read].sector_size = 512;
+								break;
+						}
+						drive_infos[read].offset =
+						  ( (atari_sector_buffer[i+2]) |
+						   ((atari_sector_buffer[i+3] << 8)) | 
+						   ((atari_sector_buffer[i+4] << 16)) | 
+						   ((atari_sector_buffer[i+5] << 24))
+					          ) << 9;
+						drive_infos[read].sector_count = 
+						    (atari_sector_buffer[i+6]) |
+						  ((atari_sector_buffer[i+7] << 8)) | 
+						  ((atari_sector_buffer[i+8] << 16)) | 
+					 	  ((atari_sector_buffer[i+9] << 24));
+						drive_infos[read].custom_loader = 0;
+	  					drive_infos[read].atari_sector_status = 0xFF;
+	  					drive_infos[read].file = file;
+					}
+				}
+			}
+		}
 	}
 	else if (file->type == 1) // XEX
 	{
@@ -312,18 +437,9 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 			drive_infos[driveNumber].sector_count = 3 + ((atr_header.wPars | (atr_header.btParsHigh << 16))*16 - 128*3) / atr_header.wSecSize;
 		}
 		drive_infos[driveNumber].sector_size = atr_header.wSecSize;
-		if(file->is_readonly)
-		{
-			info |= INFO_RO;			
-		}
-	}
-	else
-	{
-		//printf("Unknown file type");
-		return;
 	}
 
-	*zpu_uart_debug2 = 0x14;
+	//*zpu_uart_debug2 = 0x14;
 
 	//if (atr_header.btFlags&1)
 	//{
@@ -359,9 +475,10 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 		//
 	}
 */
-	*zpu_uart_debug2 = 0x15;
+	//*zpu_uart_debug2 = 0x15;
 
-	drives[driveNumber] = file;
+	//drives[driveNumber] = file;
+	drive_infos[driveNumber].file = file;
 	drive_infos[driveNumber].info = info;
 	//printf("appears valid\n");
 }
@@ -380,7 +497,7 @@ void init_drive_emulator()
 	USART_Init(speed+6);
 	for (i=0; i!=MAX_DRIVES; ++i)
 	{
-		drives[i] = 0;
+		drive_infos[i].file = 0;
 	}
 }
 
@@ -415,18 +532,26 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 	unsigned char volatile *ptr = (unsigned char volatile *)(atari_regbase + 0x300);
 	int drive = ptr[1] - 1;
 	struct command command;
-	command.deviceId = (ptr[0] + (drive & 0xFF)) | 0x80; // ddevic + dunit - 1 plus PBI marker
+	command.deviceId = (ptr[0] + (drive & 0xFF)) | 0x40; // ddevic + dunit - 1 plus PBI marker
 
-	unsigned char mode = drives_config[drive];
+	unsigned char mode = (drive < 4) ? drives_config[drive] : 0; // TODO not 0 if XDCB??? then 1???
 
-	struct SimpleFile *file = drives[drive];
+	struct SimpleFile *file = drive_infos[drive].file;
 	
 	if(file)
 	{
-		if(file->type == 3) mode = 0;
-		if(file->type == 1) mode = 1;
+		if(drive_infos[drive].info & INFO_HDD) // The type should be then ATR
+		{
+			mode = 1;
+		}
+		else
+		{
+			if(file->type == 3) mode = 0; // ATX -> Off
+			if(file->type == 1) mode = 1; // XEX -> PBI
+		}
 	}
 
+	// HSIO does not handle 512-byte sector ATRs
 	if(!mode || (file && mode == 2 && drive_infos[drive].sector_size == 512))
 		return 0xFF;
 
@@ -472,10 +597,10 @@ void processCommand()
 
 	getCommand(&command);
 
-	int drive = (command.deviceId&0xf) -1;
+	int drive = (command.deviceId & 0xf) -1;
 	if (command.deviceId >= 0x31 && command.deviceId <= 0x34 && drive_infos[drive].sector_size != 512)
 	{
-		struct SimpleFile * file = drives[drive];
+		struct SimpleFile * file = drive_infos[drive].file;
 
 	//	printf("Drive:");
 	//	printf("%x %d",command.deviceId,drive);
@@ -488,7 +613,7 @@ void processCommand()
 			//printf("Drive not present:%d %x", drive, drives[drive]);
 			//
 			//
-			*zpu_uart_debug2 = 0x16;
+			//*zpu_uart_debug2 = 0x16;
 			return;
 	
 		}
@@ -496,7 +621,7 @@ void processCommand()
 		pre_ce_delay = 300;
 		pre_an_delay = 100;
 		
-		*zpu_uart_debug3 = command.command;
+		//*zpu_uart_debug3 = command.command;
 
 
 		CommandHandler handleCommand = getCommandHandler(command, 0);
@@ -607,7 +732,7 @@ void handleReadPercomBlock(struct command command, int driveNumber, struct Simpl
 	action->sector_buffer[10] = 0;
 	action->sector_buffer[11] = 0;
 	
-	if(totalSectors == 720 || totalSectors == 1040 || totalSectors == 1440)
+	if(!(drive_infos[driveNumber].info & INFO_HDD) && (totalSectors == 720 || totalSectors == 1040 || totalSectors == 1440))
 	{
 		totalSectors = totalSectors / 40;
 		if(totalSectors == 36)
@@ -667,7 +792,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	//debug_pos = 0;
 	set_drive_led(1);
 
-	u08 pbi = command.deviceId & 0x80;
+	u08 pbi = command.deviceId & 0x40;
 	u16 sector = command.aux1 + (command.aux2 << 8);
 	int sectorSize = 0;
 	int location =0;
@@ -682,12 +807,17 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	action->respond = 0;
 
 	location = drive_infos[driveNumber].offset;
-	if (sector>3 || drive_infos[driveNumber].sector_size == 512)
+	// TODO Optimize this!
+	if (sector>3 || drive_infos[driveNumber].sector_size == 512 || (drive_infos[driveNumber].info & INFO_HDD))
 	{
-		if(drive_infos[driveNumber].sector_size != 512)
+		if(drive_infos[driveNumber].sector_size != 512 && !(drive_infos[driveNumber].info & INFO_HDD))
 		{
 			sector-=4;
 			location += 128*3;
+		}
+		else
+		{
+			sector--;
 		}
 		location += sector*drive_infos[driveNumber].sector_size;
 		sectorSize = drive_infos[driveNumber].sector_size;
@@ -782,7 +912,7 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 	u16 sector = command.aux1 | (command.aux2<<8);
 
 	int read = 0;
-	int location =0;
+	u32 location = 0;
 
 	//printf("Sector:");
 	//printf("%d",sector);
@@ -897,12 +1027,17 @@ set_number_of_sectors_to_buffer_1_2:
 	else
 	{
 		location = drive_infos[driveNumber].offset;
-		if (sector>3 || drive_infos[driveNumber].sector_size == 512)
+		// TODO Optimize this
+		if (sector>3 || drive_infos[driveNumber].sector_size == 512 || (drive_infos[driveNumber].info & INFO_HDD))
 		{
-			if(drive_infos[driveNumber].sector_size != 512)
+			if(drive_infos[driveNumber].sector_size != 512 && !(drive_infos[driveNumber].info & INFO_HDD))
 			{
 				sector-=4;
 				location += 128*3;
+			}
+			else
+			{
+				sector--;
 			}
 			location += sector*drive_infos[driveNumber].sector_size;
 			action->bytes = drive_infos[driveNumber].sector_size;
@@ -940,7 +1075,7 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 	CommandHandler res = 0;
 	u16 sector = command.aux1 + (command.aux2<<8);
 	int driveNumber = (command.deviceId & 0xf) - 1;
-	u08 pbi = command.deviceId & 0x80;
+	u08 pbi = command.deviceId & 0x40;
 
 	switch (command.command)
 	{
@@ -950,7 +1085,8 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 		break;
 	case 0x21: // format single
 	case 0x22: // format enhanced
-		res = &handleFormat;
+		if(!pbi)
+			res = &handleFormat;
 		break;
 	case 0x4e: // read percom block
 		res = &handleReadPercomBlock;

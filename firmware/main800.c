@@ -398,7 +398,7 @@ void actions()
 		file->offset = 0;
 		file_reset();
 
-		if(num<MAX_DRIVES)
+		if(num<4)
 		{
 			//set_cart_select(0);
 			set_drive_status(num, file->size ? file : 0);
@@ -505,7 +505,7 @@ void actions()
 							type != TC_MODE_ATRAX_SDX64 && type != TC_MODE_ATRAX_SDX128 && 
 							type != TC_MODE_SDX_U1MB && type != TC_MODE_SDX_SIDE2)
 						{
-							for(mounted = 0; mounted < MAX_DRIVES; mounted ++)
+							for(mounted = 0; mounted < 4; mounted ++)
 							{
 								set_drive_status(mounted, 0);
 							}
