@@ -126,7 +126,7 @@ void freeze_save(struct SimpleFile * file)
 	{
 		int byteswritten = 0;
 		file_write(file,(void *)store_mem,65536,&byteswritten);
-		file_write_flush();
+		// file_write_flush();
 	}
 }
 void freeze_load(struct SimpleFile * file)

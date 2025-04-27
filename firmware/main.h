@@ -60,7 +60,7 @@ BIT_REG(,0xff,17,cart_select,zpu_out1)
 BIT_REG(,0x01,25,freezer_enable,zpu_out1)
 #ifndef FIRMWARE_5200
 BIT_REG(,0x01,26,reset_rnmi,zpu_out1)
-BIT_REG(,0x01,27,drive_led,zpu_out1)
+//BIT_REG(,0x01,27,drive_led,zpu_out1)
 BIT_REG(,0x01,28,option_force,zpu_out1)
 #endif
 

@@ -10,7 +10,6 @@
 
 //#include "printf.h"
 //#include <stdio.h>
-#include "integer.h"
 
 extern int debug_pos; // ARG!
 // extern unsigned char volatile * baseaddr;
@@ -19,6 +18,8 @@ extern int debug_pos; // ARG!
 #define send_NACK()	USART_Transmit_Byte('N');
 #define send_CMPL()	USART_Transmit_Byte('C');
 #define send_ERR()	USART_Transmit_Byte('E');
+#define set_drive_led_on()  *zpu_out1 |= 0x08000000
+#define set_drive_led_off() *zpu_out1 &= 0xF7FFFFFF
 
 /* BiboDos needs at least 50us delay before ACK */
 #define DELAY_T2_MIN wait_us(100);
@@ -38,17 +39,7 @@ int turbo_div();
 
 // struct SimpleFile * drives[MAX_DRIVES];
 
-struct drive_info
-{
-	struct SimpleFile *file;
-	u08 info;
-	char custom_loader;
-	u32 offset;
-	u32 sector_count;
-	u16 sector_size;
-	u08 atari_sector_status;	
-}
-drive_infos[MAX_DRIVES+1];
+struct drive_info drive_infos[MAX_DRIVES+1];
 
 char speed;
 
@@ -58,6 +49,7 @@ u32 pre_an_delay;
 #define INFO_RO 0x40
 #define INFO_HDD 0x80
 #define INFO_META 0x20
+#define INFO_SS 0x10
 
 // enum DriveInfo {DI_XD=0,DI_SD=1,DI_MD=2,DI_DD=3,DI_BITS=3,DI_RO=4};
 
@@ -85,7 +77,7 @@ struct ATRHeader
 
 // char opendrive;
 
-#define ATARI_SECTOR_BUFFER_SIZE 256
+#define ATARI_SECTOR_BUFFER_SIZE 512
 
 unsigned char atari_sector_buffer[ATARI_SECTOR_BUFFER_SIZE];
 
@@ -133,6 +125,7 @@ struct command
 	u08 aux1;
 	u08 aux2;
 	u08 chksum;
+	u16 auxab;
 } __attribute__((packed));
 
 static void switch_speed()
@@ -320,7 +313,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 			// parition reread can call the same code
 
 			drive_infos[driveNumber].sector_size = 512;
-			drive_infos[driveNumber].sector_count = file->size / 0x200; // TODO Not for VHDs!!!
+			drive_infos[driveNumber].sector_count = file->size / 0x200;
 
 			file_seek(file, 0);
 			file_read(file, atari_sector_buffer, 256, &read);
@@ -356,7 +349,6 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 			info |= (atari_sector_buffer[4] & 0xF);
 			// TODO If HDD and sector_size < 512 skip bytes on sector reading/writing
 			// TODO XDCB aux3 & aux4
-			// TODO Boot drive
 			for(read = 0; read < 15; read++)
 			{
 				int i = (read+1)*16;
@@ -366,7 +358,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 					if(drive_infos[read].file && (drive_infos[read].info & INFO_HDD))
 					{
 						drive_infos[read].file = 0;
-						drive_infos[read].info = 0; // TODO ???
+						// drive_infos[read].info = 0;
 					}
 				}
 				else
@@ -380,18 +372,23 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 					}
 					else
 					{
-						switch(atari_sector_buffer[i])
+						drive_infos[read].sector_size = 128 << (atari_sector_buffer[i]-1);
+						if(drive_infos[read].sector_size != 512)
 						{
-							case 1:
-								drive_infos[read].sector_size = 128;
-								break;
-							case 2:
-								drive_infos[read].sector_size = 256;
-								break;
-							case 3:
-								drive_infos[read].sector_size = 512;
-								break;
+							drive_infos[read].info |= INFO_SS;
 						}
+						//switch(atari_sector_buffer[i])
+						//{
+						//	case 1:
+						//		drive_infos[read].sector_size = 128;
+						//		break;
+						//	case 2:
+						//		drive_infos[read].sector_size = 256;
+						//		break;
+						//	case 3:
+						//		drive_infos[read].sector_size = 512;
+						//		break;
+						//}
 						drive_infos[read].offset =
 						  ( (atari_sector_buffer[i+2]) |
 						   ((atari_sector_buffer[i+3] << 8)) | 
@@ -534,7 +531,7 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 	struct command command;
 	command.deviceId = (ptr[0] + (drive & 0xFF)) | 0x40; // ddevic + dunit - 1 plus PBI marker
 
-	unsigned char mode = (drive < 4) ? drives_config[drive] : 0; // TODO not 0 if XDCB??? then 1???
+	unsigned char mode = (drive < 4) ? drives_config[drive] : ((ptr[0] & 0x80) >> 7);
 
 	struct SimpleFile *file = drive_infos[drive].file;
 	
@@ -565,6 +562,7 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 	command.command = ptr[2];
 	command.aux1 = ptr[0xA];
 	command.aux2 = ptr[0xB];
+	command.auxab = (command.deviceId & 0x80) ? ptr[0xC] | (ptr[0xD] << 8) : 0;
 
 	CommandHandler handleCommand = getCommandHandler(command, ptr[3]);
 	if (handleCommand)
@@ -596,6 +594,7 @@ void processCommand()
 	struct command command;
 
 	getCommand(&command);
+	command.auxab = 0;
 
 	int drive = (command.deviceId & 0xf) -1;
 	if (command.deviceId >= 0x31 && command.deviceId <= 0x34 && drive_infos[drive].sector_size != 512)
@@ -638,7 +637,7 @@ void processCommand()
 			action.sector_buffer = atari_sector_buffer;
 
 			send_ACK();
-			clearSectorBuffer(action.sector_buffer, ATARI_SECTOR_BUFFER_SIZE);
+			clearSectorBuffer(atari_sector_buffer, ATARI_SECTOR_BUFFER_SIZE);
 
 /*
 			if (drive!=opendrive)
@@ -705,7 +704,7 @@ void handleFormat(struct command command, int driveNumber, struct  SimpleFile * 
 		{
 			file_write(file, &action->sector_buffer[0], 128, &written);
 		}
-		file_write_flush();
+		//file_write_flush();
 
 		// return done
 		action->sector_buffer[0] = 0xff;
@@ -787,13 +786,35 @@ void handleGetStatus(struct command command, int driveNumber, struct SimpleFile 
 	//printf(":done\n");
 }
 
+void set_location_offset(int driveNumber, u32 sector, int *sectorSize, int *location)
+{
+	*location = drive_infos[driveNumber].offset;
+	*sectorSize = drive_infos[driveNumber].sector_size;
+	if(drive_infos[driveNumber].sector_size == 512 || (drive_infos[driveNumber].info & INFO_HDD))
+	{
+		*location += (sector-1) * (*sectorSize);
+	}
+	else
+	{
+		if(sector>3)
+		{
+			*location += 128*3 + (sector-4) * (*sectorSize);
+		}
+		else
+		{
+			*location = *location + 128 * (sector - 1);
+			*sectorSize = 128;
+		}
+	}	
+}
+
 void handleWrite(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
 	//debug_pos = 0;
-	set_drive_led(1);
+	set_drive_led_on();
 
 	u08 pbi = command.deviceId & 0x40;
-	u16 sector = command.aux1 + (command.aux2 << 8);
+	u32 sector = (command.auxab << 16) | command.aux1 | (command.aux2 << 8);
 	int sectorSize = 0;
 	int location =0;
 
@@ -806,6 +827,8 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	//
 	action->respond = 0;
 
+	set_location_offset(driveNumber, sector, &sectorSize, &location);
+/*
 	location = drive_infos[driveNumber].offset;
 	// TODO Optimize this!
 	if (sector>3 || drive_infos[driveNumber].sector_size == 512 || (drive_infos[driveNumber].info & INFO_HDD))
@@ -827,7 +850,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 		location += 128*(sector-1);
 		sectorSize = 128;
 	}
-
+*/
 	unsigned char checksum = 0;
 	unsigned char expchk = 0;
 	int i;
@@ -858,18 +881,34 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 		//printf("%f:WACK data\n",when());
 		//printf("%d",location);
 		//printf("\n");
-		file_seek(file,location);
+		file_seek(file, location);
 		int written = 0;
-		file_write(file,&action->sector_buffer[0], sectorSize, &written);
+		if(drive_infos[driveNumber].info & INFO_SS)
+		{
+			u08 step = 4 / (drive_infos[driveNumber].sector_size >> 7);
+			i = 0;
+			sectorSize = ATARI_SECTOR_BUFFER_SIZE;
+			clearSectorBuffer(atari_sector_buffer, sectorSize);
+			while(written < sectorSize)
+			{
+				atari_sector_buffer[written] = action->sector_buffer[i++];
+				written += step;
+			}
+			file_write(file, atari_sector_buffer, sectorSize, &written);
+		}
+		else
+		{
+			file_write(file,&action->sector_buffer[0], sectorSize, &written);
+		}
 
 		int ok = 1;
 
 		if (command.command == 0x57)
 		{
-			unsigned char buffer[256];
+			unsigned char buffer[512];
 			int read;
-			file_seek(file,location);
-			file_read(file,buffer,sectorSize,&read);
+			file_seek(file, location);
+			file_read(file, buffer, sectorSize, &read);
 
 			for (i=0;i!=sectorSize;++i)
 			{
@@ -902,14 +941,17 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 		//printf("%f:NACK(bad checksum)\n",when());
 		send_NACK();
 	}
-	set_drive_led(0);
+	set_drive_led_off();
 }
+
+// Dummy file name for XEX disk images
+const unsigned char cfile_name[] = {'F','I','L','E','N','A','M','E','X','E','X'};
 
 void handleRead(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
-	set_drive_led(1);
+	set_drive_led_on();
 	
-	u16 sector = command.aux1 | (command.aux2<<8);
+	u32 sector = (command.auxab << 16) | command.aux1 | (command.aux2<<8);
 
 	int read = 0;
 	u32 location = 0;
@@ -920,7 +962,7 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 	if(drive_infos[driveNumber].custom_loader == 1)         //n_sector>0 && //==0 se overuje hned na zacatku
 	{
 		//sektory xex bootloaderu, tj. 1 nebo 2
-		u08 i,b;
+		u08 i, b;
 		int file_sectors;
 
 		//printf("XEX ");
@@ -963,23 +1005,8 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 			//fatGetDirEntry(FileInfo.vDisk.file_index,5,0);
 			//fatGetDirEntry(FileInfo.vDisk.file_index,0); //ale musi to posunout o 5 bajtu doprava
 
-			//{
-				action->sector_buffer[5] = 'F';
-				action->sector_buffer[6] = 'I';
-				action->sector_buffer[7] = 'L';
-				action->sector_buffer[8] = 'E';
-				action->sector_buffer[9] = 'N';
-				action->sector_buffer[10] = 'A';
-				action->sector_buffer[11] = 'M';
-				action->sector_buffer[12] = 'E';
-				action->sector_buffer[13] = 'X';
-				action->sector_buffer[14] = 'E';
-				action->sector_buffer[15] = 'X';
-
-				u08 i;
-				for(i=16;i<XEX_SECTOR_SIZE;i++)
-					action->sector_buffer[i]=0x00;
-			//}
+			memcp8(cfile_name, &action->sector_buffer[5], 0, 11);
+			clearSectorBuffer(&action->sector_buffer[16], XEX_SECTOR_SIZE-16);
 
 			//teprve ted muze pridat prvnich 5 bytu na zacatek nulte adresarove polozky (pred nazev)
 			//atari_sector_buffer[0]=0x42;							//0
@@ -990,8 +1017,8 @@ void handleRead(struct command command, int driveNumber, struct SimpleFile * fil
 			action->sector_buffer[3] = 0x71;
 			action->sector_buffer[4] = 0x01;
 set_number_of_sectors_to_buffer_1_2:
-			action->sector_buffer[1] = file_sectors & 0xFF;
-			action->sector_buffer[2] = (file_sectors >> 8) & 0xFF;
+			action->sector_buffer[1] = file_sectors;
+			action->sector_buffer[2] = (file_sectors >> 8);
 		}
 		else
 		if(sector>=0x171)
@@ -1005,9 +1032,9 @@ set_number_of_sectors_to_buffer_1_2:
 			else
 				sector++; //ukazatel na dalsi
 
-			action->sector_buffer[XEX_SECTOR_SIZE-3] = (sector>>8) & 0xFF; //nejdriv HB !!!
-			action->sector_buffer[XEX_SECTOR_SIZE-2] = sector & 0xFF; //pak DB!!! (je to HB,DB)
-			action->sector_buffer[XEX_SECTOR_SIZE-1] = read & 0xFF;
+			action->sector_buffer[XEX_SECTOR_SIZE-3] = (sector>>8);
+			action->sector_buffer[XEX_SECTOR_SIZE-2] = sector;
+			action->sector_buffer[XEX_SECTOR_SIZE-1] = read;
 		}
 		//printf(" sending\n");
 
@@ -1026,6 +1053,11 @@ set_number_of_sectors_to_buffer_1_2:
 	}
 	else
 	{
+		//int sectorSize = drive_infos[driveNumber].sector_size;
+		action->bytes = drive_infos[driveNumber].sector_size;
+		set_location_offset(driveNumber, sector, &action->bytes, &location);
+		//action->bytes = sectorSize;
+		/*
 		location = drive_infos[driveNumber].offset;
 		// TODO Optimize this
 		if (sector>3 || drive_infos[driveNumber].sector_size == 512 || (drive_infos[driveNumber].info & INFO_HDD))
@@ -1047,15 +1079,31 @@ set_number_of_sectors_to_buffer_1_2:
 			location += 128*(sector-1);
 			action->bytes = 128;
 		}
+		*/
 		//printf("%d",location);
 		//printf("\n");
 		//printf("%f:Read\n",when());
-		file_seek(file,location);
-		file_read(file,&action->sector_buffer[0], action->bytes, &read);
+		file_seek(file, location);
+		if(drive_infos[driveNumber].info & INFO_SS)
+		{
+			u08 step = 4 / (drive_infos[driveNumber].sector_size >> 7);
+			file_read(file, atari_sector_buffer, ATARI_SECTOR_BUFFER_SIZE, &read);
+			read = 0;
+			int n = 0;
+			while(read < ATARI_SECTOR_BUFFER_SIZE)
+			{
+				action->sector_buffer[n++] = atari_sector_buffer[read];
+				read += step;
+			}
+		}
+		else
+		{
+			file_read(file, &action->sector_buffer[0], action->bytes, &read);			
+		}
 		//printf("%f:Read done\n",when());
 	}
 
-	set_drive_led(0);
+	set_drive_led_off();
 	//topofscreen();
 	//hexdump_pure(atari_sector_buffer,sectorSize);
 	//printf("Sending\n");
@@ -1073,7 +1121,7 @@ set_number_of_sectors_to_buffer_1_2:
 CommandHandler getCommandHandler(struct command command, u08 dstats)
 {
 	CommandHandler res = 0;
-	u16 sector = command.aux1 + (command.aux2<<8);
+	u32 sector = (command.auxab << 16) | command.aux1 | (command.aux2<<8);
 	int driveNumber = (command.deviceId & 0xf) - 1;
 	u08 pbi = command.deviceId & 0x40;
 

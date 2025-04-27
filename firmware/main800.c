@@ -619,9 +619,14 @@ xex_eof:
 			}
 			pbi_ram_base[2] = 0;
 			unsigned char boot_drv = get_bootpbi();
-			if(boot_drv)
+			if(boot_drv == 1 && drive_infos[MAX_DRIVES].file)
 			{
-				*((volatile unsigned char *)(atari_regbase+0x0301)) = boot_drv; 
+				// APT
+				*((volatile unsigned char *)(atari_regbase+0x0301)) = drive_infos[MAX_DRIVES].info & 0xF; 				
+			}
+			else if(boot_drv)
+			{
+				*((volatile unsigned char *)(atari_regbase+0x0301)) = (boot_drv-1); 
 			}
 		}
 		else if(pbi_ram_base[4] == 0x01)

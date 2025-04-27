@@ -11,9 +11,23 @@
 // a) Command line
 // b) Pokey
 // Both these are mapped into zpu config regs
+#include "integer.h"
 #include "file.h"
 
 #define MAX_DRIVES 15
+
+struct drive_info
+{
+	struct SimpleFile *file;
+	u08 info;
+	char custom_loader;
+	u32 offset;
+	u32 sector_count;
+	u16 sector_size;
+	u08 atari_sector_status;	
+};
+
+extern struct drive_info drive_infos[MAX_DRIVES+1];
 
 void actions(); // this is called whenever possible - should be quick
 

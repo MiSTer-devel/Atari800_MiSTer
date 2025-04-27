@@ -113,7 +113,7 @@ enum SimpleFileStatus file_write(struct SimpleFile *file, unsigned char *buffer,
 	return SimpleFile_FAIL;
 }
 
-enum SimpleFileStatus file_write_flush()
-{
-	return SimpleFile_FAIL;
-}
+//enum SimpleFileStatus file_write_flush()
+//{
+//	return SimpleFile_FAIL;
+//}
