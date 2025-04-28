@@ -1,5 +1,14 @@
 #pragma once
 
+#define get_sd_done() (*zpu_in2 & 0x00000100)
+#define set_sd_data_mode_on() *zpu_out2 |= 0x00000001
+#define set_sd_data_mode_off() *zpu_out2 &= 0xFFFFFFFE
+#define set_sd_read_on() *zpu_out2 |= 0x00000002
+#define set_sd_read_off() *zpu_out2 &= 0xFFFFFFFD
+#define set_sd_write_on() *zpu_out2 |= 0x00000004
+#define set_sd_write_off() *zpu_out2 &= 0xFFFFFFFB
+#define set_sd_num(n) *zpu_out2 = (*zpu_out2 & 0xFFFFFFC7) | (n << 3)
+
 struct SimpleFile
 {
 	int num;

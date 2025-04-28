@@ -194,7 +194,7 @@ void actions()
 		set_pause_6502(1);
 		freeze();
 
-		set_sd_data_mode(1);
+		set_sd_data_mode_on();
 		files[4].size = *zpu_in3;
 		files[4].type = get_sd_filetype();
 		files[4].is_readonly = get_sd_readonly();

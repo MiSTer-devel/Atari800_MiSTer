@@ -22,6 +22,9 @@
 #include "atx_eclaire.h"
 #include "atx.h"
 #include "regs.h"
+#include "pause.h"
+
+#define get_atx1050() (*zpu_in2 & 0x00000020)
 
 // number of angular units in a full disk rotation
 #define AU_FULL_ROTATION         26042

@@ -32,7 +32,7 @@ extern struct drive_info drive_infos[MAX_DRIVES+1];
 void actions(); // this is called whenever possible - should be quick
 
 void init_drive_emulator();
-void run_drive_emulator(); // Blocks. Pokey at its fastest is 6 cycles * 10 bits per byte. i.e. 60 cycles at 1.79MHz.
+//void run_drive_emulator(); // Blocks. Pokey at its fastest is 6 cycles * 10 bits per byte. i.e. 60 cycles at 1.79MHz.
 void processCommand();
 unsigned char processCommandPBI(unsigned char *);
 

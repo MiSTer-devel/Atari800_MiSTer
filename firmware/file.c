@@ -21,16 +21,16 @@ BYTE cache_read(DWORD offset, int file)
 	{
 		int i;
 
-		set_sd_data_mode(1);
+		set_sd_data_mode_on();
 		*zpu_out3 = offset >> 9;
 
 		set_sd_num(file);
-		set_sd_read(0);
-		set_sd_read(1);
+		set_sd_read_off();
+		set_sd_read_on();
 		while(!get_sd_done()) {};
-		set_sd_read(0);
+		set_sd_read_off();
 
-		set_sd_data_mode(0);
+		set_sd_data_mode_off();
 		for(i=0; i<512; i++) sect_buffer[i] = *zpu_in3;
 
 		cur_offset = offset;
@@ -43,17 +43,17 @@ void cache_write()
 {
 	int i;
 
-	set_sd_data_mode(0);
+	set_sd_data_mode_off();
 	for(i=0; i<512; i++) *zpu_out3 = sect_buffer[i];
 
-	set_sd_data_mode(1);
+	set_sd_data_mode_on();
 	*zpu_out3 = cur_offset >> 9;
 
 	set_sd_num(cur_file);
-	set_sd_write(0);
-	set_sd_write(1);
+	set_sd_write_off();
+	set_sd_write_on();
 	while(!get_sd_done()) {};
-	set_sd_write(0);
+	set_sd_write_off();
 }
 
 void file_reset()

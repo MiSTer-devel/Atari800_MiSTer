@@ -364,7 +364,12 @@ void mainloop()
 	init_drive_emulator();
 
 	reboot(1, 0);
-	run_drive_emulator();
+//	run_drive_emulator();
+	while (1)
+	{
+		processCommand();
+	}
+
 }
 
 unsigned char volatile *xex_loader_base;
@@ -389,7 +394,7 @@ void actions()
 	{
 		last_mount = mounted;
 		
-		set_sd_data_mode(1);
+		set_sd_data_mode_on();
 		int num = get_sd_fileno();
 		struct SimpleFile *file = &files[num];
 		file->size = *zpu_in3;
@@ -411,8 +416,8 @@ void actions()
 			set_drive_status(0, file->size ? file : 0);
 			reboot(1, 0);
 			// Important: if you set Option key before reset it will be cleared by reset
-			set_option_force(1);
-			set_option_force(0);
+			set_option_force_on();
+			set_option_force_off();
 		}
 		else if(num == 5)
 		{
