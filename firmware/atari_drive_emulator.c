@@ -494,15 +494,16 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 
 void init_drive_emulator()
 {
-	int i;
+	//int i;
 
 	// opendrive = -1;
 	speed = speedslow;
-	USART_Init(speed+6);
-	for (i=0; i!=MAX_DRIVES; ++i)
-	{
-		drive_infos[i].file = 0;
-	}
+	USART_Init(speedslow+6);
+	memset8(drive_infos, 0, (MAX_DRIVES+1)*sizeof(struct drive_info));
+	//for (i=0; i!=MAX_DRIVES; ++i)
+	//{
+	//	drive_infos[i].file = 0;
+	//}
 }
 /*
 void run_drive_emulator()

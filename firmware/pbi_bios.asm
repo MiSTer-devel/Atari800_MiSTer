@@ -10,6 +10,15 @@ dtimlo	= $306
 cdtma1	= $226
 setvbv	= $e45c
 
+; PBI BIOS RAM
+pbi_magic = $d100 ; word
+pbi_req_init_flag = $d102
+pbi_splash_flag = $d103
+pbi_req_proc_flag = $d104
+pbi_req_proc_res = $d105
+pbi_stack_save = $d106
+pbi_drive_conf = $d10c
+
 	* = $D800
 bios1_start
 	.byte 'M', 'S', 'T'
@@ -34,16 +43,18 @@ pdinit
 	lda pdvmsk : ora pdvrs : sta pdvmsk
 	lda #0 : ldx #$fe : sta $d100-1,x : dex : bne *-4
 	; Marker for the core firmware
-	lda #$a5 : sta $d100 : sta $d101
+	lda #$a5 : sta pbi_magic : sta pbi_magic+1
 	; ask for init
-	inc $d102 : lda $d102 : bne *-3
+	inc pbi_req_init_flag : lda pbi_req_init_flag : bne *-3
 	; Do we want the splash?
-	lda $d103 : beq pdinit_ret
+	lda pbi_splash_flag : beq pdinit_ret
+	jsr boot_screen_init
 	lda #$0c : sta $2c5 ; color 1
 	lda #$e0 : sta $d409 ; chbase
 	lda #<display_list : sta $d402 : lda #>display_list : sta $d403 ; display list
 	lda $14 : cmp $14 : beq *-2 : ldy #$22 : sty $d400 ; dmactl
-	clc : adc #100 : cmp $14 : bne *-2 : stx $d400
+	clc : adc #100 : cmp $14 : bne *-2
+	lda #0 : sta $d400
 pdinit_ret
 	rts
 
@@ -70,18 +81,37 @@ display_text2_len = *-display_text2
 	.dsb 40-display_text2_len,0
 display_text3 = $d110 
 
+drive_labels_1 .byte 'O'-$20, 'P'-$20, 'H'-$20
+drive_labels_2 .byte 'f',     'B'-$20, 'S'-$20
+drive_labels_3 .byte 'f',     'I'-$20, 'I'-$20
+drive_labels_4 .byte 0,       0,       'O'-$20
+
+boot_screen_init
+	ldy #1
+boot_screen_init_loop
+	lda #'D'-$20 : sta display_text3+2,x : inx
+	tya : pha : ora #$10 : sta display_text3+2,x : inx
+	lda #':'-$20 : sta display_text3+2,x : inx : inx
+	lda pbi_drive_conf-1,y : tay
+	lda drive_labels_1,y : sta display_text3+2,x : inx
+	lda drive_labels_2,y : sta display_text3+2,x : inx
+	lda drive_labels_3,y : sta display_text3+2,x : inx
+	lda drive_labels_4,y : sta display_text3+2,x : inx : inx
+	pla : tay : iny : cpy #5 : bne boot_screen_init_loop
+	rts
+
 ; The main block I/O routine
 pdior
-	lda ddevic : cmp #$31 : bne pdior_bail
+	lda ddevic : and #$7F : cmp #$31 : bne pdior_bail
 	lda dunit : beq pdior_bail
 	cmp #$10 : bcs pdior_bail
-	tsx : stx $d106
+	tsx : stx pbi_stack_save
 	lda dtimlo : ror : ror : tay : and #$3f : tax : tya : ror : and #$c0 : tay : lda #1
 	jsr setvbv
 	lda #<pbi_time_out : sta cdtma1 : lda #>pbi_time_out : sta cdtma1+1
-	inc $d104 : lda $d104 : bne *-3
+	inc pbi_req_proc_flag : lda pbi_req_proc_flag : bne *-3
 	ldx #0 : ldy #0 : lda #1 : jsr setvbv 
-	lda $d105 : bmi pdior_bail ; the FW says either no PBI service or ATX (plain SIO)
+	lda pbi_req_proc_res : bmi pdior_bail ; the FW says either no PBI service or ATX (plain SIO)
 	beq pdior_pbi_ok ; the drive was in PBI mode and got serviced
 	; otherwise call HSIO
 	jsr $dc00 : sec : rts
@@ -91,7 +121,8 @@ pdior_bail
 	; We are not servicing this block I/O request
 	clc : rts
 pbi_time_out
-	lda #0 : sta $d104 : ldx $d106 : txs : lda #$8a : sta dstats : bne pdior_pbi_ok
+	lda #0 : sta pbi_req_proc_flag : ldx pbi_stack_save : txs
+	lda #$8a : sta dstats : bne pdior_pbi_ok
 bios1_end
 
 .dsb ($400-bios1_end+bios1_start),$ff

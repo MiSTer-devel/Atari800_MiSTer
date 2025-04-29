@@ -598,6 +598,8 @@ xex_eof:
 			pbi_drives_config[2] = (*zpu_in2 >> 20) & 0x3;
 			pbi_drives_config[3] = (*zpu_in2 >> 22) & 0x3;
 			pbi_ram_base[3] = get_splashpbi();
+			memcp8(pbi_drives_config, &pbi_ram_base[0x0C], 0, 4);
+			/*
 			for(mounted = 0; mounted < 4; mounted++)
 			{
 				pbi_ram_base[0x12+9*mounted] = 'D'-0x20;
@@ -622,16 +624,17 @@ xex_eof:
 						break;
 				}
 			}
+			*/
 			pbi_ram_base[2] = 0;
 			unsigned char boot_drv = get_bootpbi();
 			if(boot_drv == 1 && drive_infos[MAX_DRIVES].file)
 			{
 				// APT
-				*((volatile unsigned char *)(atari_regbase+0x0301)) = drive_infos[MAX_DRIVES].info & 0xF; 				
+				*((volatile unsigned char *)(atari_regbase+0x0301)) = drive_infos[MAX_DRIVES].info & 0xF;
 			}
 			else if(boot_drv)
 			{
-				*((volatile unsigned char *)(atari_regbase+0x0301)) = (boot_drv-1); 
+				*((volatile unsigned char *)(atari_regbase+0x0301)) = (boot_drv-1);
 			}
 		}
 		else if(pbi_ram_base[4] == 0x01)

@@ -209,13 +209,6 @@ unsigned char toatarichar(int val)
 	return val;
 } 
 
-void clearscreen()
-{
-	unsigned volatile char * screen;
-	for (screen=(unsigned volatile char *)(screen_address+atari_regbase); screen!=(unsigned volatile char *)(atari_regbase+screen_address+1024); ++screen)
-		*screen = 0x00;
-}
-
 void char_out (void* p, char c)
 {
 	unsigned char val = toatarichar(c);
@@ -242,6 +235,14 @@ void clear_main_ram()
 {
 	memset8(SRAM_BASE, 0, main_ram_size); // SRAM, if present (TODO)
 	memset32(SDRAM_BASE, 0x00FF00FF, main_ram_size/4);
+}
+
+void clearscreen()
+{
+	//unsigned volatile char * screen;
+	//for (screen=(unsigned volatile char *)(screen_address+atari_regbase); screen!=(unsigned volatile char *)(atari_regbase+screen_address+1024); ++screen)
+	//	*screen = 0x00;
+	memset8((unsigned volatile char *)(screen_address+atari_regbase), 0, 1024);
 }
 
 struct SimpleFile *xex_file;
