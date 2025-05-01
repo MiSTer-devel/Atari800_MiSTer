@@ -205,6 +205,103 @@ void getCommand(struct command * cmd)
 	// DELAY_T2_MIN;
 }
 
+unsigned char hdd_partition_scan(struct SimpleFile *file, unsigned char info)
+{
+	int read = 0;
+	file_seek(file, 0);
+	file_read(file, atari_sector_buffer, 256, &read);
+	if(read != 256) return 0;
+	if(atari_sector_buffer[1] != 'A' || atari_sector_buffer[2] != 'P' || atari_sector_buffer[3] != 'T')
+	{
+		file_read(file, atari_sector_buffer, 256, &read);
+		if(read != 256) return 0;
+		read = 0xC2;
+		while(read < 0x100)
+		{
+			if(atari_sector_buffer[read] == 0x7F)
+			{
+				read = ((atari_sector_buffer[read+4]) |
+				((atari_sector_buffer[read+5] << 8)) | 
+				((atari_sector_buffer[read+6] << 16)) | 
+				((atari_sector_buffer[read+7] << 24))) << 9; 
+				file_seek(file, read);
+				file_read(file, atari_sector_buffer, 256, &read);
+				if(read != 256 || atari_sector_buffer[1] != 'A' || atari_sector_buffer[2] != 'P' || atari_sector_buffer[3] != 'T') return 0;
+				break;
+			}
+			read += 16;
+		}
+	}
+	if(atari_sector_buffer[0] == 0x10)
+	{
+		info |= INFO_META;
+	}
+	else if(atari_sector_buffer[0]) return 0;
+	info |= (atari_sector_buffer[4] & 0xF);
+	for(read = 0; read < 15; read++)
+	{
+		int i = (read+1)*16;
+		if(!atari_sector_buffer[i])
+		{
+			// empty slot
+			if(drive_infos[read].file && (drive_infos[read].info & INFO_HDD))
+			{
+				drive_infos[read].file = 0;
+			}
+		}
+		else
+		{
+			drive_infos[read].info = (info & 0xC0) | (atari_sector_buffer[i] & 0x40 ? INFO_META : 0) |
+			((atari_sector_buffer[i] & 0x30) || (atari_sector_buffer[i+12] & 0x80) ? INFO_RO : 0);
+			atari_sector_buffer[i] &= 0x8F;
+			if(atari_sector_buffer[i] > 3 || (atari_sector_buffer[i+1] != 0x00 && atari_sector_buffer[i+1] != 0x03) || !(atari_sector_buffer[i+12] & 0x40))
+			{
+				drive_infos[read].file = 0;												
+			}
+			else
+			{
+				drive_infos[read].sector_size = 128 << (atari_sector_buffer[i]-1);
+				if(drive_infos[read].sector_size != 512)
+				{
+					drive_infos[read].info |= INFO_SS;
+				}
+				drive_infos[read].offset =
+				( atari_sector_buffer[i+2] |
+					(atari_sector_buffer[i+3] << 8) | 
+					(atari_sector_buffer[i+4] << 16) | 
+					(atari_sector_buffer[i+5] << 24)
+				) << 9;
+				drive_infos[read].sector_count = 
+				atari_sector_buffer[i+6] |
+				(atari_sector_buffer[i+7] << 8) | 
+				(atari_sector_buffer[i+8] << 16) | 
+				(atari_sector_buffer[i+9] << 24);
+				drive_infos[read].partition_id = atari_sector_buffer[i+10] | (atari_sector_buffer[i+11] << 8);
+				if(atari_sector_buffer[i+1] == 0x00) // DOS partition
+				{
+					u16 p_offset =
+					(atari_sector_buffer[i+14] | (atari_sector_buffer[i+15] << 8)) << 9;
+					drive_infos[read].meta_offset = drive_infos[read].offset - 512;
+					drive_infos[read].offset += p_offset;
+				}
+				else // External partition
+				{
+					drive_infos[read].meta_offset =
+					(atari_sector_buffer[i+13] |
+						(atari_sector_buffer[i+14] << 8) | 
+						(atari_sector_buffer[i+15] << 16)
+					) << 9;
+				}
+				drive_infos[read].custom_loader = 0;
+				drive_infos[read].atari_sector_status = 0xFF;
+				drive_infos[read].file = file;
+				
+			}
+		}
+	}
+	return info;
+}
+
 // Called whenever file changed
 void set_drive_status(int driveNumber, struct SimpleFile * file)
 {
@@ -322,99 +419,9 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 			drive_infos[driveNumber].sector_size = 512;
 			drive_infos[driveNumber].sector_count = file->size / 0x200;
 			drive_infos[driveNumber].atari_sector_status = 0;
-
-			file_seek(file, 0);
-			file_read(file, atari_sector_buffer, 256, &read);
-			if(read != 256) return;
 			drive_infos[driveNumber].offset = 0;
-			if(atari_sector_buffer[1] != 'A' || atari_sector_buffer[2] != 'P' || atari_sector_buffer[3] != 'T')
-			{
-				file_read(file, atari_sector_buffer, 256, &read);
-				if(read != 256) return;
-				read = 0xC2;
-				while(read < 0x100)
-				{
-					if(atari_sector_buffer[read] == 0x7F)
-					{
-						read = ((atari_sector_buffer[read+4]) |
-							((atari_sector_buffer[read+5] << 8)) | 
-							((atari_sector_buffer[read+6] << 16)) | 
-							((atari_sector_buffer[read+7] << 24))) << 9; 
-						file_seek(file, read);
-						file_read(file, atari_sector_buffer, 256, &read);
-						if(read != 256 || atari_sector_buffer[1] != 'A' || atari_sector_buffer[2] != 'P' || atari_sector_buffer[3] != 'T') return;
-						break;
-					}
-					read += 16;
-				}
-			}
-			if(atari_sector_buffer[0] == 0x10)
-			{
-				info |= INFO_META;
-			}
-			else if(atari_sector_buffer[0]) return;
-			info |= (atari_sector_buffer[4] & 0xF);
-			for(read = 0; read < 15; read++)
-			{
-				int i = (read+1)*16;
-				if(!atari_sector_buffer[i])
-				{
-					// empty slot
-					if(drive_infos[read].file && (drive_infos[read].info & INFO_HDD))
-					{
-						drive_infos[read].file = 0;
-					}
-				}
-				else
-				{
-					drive_infos[read].info = (info & 0xC0) | (atari_sector_buffer[i] & 0x40 ? INFO_META : 0) |
-						((atari_sector_buffer[i] & 0x30) || (atari_sector_buffer[i+12] & 0x80) ? INFO_RO : 0);
-					atari_sector_buffer[i] &= 0x8F;
-					if(atari_sector_buffer[i] > 3 || (atari_sector_buffer[i+1] != 0x00 && atari_sector_buffer[i+1] != 0x03) || !(atari_sector_buffer[i+12] & 0x40))
-					{
-						drive_infos[read].file = 0;												
-					}
-					else
-					{
-						drive_infos[read].sector_size = 128 << (atari_sector_buffer[i]-1);
-						if(drive_infos[read].sector_size != 512)
-						{
-							drive_infos[read].info |= INFO_SS;
-						}
-						drive_infos[read].offset =
-						  ( atari_sector_buffer[i+2] |
-						   (atari_sector_buffer[i+3] << 8) | 
-						   (atari_sector_buffer[i+4] << 16) | 
-						   (atari_sector_buffer[i+5] << 24)
-					          ) << 9;
-						drive_infos[read].sector_count = 
-						   atari_sector_buffer[i+6] |
-						  (atari_sector_buffer[i+7] << 8) | 
-						  (atari_sector_buffer[i+8] << 16) | 
-					 	  (atari_sector_buffer[i+9] << 24);
-						drive_infos[read].partition_id = atari_sector_buffer[i+10] | (atari_sector_buffer[i+11] << 8);
-						if(atari_sector_buffer[i+1] == 0x00) // DOS partition
-						{
-							u16 p_offset =
-								(atari_sector_buffer[i+14] | (atari_sector_buffer[i+15] << 8)) << 9;
-							drive_infos[read].meta_offset = drive_infos[read].offset - 512;
-							drive_infos[read].offset += p_offset;
-						}
-						else // External partition
-						{
-							drive_infos[read].meta_offset =
-							  (atari_sector_buffer[i+13] |
-							   (atari_sector_buffer[i+14] << 8) | 
-							   (atari_sector_buffer[i+15] << 16)
-							  ) << 9;
-						}
-						drive_infos[read].custom_loader = 0;
-	  					drive_infos[read].atari_sector_status = 0xFF;
-	  					drive_infos[read].file = file;
-
-					}
-				}
-			}
+			info = hdd_partition_scan(file, info);
+			if(!info) return;
 		}
 	}
 	else if (file->type == 1) // XEX
@@ -543,7 +550,7 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 	struct command command;
 	command.deviceId = (ptr[0] + drive) | 0x40; // ddevic + dunit - 1 plus PBI marker
 
-	unsigned char mode = sd_device ? 1 : (drive < 4 ? drives_config[drive] : ((ptr[0] & 0x80) >> 7));
+	unsigned char mode = (sd_device && !drive) ? 1 : ((!sd_device && drive < 4) ? drives_config[drive] : ((ptr[0] & 0x80) >> 7));
 
 	struct SimpleFile *file = 0;
 	if(sd_device)
@@ -563,7 +570,10 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 	{
 		if(drive_infos[drive].info & INFO_HDD) // The type should be then ATR
 		{
-			mode = 1;
+			if(!sd_device)
+			{
+				mode = 1;
+			}
 		}
 		else
 		{
@@ -780,6 +790,20 @@ void handleReadPercomBlock(struct command command, int driveNumber, struct Simpl
 	action->bytes = 12;
 	//printf("%d",atari_sector_buffer[0]); // and this... The wrong checksum is sent!!
 	//printf(":done\n");
+}
+
+void handleForceMediaChange(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
+{
+	action->respond = 0;
+	unsigned char info = hdd_partition_scan(file, INFO_HDD | (file->is_readonly ? INFO_RO : 0));
+	if(!info)
+	{
+		action->success = 0;
+	}
+	else
+	{
+		drive_infos[driveNumber].info =  info;
+	}
 }
 
 // TODO use #define for version number for these two and get status byte
@@ -1232,6 +1256,10 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 	case 0x22: // format enhanced
 		if(!pbi)
 			res = &handleFormat;
+		break;
+	case 0x46:
+		if(pbi)
+			res = &handleForceMediaChange;
 		break;
 	case 0x4e: // read percom block
 		if(min_sector)

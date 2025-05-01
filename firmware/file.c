@@ -77,7 +77,7 @@ enum SimpleFileStatus file_read(struct SimpleFile *file, unsigned char *buffer, 
 	return SimpleFile_FAIL;
 }
 
-enum SimpleFileStatus file_seek(struct SimpleFile * file, int offsetFromStart)
+enum SimpleFileStatus file_seek(struct SimpleFile * file, unsigned int offsetFromStart)
 {
 	if((file->size > 0) && (file->size >= offsetFromStart))
 	{
