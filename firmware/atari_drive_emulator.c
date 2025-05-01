@@ -321,6 +321,7 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 
 			drive_infos[driveNumber].sector_size = 512;
 			drive_infos[driveNumber].sector_count = file->size / 0x200;
+			drive_infos[driveNumber].atari_sector_status = 0;
 
 			file_seek(file, 0);
 			file_read(file, atari_sector_buffer, 256, &read);
@@ -340,7 +341,6 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 							((atari_sector_buffer[read+6] << 16)) | 
 							((atari_sector_buffer[read+7] << 24))) << 9; 
 						file_seek(file, read);
-						drive_infos[driveNumber].offset = read;
 						file_read(file, atari_sector_buffer, 256, &read);
 						if(read != 256 || atari_sector_buffer[1] != 'A' || atari_sector_buffer[2] != 'P' || atari_sector_buffer[3] != 'T') return;
 						break;
@@ -354,8 +354,6 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 			}
 			else if(atari_sector_buffer[0]) return;
 			info |= (atari_sector_buffer[4] & 0xF);
-			// TODO If HDD and sector_size < 512 skip bytes on sector reading/writing
-			// TODO XDCB aux3 & aux4
 			for(read = 0; read < 15; read++)
 			{
 				int i = (read+1)*16;
@@ -365,7 +363,6 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 					if(drive_infos[read].file && (drive_infos[read].info & INFO_HDD))
 					{
 						drive_infos[read].file = 0;
-						// drive_infos[read].info = 0;
 					}
 				}
 				else
@@ -384,32 +381,37 @@ void set_drive_status(int driveNumber, struct SimpleFile * file)
 						{
 							drive_infos[read].info |= INFO_SS;
 						}
-						//switch(atari_sector_buffer[i])
-						//{
-						//	case 1:
-						//		drive_infos[read].sector_size = 128;
-						//		break;
-						//	case 2:
-						//		drive_infos[read].sector_size = 256;
-						//		break;
-						//	case 3:
-						//		drive_infos[read].sector_size = 512;
-						//		break;
-						//}
 						drive_infos[read].offset =
-						  ( (atari_sector_buffer[i+2]) |
-						   ((atari_sector_buffer[i+3] << 8)) | 
-						   ((atari_sector_buffer[i+4] << 16)) | 
-						   ((atari_sector_buffer[i+5] << 24))
+						  ( atari_sector_buffer[i+2] |
+						   (atari_sector_buffer[i+3] << 8) | 
+						   (atari_sector_buffer[i+4] << 16) | 
+						   (atari_sector_buffer[i+5] << 24)
 					          ) << 9;
 						drive_infos[read].sector_count = 
-						    (atari_sector_buffer[i+6]) |
-						  ((atari_sector_buffer[i+7] << 8)) | 
-						  ((atari_sector_buffer[i+8] << 16)) | 
-					 	  ((atari_sector_buffer[i+9] << 24));
+						   atari_sector_buffer[i+6] |
+						  (atari_sector_buffer[i+7] << 8) | 
+						  (atari_sector_buffer[i+8] << 16) | 
+					 	  (atari_sector_buffer[i+9] << 24);
+						drive_infos[read].partition_id = atari_sector_buffer[i+10] | (atari_sector_buffer[i+11] << 8);
+						if(atari_sector_buffer[i+1] == 0x00) // DOS partition
+						{
+							u16 p_offset =
+								(atari_sector_buffer[i+14] | (atari_sector_buffer[i+15] << 8)) << 9;
+							drive_infos[read].meta_offset = drive_infos[read].offset - 512;
+							drive_infos[read].offset += p_offset;
+						}
+						else // External partition
+						{
+							drive_infos[read].meta_offset =
+							  (atari_sector_buffer[i+13] |
+							   (atari_sector_buffer[i+14] << 8) | 
+							   (atari_sector_buffer[i+15] << 16)
+							  ) << 9;
+						}
 						drive_infos[read].custom_loader = 0;
 	  					drive_infos[read].atari_sector_status = 0xFF;
 	  					drive_infos[read].file = file;
+
 					}
 				}
 			}
@@ -536,13 +538,26 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 	// mark a bit in deviceId to indicate this is PBI
 
 	unsigned char volatile *ptr = (unsigned char volatile *)(atari_regbase + 0x300);
+	u08 sd_device = (ptr[0] & 0x7F) == 0x20;
 	int drive = ptr[1] - 1;
 	struct command command;
-	command.deviceId = (ptr[0] + (drive & 0xFF)) | 0x40; // ddevic + dunit - 1 plus PBI marker
+	command.deviceId = (ptr[0] + drive) | 0x40; // ddevic + dunit - 1 plus PBI marker
 
-	unsigned char mode = (drive < 4) ? drives_config[drive] : ((ptr[0] & 0x80) >> 7);
+	unsigned char mode = sd_device ? 1 : (drive < 4 ? drives_config[drive] : ((ptr[0] & 0x80) >> 7));
 
-	struct SimpleFile *file = drive_infos[drive].file;
+	struct SimpleFile *file = 0;
+	if(sd_device)
+	{
+		if(!drive)
+		{
+			drive = MAX_DRIVES;
+			file = drive_infos[drive].file;
+		}
+	}
+	else
+	{
+		file = drive_infos[drive].file;
+	}
 	
 	if(file)
 	{
@@ -767,29 +782,94 @@ void handleReadPercomBlock(struct command command, int driveNumber, struct Simpl
 	//printf(":done\n");
 }
 
+// TODO use #define for version number for these two and get status byte
+const unsigned char sd_device_name[] = {'S','D','H','C',' ','M','i','S','T','e','r',' ','v','.','0','.','8'};
+const unsigned char bios_name[] = {'M','i','S','T','e','r',' ','c','o','r','e',' ','P','B','I',' ','B','I','O','S',' ','v','.','0','.','8'};
+
+// getstats for a0 01 on Ultimate - 40 FC E0 0E
+// dev info:
+// 01 00 01 0F 00 00 00 02 00 04 10 00 00 00 00 00
+// 0E003F   1c007e00
+// 0E0040 FAT16 meta 1c008000
+// 0E0041 boot meta 1c008200
+// 0F0041 data meta  1e008200
+
+void handleDeviceInfo(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
+{
+	//action->bytes = driveNumber == MAX_DRIVES ? 512 : 64;
+	memset8(action->sector_buffer, 0, action->bytes);
+	action->sector_buffer[0] = 1;
+	action->sector_buffer[2] = 1;
+	action->sector_buffer[6] = drive_infos[driveNumber].sector_size;
+	action->sector_buffer[7] = drive_infos[driveNumber].sector_size >> 8;
+	action->sector_buffer[8] = drive_infos[driveNumber].sector_count;
+	action->sector_buffer[9] = drive_infos[driveNumber].sector_count >> 8;
+	action->sector_buffer[10] = drive_infos[driveNumber].sector_count >> 16;
+	action->sector_buffer[11] = drive_infos[driveNumber].sector_count >> 24;
+	if(driveNumber == MAX_DRIVES)
+	{
+		memcp8(sd_device_name, &action->sector_buffer[0x10], 0, 17);
+		memcp8(bios_name, &action->sector_buffer[0x38], 0, 26);
+	}
+	else
+	{
+		action->sector_buffer[3] = drive_infos[driveNumber].partition_id;
+		action->sector_buffer[4] = drive_infos[driveNumber].partition_id >> 8;
+		// TODO This made me realize that we are limited in the SD image size
+		action->sector_buffer[12] = drive_infos[driveNumber].offset >> 9;
+		action->sector_buffer[13] = drive_infos[driveNumber].offset >> 17;
+		action->sector_buffer[14] = drive_infos[driveNumber].offset >> 25;
+		if(drive_infos[driveNumber].info & INFO_META)
+		{
+			int read;
+			file_seek(drive_infos[driveNumber].file, drive_infos[driveNumber].meta_offset+16);
+			file_read(drive_infos[driveNumber].file, &action->sector_buffer[0x10], 40, &read);
+			if(read != 40)
+			{
+				action->success = 0;
+			}
+		}
+	}
+}
+
+void handleDeviceStatus(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
+{
+	memset8(action->sector_buffer, 0, action->bytes);
+	action->sector_buffer[0x0C] = 0x3F;
+	//action->bytes = 512;
+}
+
 void handleGetStatus(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
 	unsigned char status;
 	//printf("Stat:");
 
-	status = 0x10; // Motor on;
-
-	if (drive_infos[driveNumber].info & INFO_RO)
+	if(driveNumber == MAX_DRIVES)
 	{
-		status |= 0x08; // write protected; // no write support yet...
+		status = 0x40;
 	}
-	if(drive_infos[driveNumber].sector_count != 720)
+	else
 	{
-		status |= 0x80; // medium density - or a strange one...
-	}
-	if(drive_infos[driveNumber].sector_size != 128)
-	{
-		status |= 0x20; // 256 byte sectors		
+		
+		status = 0x10; // Motor on;
+		
+		if (drive_infos[driveNumber].info & INFO_RO)
+		{
+			status |= 0x08; // write protected; // no write support yet...
+		}
+		if(drive_infos[driveNumber].sector_count != 720)
+		{
+			status |= 0x80; // medium density - or a strange one...
+		}
+		if(drive_infos[driveNumber].sector_size != 128)
+		{
+			status |= 0x20; // 256 byte sectors		
+		}
 	}
 	action->sector_buffer[0] = status;
 	action->sector_buffer[1] = drive_infos[driveNumber].atari_sector_status;
-	action->sector_buffer[2] = 0xe0;
-	action->sector_buffer[3] = 0x0;
+	action->sector_buffer[2] = driveNumber == MAX_DRIVES ? 0x10 : 0xe0; // What should be our ID?
+	action->sector_buffer[3] = driveNumber == MAX_DRIVES ? 0x08 : 0x0; // v0.8
 	//hexdump_pure(atari_sector_buffer,4); // Somehow with this...
 	
 	action->bytes = 4;
@@ -797,13 +877,17 @@ void handleGetStatus(struct command command, int driveNumber, struct SimpleFile 
 	//printf(":done\n");
 }
 
-void set_location_offset(int driveNumber, u32 sector, int *sectorSize, int *location)
+void set_location_offset(int driveNumber, u32 sector, int *sectorSize, u32 *location)
 {
 	*location = drive_infos[driveNumber].offset;
 	*sectorSize = drive_infos[driveNumber].sector_size;
 	if(drive_infos[driveNumber].sector_size == 512 || (drive_infos[driveNumber].info & INFO_HDD))
 	{
-		*location += (sector-1) * (*sectorSize);
+		if(driveNumber != MAX_DRIVES)
+		{
+			sector--;
+		}
+		*location += sector * (*sectorSize);
 	}
 	else
 	{
@@ -827,7 +911,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	u08 pbi = command.deviceId & 0x40;
 	u32 sector = (command.auxab << 16) | command.aux1 | (command.aux2 << 8);
 	int sectorSize = 0;
-	int location =0;
+	u32 location =0;
 
 	if (file->is_readonly)
 	{
@@ -1134,7 +1218,8 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 {
 	CommandHandler res = 0;
 	u32 sector = (command.auxab << 16) | command.aux1 | (command.aux2<<8);
-	int driveNumber = (command.deviceId & 0xf) - 1;
+	u08 min_sector = (command.deviceId & 0x3F) == 0x20 ? 0 : 1;
+	int driveNumber = min_sector ? (command.deviceId & 0xf) - 1 : MAX_DRIVES;
 	u08 pbi = command.deviceId & 0x40;
 
 	switch (command.command)
@@ -1149,7 +1234,8 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 			res = &handleFormat;
 		break;
 	case 0x4e: // read percom block
-		res = &handleReadPercomBlock;
+		if(min_sector)
+			res = &handleReadPercomBlock;
 		break;
 	case 0x53: // get status
 		if(!pbi || dstats == 0x40)
@@ -1157,11 +1243,11 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 		break;
 	case 0x50: // write
 	case 0x57: // write with verify
-		if ((!pbi || dstats == 0x80) && sector > 0 && sector <= drive_infos[driveNumber].sector_count)
+		if ((!pbi || dstats == 0x80) && sector >= min_sector && sector - min_sector < drive_infos[driveNumber].sector_count)
 			res = &handleWrite;
 		break;
 	case 0x52: // read
-		if ((!pbi || dstats == 0x40) && sector > 0 && sector <= drive_infos[driveNumber].sector_count)
+		if ((!pbi || dstats == 0x40) && sector >= min_sector && sector - min_sector < drive_infos[driveNumber].sector_count)
 		{
 			if(drive_infos[driveNumber].custom_loader == 2) // ATX!
 			{
@@ -1169,6 +1255,14 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 			}
 			res = &handleRead;
 		}
+		break;
+	case 0x6E: // PBI device info
+		if(pbi && dstats == 0x40)
+			res = &handleDeviceInfo;
+		break;
+	case 0xEC: // PBI device status
+		if(pbi && dstats == 0x40)
+			res = &handleDeviceStatus;
 		break;
 	}
 

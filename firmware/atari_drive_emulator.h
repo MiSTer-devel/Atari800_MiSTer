@@ -22,6 +22,8 @@ struct drive_info
 	u08 info;
 	char custom_loader;
 	u32 offset;
+	u32 meta_offset; // HDD only
+	u16 partition_id; // HDD only
 	u32 sector_count;
 	u16 sector_size;
 	u08 atari_sector_status;	

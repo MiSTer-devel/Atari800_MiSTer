@@ -17,6 +17,7 @@ pbi_splash_flag = $d103
 pbi_req_proc_flag = $d104
 pbi_req_proc_res = $d105
 pbi_stack_save = $d106
+pbi_drive_boot = $d10b
 pbi_drive_conf = $d10c
 
 	* = $D800
@@ -102,7 +103,9 @@ boot_screen_init_loop
 
 ; The main block I/O routine
 pdior
-	lda ddevic : and #$7F : cmp #$31 : bne pdior_bail
+	lda ddevic : and #$7F : cmp #$31 : beq pdior_2
+	cmp #$20 : bne pdior_bail
+pdior_2
 	lda dunit : beq pdior_bail
 	cmp #$10 : bcs pdior_bail
 	tsx : stx pbi_stack_save

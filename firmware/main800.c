@@ -625,8 +625,8 @@ xex_eof:
 				}
 			}
 			*/
-			pbi_ram_base[2] = 0;
 			unsigned char boot_drv = get_bootpbi();
+			pbi_ram_base[0x0B] = boot_drv;
 			if(boot_drv == 1 && drive_infos[MAX_DRIVES].file)
 			{
 				// APT
@@ -636,6 +636,7 @@ xex_eof:
 			{
 				*((volatile unsigned char *)(atari_regbase+0x0301)) = (boot_drv-1);
 			}
+			pbi_ram_base[2] = 0;
 		}
 		else if(pbi_ram_base[4] == 0x01)
 		{
