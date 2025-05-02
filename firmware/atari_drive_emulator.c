@@ -550,6 +550,14 @@ unsigned char processCommandPBI(unsigned char *drives_config)
 	struct command command;
 	command.deviceId = (ptr[0] + drive) | 0x40; // ddevic + dunit - 1 plus PBI marker
 
+	/*
+	  This piece of admitedely contrived logic takes care of diverting or not further processing
+	  to SIO routines. The procedure is not exactly the same as on, say, Ultimate 1MB PBI BIOS, nor 
+	  it is strictly according to the PBI API requirements, here we (safely?) assume there are no
+	  other PBI devices (and hence ROM BIOSes), so this allows us to take some shortcuts (which also
+	  speeds up things on the Atari / SDX side).
+	*/
+
 	unsigned char mode = (sd_device && !drive) ? 1 : ((!sd_device && drive < 4) ? drives_config[drive] : ((ptr[0] & 0x80) >> 7));
 
 	struct SimpleFile *file = 0;
@@ -806,17 +814,7 @@ void handleForceMediaChange(struct command command, int driveNumber, struct Simp
 	}
 }
 
-// TODO use #define for version number for these two and get status byte
-const unsigned char sd_device_name[] = {'S','D','H','C',' ','M','i','S','T','e','r',' ','v','.','0','.','8'};
-const unsigned char bios_name[] = {'M','i','S','T','e','r',' ','c','o','r','e',' ','P','B','I',' ','B','I','O','S',' ','v','.','0','.','8'};
-
-// getstats for a0 01 on Ultimate - 40 FC E0 0E
-// dev info:
-// 01 00 01 0F 00 00 00 02 00 04 10 00 00 00 00 00
-// 0E003F   1c007e00
-// 0E0040 FAT16 meta 1c008000
-// 0E0041 boot meta 1c008200
-// 0F0041 data meta  1e008200
+//const unsigned char sd_device_name[] = {'S','D','H','C',' ','M','i','S','T','e','r',' ','S','D','E','M','U',' ','v','.','0','.','8'};
 
 void handleDeviceInfo(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
@@ -832,8 +830,9 @@ void handleDeviceInfo(struct command command, int driveNumber, struct SimpleFile
 	action->sector_buffer[11] = drive_infos[driveNumber].sector_count >> 24;
 	if(driveNumber == MAX_DRIVES)
 	{
-		memcp8(sd_device_name, &action->sector_buffer[0x10], 0, 17);
-		memcp8(bios_name, &action->sector_buffer[0x38], 0, 26);
+		// memcp8(sd_device_name, &action->sector_buffer[0x10], 0, 23);
+		memcp8((unsigned char volatile *)(atari_regbase + 0xDFAF), &action->sector_buffer[0x10], 0, ((unsigned volatile char *)(atari_regbase + 0xDFAE))[0]);
+		memcp8((unsigned char volatile *)(atari_regbase + 0xDFD8), &action->sector_buffer[0x38], 0, ((unsigned volatile char *)(atari_regbase + 0xDFD7))[0]);
 	}
 	else
 	{
@@ -893,7 +892,7 @@ void handleGetStatus(struct command command, int driveNumber, struct SimpleFile 
 	action->sector_buffer[0] = status;
 	action->sector_buffer[1] = drive_infos[driveNumber].atari_sector_status;
 	action->sector_buffer[2] = driveNumber == MAX_DRIVES ? 0x10 : 0xe0; // What should be our ID?
-	action->sector_buffer[3] = driveNumber == MAX_DRIVES ? 0x08 : 0x0; // v0.8
+	action->sector_buffer[3] = driveNumber == MAX_DRIVES ? ((unsigned volatile char *)(atari_regbase + 0xDFAD))[0] : 0x00; // version
 	//hexdump_pure(atari_sector_buffer,4); // Somehow with this...
 	
 	action->bytes = 4;

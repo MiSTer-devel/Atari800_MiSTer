@@ -1,6 +1,9 @@
 ; Links:
 ; http://atariki.krap.pl/index.php/ROM_PBI
 
+#define VER_MAJOR 0
+#define VER_MINOR 8
+
 pdvmsk	= $247
 pdvrs	= $248
 ddevic	= $300
@@ -19,6 +22,7 @@ pbi_req_proc_res = $d105
 pbi_stack_save = $d106
 pbi_drive_boot = $d10b
 pbi_drive_conf = $d10c
+; HSIO RAM variables sit upwards of $d1f0 incl.
 
 	* = $D800
 bios1_start
@@ -66,6 +70,8 @@ display_list
 	.byte $42 : .word display_text2
 	.byte $70
 	.byte $42 : .word display_text3
+	.byte $30
+	.byte $02
 	.byte $41 : .word display_list
 
 display_text1
@@ -82,10 +88,17 @@ display_text2_len = *-display_text2
 	.dsb 40-display_text2_len,0
 display_text3 = $d110 
 
-drive_labels_1 .byte 'O'-$20, 'P'-$20, 'H'-$20
-drive_labels_2 .byte 'f',     'B'-$20, 'S'-$20
-drive_labels_3 .byte 'f',     'I'-$20, 'I'-$20
-drive_labels_4 .byte 0,       0,       'O'-$20
+drive_labels_1	.byte 'O'-$20, 'P'-$20, 'H'-$20
+drive_labels_2	.byte 'f',     'B'-$20, 'S'-$20
+drive_labels_3	.byte 'f',     'I'-$20, 'I'-$20
+drive_labels_4	.byte 0,       0,       'O'-$20
+
+boot_label_1	.byte 'B'-$20,'o','o','t',0,'D'-$20,'r','i','v','e',':'-$20
+boot_label_1_len = *-boot_label_1
+boot_label_2	.byte 'D'-$20,'e','f','a','u','l','t'
+boot_label_2_len = *-boot_label_2
+boot_label_3	.byte 'A'-$20,'P'-$20,'T'-$20
+boot_label_3_len = *-boot_label_3
 
 boot_screen_init
 	ldy #1
@@ -99,6 +112,29 @@ boot_screen_init_loop
 	lda drive_labels_3,y : sta display_text3+2,x : inx
 	lda drive_labels_4,y : sta display_text3+2,x : inx : inx
 	pla : tay : iny : cpy #5 : bne boot_screen_init_loop
+	ldy #boot_label_1_len
+boot_screen_init_loop_2
+	lda boot_label_1-1,y : sta display_text3+41,y
+	dey : bne boot_screen_init_loop_2
+	ldx pbi_drive_boot : dex 
+	bmi boot_drv_def
+	beq boot_drv_apt
+	lda #'D'-$20 : sta display_text3+42+boot_label_1_len+1
+	txa : ora #$10 : sta display_text3+42+boot_label_1_len+2
+	lda #':'-$20 : sta display_text3+42+boot_label_1_len+3
+	bne boot_screen_init_ret
+boot_drv_def
+	ldy #boot_label_2_len
+boot_drv_def_loop
+	lda boot_label_2-1,y : sta display_text3+42+boot_label_1_len,y
+	dey : bne boot_drv_def_loop
+	beq boot_screen_init_ret
+boot_drv_apt
+	ldy #boot_label_3_len
+boot_drv_apt_loop
+	lda boot_label_3-1,y : sta display_text3+42+boot_label_1_len,y
+	dey : bne boot_drv_apt_loop
+boot_screen_init_ret
 	rts
 
 ; The main block I/O routine
@@ -134,7 +170,24 @@ hsio_start	; This should be $dc00
 .bin 6,0,"hsio-pbi.xex"
 hsio_end
 
-.dsb ($400-hsio_end+hsio_start),$ff
+.dsb ($3AD-hsio_end+hsio_start),$ff
+
+.byte VER_MAJOR*16+VER_MINOR ; Version byte
+.byte (device_name_end-device_name-1)
+device_name
+.byte "SDHC MiSTer SDEMU v.",VER_MAJOR+$30,'.',VER_MINOR+$30,$9B
+device_name_end
+
+.dsb  (40-device_name_end+device_name),$ff
+
+; .dsb ($3D7-hsio_end+hsio_start),$ff
+
+.byte (bios_name_end-bios_name-1)
+bios_name
+.byte "MiSTer core PBI BIOS v.",VER_MAJOR+$30,'.',VER_MINOR+$30,$9B
+bios_name_end
+
+.dsb  (40-bios_name_end+bios_name),$ff
 
 	* = $D800
 .dsb $800,$22
