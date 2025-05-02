@@ -900,30 +900,31 @@ void handleGetStatus(struct command command, int driveNumber, struct SimpleFile 
 	//printf(":done\n");
 }
 
-void set_location_offset(int driveNumber, u32 sector, int *sectorSize, u32 *location)
+int set_location_offset(int driveNumber, u32 sector, u32 *location)
 {
 	*location = drive_infos[driveNumber].offset;
-	*sectorSize = drive_infos[driveNumber].sector_size;
+	int sectorSize = drive_infos[driveNumber].info & (INFO_HDD | INFO_SS) ? 512 : drive_infos[driveNumber].sector_size;
 	if(drive_infos[driveNumber].sector_size == 512 || (drive_infos[driveNumber].info & INFO_HDD))
 	{
 		if(driveNumber != MAX_DRIVES)
 		{
 			sector--;
 		}
-		*location += sector * (*sectorSize);
+		*location += sector * sectorSize;
 	}
 	else
 	{
 		if(sector>3)
 		{
-			*location += 128*3 + (sector-4) * (*sectorSize);
+			*location += 128*3 + (sector-4) * sectorSize;
 		}
 		else
 		{
 			*location = *location + 128 * (sector - 1);
-			*sectorSize = 128;
+			sectorSize = 128;
 		}
-	}	
+	}
+	return sectorSize;
 }
 
 void handleWrite(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
@@ -945,7 +946,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	//
 	action->respond = 0;
 
-	set_location_offset(driveNumber, sector, &sectorSize, &location);
+	sectorSize = set_location_offset(driveNumber, sector, &location);
 /*
 	location = drive_infos[driveNumber].offset;
 	// TODO Optimize this!
@@ -1003,7 +1004,7 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 		int written = 0;
 		if(drive_infos[driveNumber].info & INFO_SS)
 		{
-			u08 step = 4 / (drive_infos[driveNumber].sector_size >> 7);
+			u08 step = 512 / drive_infos[driveNumber].sector_size;
 			i = 0;
 			sectorSize = ATARI_SECTOR_BUFFER_SIZE;
 			memset8(atari_sector_buffer, 0, sectorSize);
@@ -1172,10 +1173,7 @@ set_number_of_sectors_to_buffer_1_2:
 	}
 	else
 	{
-		//int sectorSize = drive_infos[driveNumber].sector_size;
-		action->bytes = drive_infos[driveNumber].sector_size;
-		set_location_offset(driveNumber, sector, &action->bytes, &location);
-		//action->bytes = sectorSize;
+		action->bytes = set_location_offset(driveNumber, sector, &location);
 		/*
 		location = drive_infos[driveNumber].offset;
 		// TODO Optimize this
@@ -1205,7 +1203,7 @@ set_number_of_sectors_to_buffer_1_2:
 		file_seek(file, location);
 		if(drive_infos[driveNumber].info & INFO_SS)
 		{
-			u08 step = 4 / (drive_infos[driveNumber].sector_size >> 7);
+			u08 step = 512 / drive_infos[driveNumber].sector_size;
 			file_read(file, atari_sector_buffer, ATARI_SECTOR_BUFFER_SIZE, &read);
 			read = 0;
 			int n = 0;
