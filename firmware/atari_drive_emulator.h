@@ -29,12 +29,12 @@ struct drive_info
 	u08 atari_sector_status;	
 };
 
+// The extra slot is for the HDD image as a whole (APT API)
 extern struct drive_info drive_infos[MAX_DRIVES+1];
 
 void actions(); // this is called whenever possible - should be quick
 
 void init_drive_emulator();
-//void run_drive_emulator(); // Blocks. Pokey at its fastest is 6 cycles * 10 bits per byte. i.e. 60 cycles at 1.79MHz.
 void processCommand();
 unsigned char processCommandPBI(unsigned char *);
 
@@ -42,11 +42,4 @@ unsigned char processCommandPBI(unsigned char *);
 // For a read-only disk, just have no write function!
 struct SimpleFile;
 void set_drive_status(int driveNumber, struct SimpleFile * file);
-// struct SimpleFile * get_drive_status(int driveNumber);
-// void describe_disk(int driveNumber, char * buffer);
-
-// Pokey divisor
-//void set_turbo_drive(int pos);
-//int get_turbo_drive();
-//char const * get_turbo_drive_str();
 

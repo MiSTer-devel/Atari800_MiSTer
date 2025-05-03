@@ -239,9 +239,6 @@ void clear_main_ram()
 
 void clearscreen()
 {
-	//unsigned volatile char * screen;
-	//for (screen=(unsigned volatile char *)(screen_address+atari_regbase); screen!=(unsigned volatile char *)(atari_regbase+screen_address+1024); ++screen)
-	//	*screen = 0x00;
 	memset8((unsigned volatile char *)(screen_address+atari_regbase), 0, 1024);
 }
 

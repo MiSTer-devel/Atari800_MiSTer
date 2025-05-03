@@ -599,32 +599,6 @@ xex_eof:
 			pbi_drives_config[3] = (*zpu_in2 >> 22) & 0x3;
 			pbi_ram_base[3] = get_splashpbi();
 			memcp8(pbi_drives_config, &pbi_ram_base[0x0C], 0, 4);
-			/*
-			for(mounted = 0; mounted < 4; mounted++)
-			{
-				pbi_ram_base[0x12+9*mounted] = 'D'-0x20;
-				pbi_ram_base[0x12+9*mounted+1] = 0x11+mounted;
-				pbi_ram_base[0x12+9*mounted+2] = ':'-0x20;
-				switch(pbi_drives_config[mounted]) {
-					case 0:
-						pbi_ram_base[0x12+9*mounted+4] = 'O'-0x20;
-						pbi_ram_base[0x12+9*mounted+5] = 'f';
-						pbi_ram_base[0x12+9*mounted+6] = 'f';
-						break;
-					case 1:
-						pbi_ram_base[0x12+9*mounted+4] = 'P'-0x20;
-						pbi_ram_base[0x12+9*mounted+5] = 'B'-0x20;
-						pbi_ram_base[0x12+9*mounted+6] = 'I'-0x20;
-						break;
-					case 2:
-						pbi_ram_base[0x12+9*mounted+4] = 'H'-0x20;
-						pbi_ram_base[0x12+9*mounted+5] = 'S'-0x20;
-						pbi_ram_base[0x12+9*mounted+6] = 'I'-0x20;
-						pbi_ram_base[0x12+9*mounted+7] = 'O'-0x20;
-						break;
-				}
-			}
-			*/
 			unsigned char boot_drv = get_bootpbi();
 			pbi_ram_base[0x0B] = boot_drv;
 			if(boot_drv == 1 && drive_infos[MAX_DRIVES].file)
