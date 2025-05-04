@@ -1002,6 +1002,7 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 {
 	CommandHandler res = 0;
 	u32 sector = (command.auxab << 16) | command.aux1 | (command.aux2<<8);
+	// The HDD SD card counts sectors from 0
 	u08 min_sector = (command.deviceId & 0x3F) == 0x20 ? 0 : 1;
 	int driveNumber = min_sector ? (command.deviceId & 0xf) - 1 : MAX_DRIVES;
 	u08 pbi = command.deviceId & 0x40;

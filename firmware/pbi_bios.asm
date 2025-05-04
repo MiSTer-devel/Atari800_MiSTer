@@ -173,6 +173,7 @@ hsio_end
 .dsb ($3AD-hsio_end+hsio_start),$ff
 
 .byte VER_MAJOR*16+VER_MINOR ; Version byte
+
 .byte (device_name_end-device_name-1)
 device_name
 .byte "SDHC MiSTer SDEMU v.",VER_MAJOR+$30,'.',VER_MINOR+$30,$9B
@@ -190,10 +191,10 @@ bios_name_end
 .dsb  (40-bios_name_end+bios_name),$ff
 
 	* = $D800
-.dsb $800,$22
+.dsb $800,$FF
 
 	* = $D800
-.dsb $800,$33
+.dsb $800,$FF
 
 	* = $D800
-.dsb $800,$44
+.dsb $800,$FF

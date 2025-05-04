@@ -364,7 +364,6 @@ void mainloop()
 	init_drive_emulator();
 
 	reboot(1, 0);
-//	run_drive_emulator();
 	while (1)
 	{
 		processCommand();
