@@ -907,6 +907,8 @@ BEGIN
 			irqst_next(5) <= not(irqen_reg(5));
 		end if;
 		
+		irqst_next(3) <= serout_active_reg;
+		
 		if (serial_op_needed_interrupt_delayed_reg(1) = '1') then
 			irqst_next(4) <= not(irqen_reg(4));
 		end if;
