@@ -851,7 +851,7 @@ BEGIN
 		end if;
 		
 		if (addr_decoded(14) = '1') then --IRQST - bits set to low when irq
-			data_out <= IRQST_REG;
+			data_out <= IRQST_REG(7 downto 4) & serout_active_next & IRQST_REG(2 downto 0);
 			--break_irq_n & other_key_irq_n & serial_ip_irq_n & serial_op_irq_n & serial_trans_irq_n & timer3_irq_n & timer_1_irq_n & timer_0_irq_n
 		end if;		
 
@@ -906,8 +906,6 @@ BEGIN
 		if (serial_ip_ready_interrupt = '1') then
 			irqst_next(5) <= not(irqen_reg(5));
 		end if;
-		
-		irqst_next(3) <= serout_active_reg;
 		
 		if (serial_op_needed_interrupt_delayed_reg(1) = '1') then
 			irqst_next(4) <= not(irqen_reg(4));
