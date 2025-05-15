@@ -790,8 +790,11 @@ gen_normal_memory : if low_memory=0 generate
 	-- base 64k RAM  - banks 0-3    "000 0000 1111 1111 1111 1111" (TOP)
 	-- to 512k RAM   - banks 4-31   "000 0111 1111 1111 1111 1111" (TOP) 
 	-- to 4MB RAM    - banks 32-255 "011 1111 1111 1111 1111 1111" (TOP)
-	-- +64k          - banks 256-259"100 0000 0000 1111 1111 1111" (TOP)
-	-- SCRATCH       - 4MB+64k-5MB
+	-- +64k          - banks 256-259"100 0000 XX11 1111 1111 1111" (TOP)
+	-- BASIC/OS ROM  -              "100 0001 0XXX XXXX XXXX XXXX" (BOT) (BASIC IN SLOT 0!)
+	SDRAM_BASIC_ROM_ADDR <= "100" & "000100" & "00000000000000";
+	SDRAM_OS_ROM_ADDR    <= "100" & "000101" & "00000000000000";
+	-- SCRATCH       - 4MB+64k+32K+32K-5MB
 	-- 128k freezer ram		"100 100Y YYYY YYYY YYYY YYYY"
 	SDRAM_FREEZER_RAM_ADDR <= "100100" & freezer_access_address;
 	-- 64k freezer rom		"100 1010 YYYY YYYY YYYY YYYY"
@@ -799,9 +802,8 @@ gen_normal_memory : if low_memory=0 generate
 	-- CARTS         -              "101 YYYY YYY0 0000 0000 0000" (BOT) - 2MB! 8kb banks
 	--SDRAM_CART_ADDR      <= "101"&cart_select& "0000000000000";
 	SDRAM_CART_ADDR	<= "1" & emu_cart_address(20) & (not emu_cart_address(20)) & emu_cart_address(19 downto 0);
-	-- BASIC/OS ROM  -              "111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K				
-	SDRAM_BASIC_ROM_ADDR <= "111"&"000000" &"00000000000000";
-	SDRAM_OS_ROM_ADDR    <= "111"&"000001" &"00000000000000";
+	-- VBXE?         -              "111 0VVV 0000 0000 0000 0000" (BOT) - SECOND LAST 512K
+	-- Is this used for anything?:
 	-- SYSTEM        -              "111 1000 0000 0000 0000 0000" (BOT) - LAST 512K
 
 end generate;

@@ -409,8 +409,8 @@ PORT MAP
 joy <= joy1 or joy2;
 
 ROM_ADDR <= SDRAM_ADDR(14 downto 0);
-RAM_DATA <= x"FFFFFF"&ROM_DO when SDRAM_ADDR(22 downto 15) = "11100000" else
-            (others=>'1')    when SDRAM_ADDR(22 downto 20) = "111" else
+RAM_DATA <= x"FFFFFF"&ROM_DO when SDRAM_ADDR(22 downto 15) = "10000010" else
+            (others=>'1')    when SDRAM_ADDR(22 downto 15) = "10000011" else
             SDRAM_DO;
 
 zpu: entity work.zpucore
