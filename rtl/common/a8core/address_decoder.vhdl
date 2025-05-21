@@ -207,10 +207,10 @@ ARCHITECTURE vhdl OF address_decoder IS
 --	signal sdram_request_reg : std_logic;
 --	signal SDRAM_REQUEST_COMPLETE	: std_logic;
 	
-	signal fetch_priority : std_logic_vector(2 downto 0);
+	--signal fetch_priority : std_logic_vector(2 downto 0);
 	
-	signal fetch_wait_next : std_logic_vector(8 downto 0);
-	signal fetch_wait_reg : std_logic_vector(8 downto 0);	
+	--signal fetch_wait_next : std_logic_vector(8 downto 0);
+	--signal fetch_wait_reg : std_logic_vector(8 downto 0);	
 	
 	signal antic_fetch_real_next : std_logic;
 	signal antic_fetch_real_reg : std_logic;
@@ -311,7 +311,7 @@ BEGIN
 			write_enable_freezer_reg <= '0';
 			data_write_reg <= (others=> '0');
 			--sdram_request_reg <= '0';
-			fetch_wait_reg <= (others=>'0');
+			--fetch_wait_reg <= (others=>'0');
 
 			cpu_fetch_real_reg <= '0';
 			antic_fetch_real_reg <= '0';	
@@ -334,7 +334,7 @@ BEGIN
 			write_enable_freezer_reg <= write_enable_freezer_next;
 			data_write_reg <= data_WRITE_next;
 			--sdram_request_reg <= sdram_request_next;
-			fetch_wait_reg <= fetch_wait_next;
+			--fetch_wait_reg <= fetch_wait_next;
 			
 			cpu_fetch_real_reg <= cpu_fetch_real_next;
 			antic_fetch_real_reg <= antic_fetch_real_next;
@@ -564,8 +564,8 @@ BEGIN
 	
 	-- state machine impl
 	pbi_takeover_adj <= (pbi_takeover) when (freezer_enable='0' or not(freezer_disable_atari)) else '0';
-	fetch_priority <= ANTIC_FETCH&DMA_FETCH&CPU_FETCH;
-	process(fetch_wait_reg, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, fetch_priority, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg)
+	--fetch_priority <= ANTIC_FETCH&DMA_FETCH&CPU_FETCH;
+	process(antic_fetch, dma_fetch, cpu_fetch, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg)
 	begin
 		start_request <= '0';
 		pbi_request <= '0';
@@ -573,7 +573,7 @@ BEGIN
 		notify_cpu <= '0';
 		notify_DMA <= '0';
 		state_next <= state_reg;
-		fetch_wait_next <= std_logic_vector(unsigned(fetch_wait_reg) + to_unsigned(1,9));
+		--fetch_wait_next <= std_logic_vector(unsigned(fetch_wait_reg) + to_unsigned(1,9));
 		pbi_cycle_next <= pbi_cycle_reg;
 
 		addr_next <= addr_reg;
@@ -590,7 +590,7 @@ BEGIN
 		
 		case state_reg is
 			when state_idle =>
-				fetch_wait_next <= (others=>'0');
+				--fetch_wait_next <= (others=>'0');
 				write_enable_next <= '0';
 				write_enable_freezer_next <= '0';
 				width_8bit_next <= '0';
@@ -599,8 +599,10 @@ BEGIN
 				data_WRITE_next <= (others => '0');
 				addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);				
 				
-				case fetch_priority is
-				when "100"|"101"|"110"|"111" => -- antic wins
+				--case fetch_priority is
+				--when "100"|"101"|"110"|"111" => -- antic wins
+				--when "100" | "101" => -- antic wins
+				if antic_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
 					pbi_cycle_next <= pbi_takeover_adj;
@@ -613,7 +615,11 @@ BEGIN
 					end if;
 					antic_fetch_real_next <= '1';
 					cpu_fetch_real_next <= '0';
-				when "010"|"011" => -- DMA wins (DMA usually accesses own ROM memory - this is NOT a DMA_fetch)
+				--when "010"|"011" => -- DMA wins (DMA usually accesses own ROM memory - this is NOT a DMA_fetch)
+				--when "010"  => -- DMA wins (DMA usually accesses own ROM memory - this is NOT a DMA_fetch)
+				elsif dma_fetch = '1' then
+					-- It seems it does not matter which priority DMA has
+					-- the important one is that ANTIC comes before CPU
 					-- TODO, lower priority than 6502, except on first request in block...
 					start_request <= '1';
 					addr_next <= DMA_ADDR;
@@ -631,7 +637,9 @@ BEGIN
 					else
 						state_next <= state_waiting_DMA;
 					end if;					
-				when "001" => -- 6502 wins
+				--when "001" => -- 6502 wins
+				-- when "001"|"011" => -- 6502 wins
+				elsif cpu_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
 					pbi_cycle_next <= pbi_takeover_adj;
@@ -648,11 +656,12 @@ BEGIN
 					end if;
 					cpu_fetch_real_next <= '1';
 					antic_fetch_real_next <= '0';
-				when "000" =>
-					-- no requests
-				when others =>
-					-- nop
-				end case;
+				end if;
+				--when "000" =>
+				--	-- no requests
+				--when others =>
+				--	-- nop
+				--end case;
 			when state_waiting_antic =>
 				notify_antic <= request_complete;
 				if (pbi_release = '1' or request_complete = '1') then

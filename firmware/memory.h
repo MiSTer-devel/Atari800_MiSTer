@@ -20,8 +20,8 @@
 
 #define CARTRIDGE_MEM (SDRAM_BASE + 0x500000)
 
-// offset into SDRAM
-#define ROM_OFS 0x700000
+// offset into SDRAM Currently not valid
+// #define ROM_OFS 0x700000
 
 #define atari_regbase  ((void*) 0x10000)
 #define atari_regmirror  ((void*) 0x20000)

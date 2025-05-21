@@ -25,12 +25,14 @@ PORT
 	ANTIC_REFRESH : IN STD_LOGIC;
 	MEMORY_READY_CPU : IN STD_LOGIC;          -- during memory wait states keep CPU awake
 	MEMORY_READY_ANTIC : IN STD_LOGIC;          -- during memory wait states keep CPU awake
+	MEMORY_READY_VBXE : IN STD_LOGIC := '0';
 	PAUSE_6502 : in std_logic;
 	THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0);
 
 	ANTIC_ENABLE_179 : OUT STD_LOGIC;  -- always about 1.79MHz to keep sound the same - 1 cycle early
 	oldcpu_enable : OUT STD_LOGIC;     -- always about 1.79MHz to keep sound the same - 1 cycle only, when memory is ready...
-	CPU_ENABLE_OUT : OUT STD_LOGIC    -- for compatibility run at 1.79MHz, for speed run as fast as we can
+	CPU_ENABLE_OUT : OUT STD_LOGIC;    -- for compatibility run at 1.79MHz, for speed run as fast as we can
+	VBXE_ENABLE_OUT : OUT STD_LOGIC
 	
 	-- antic DMA runs 1 cycle after 'enable', so ANTIC_ENABLE is delayed by cycle_length-1 cycles vs CPU_ENABLE (when in 1.79MHz mode)
 );
@@ -66,12 +68,18 @@ ARCHITECTURE vhdl OF shared_enable IS
 	signal enable_179 : std_logic;
 	signal enable_179_early : std_logic;
 	signal cpu_enable : std_logic;
+	signal vbxe_enable : std_logic;
 	
 	signal cpu_extra_enable_next : std_logic;
 	signal cpu_extra_enable_reg : std_logic;
+	signal vbxe_extra_enable_next : std_logic;
+	signal vbxe_extra_enable_reg : std_logic;
 	
 	signal speed_shift_next : std_logic_vector(cycle_length-1 downto 0);
 	signal speed_shift_reg : std_logic_vector(cycle_length-1 downto 0);	
+
+	signal vbxe_shift_next : std_logic_vector(cycle_length-1 downto 0);
+	signal vbxe_shift_reg : std_logic_vector(cycle_length-1 downto 0);	
 	
 	signal oldcycle_go : std_logic;
 	signal oldcycle_state_next : std_logic_vector(2 downto 0);
@@ -115,6 +123,23 @@ begin
 		speed_shift_next(0) <= speed_shift;
 	end process;
 
+	-- TODO the issue is that this is likely not going to work together with CPU throttling
+	process(vbxe_shift_reg, enable_179)
+		variable vbxe_shift_temp : std_logic_vector(cycle_length-1 downto 0);
+	begin
+
+		if (enable_179 = '1') then -- synchronize (TODO with phase shift?)
+			vbxe_shift_temp(cycle_length-1 downto 0) := (0 => '1', others => '0');
+			-- vbxe_shift_temp(0) := '1';
+		else
+			vbxe_shift_temp := vbxe_shift_reg;
+		end if;
+
+		vbxe_shift_next(cycle_length-1 downto 1) <= vbxe_shift_temp(cycle_length-2 downto 0);
+		vbxe_shift_next(0) <= vbxe_shift_temp(cycle_length/8-1);
+		
+	end process;
+
 	delay_line_phase : delay_line
 		generic map (COUNT=>cycle_length-1)
 		port map(clk=>clk,sync_reset=>'0',reset_n=>reset_n,data_in=>enable_179, enable=>'1', data_out=>enable_179_early);	
@@ -124,12 +149,16 @@ begin
 	begin
 		if (reset_n = '0') then
 			cpu_extra_enable_reg <= '0';
+			vbxe_extra_enable_reg <= '0';
 			oldcycle_state_reg <= oldcycle_state_idle;
 			speed_shift_reg <= (others=>'0');
+			vbxe_shift_reg <= (others=>'0');
 		elsif (clk'event and clk='1') then										
 			cpu_extra_enable_reg <= cpu_extra_enable_next;
+			vbxe_extra_enable_reg <= vbxe_extra_enable_next;
 			oldcycle_state_reg <= oldcycle_state_next;
 			speed_shift_reg <= speed_shift_next;
+			vbxe_shift_reg <= vbxe_shift_next;
 		end if;
 	end process;
 	
@@ -139,6 +168,9 @@ begin
 
 	cpu_enable <= (speed_shift_reg(0) or cpu_extra_enable_reg or enable_179) and not(skip_cycle);
 	cpu_extra_enable_next <= cpu_enable and not(memory_ready);
+
+	vbxe_enable <= (vbxe_shift_reg(0) or vbxe_extra_enable_reg);
+	vbxe_extra_enable_next <= vbxe_enable and not(memory_ready_vbxe);
 
 	process(oldcycle_state_reg,enable_179,memory_ready,skip_cycle,cpu_enable)
 	begin
@@ -205,5 +237,6 @@ begin
 	ANTIC_ENABLE_179 <= enable_179_early;
 	
 	CPU_ENABLE_OUT <= cpu_enable; -- run at 25MHz
-
+	VBXE_ENABLE_OUT <= vbxe_enable;
+	
 end vhdl;
