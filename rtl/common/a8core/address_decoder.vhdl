@@ -265,7 +265,6 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart2_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart2_int_d_out: std_logic_vector(7 downto 0);
 
-	signal emu_pbi_clk_enable : std_logic;
 	signal emu_pbi_enable : std_logic;
 	signal emu_pbi_d1xx : std_logic;
 	signal emu_pbi_d8xx : std_logic;
@@ -277,6 +276,8 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal pbi_mpd : std_logic;
 	
 	signal atari_clk_enable: std_logic;
+	signal atari_dma_access : std_logic;
+	signal atari_with_dma_clk_enable : std_logic;
 	signal freezer_disable_atari: boolean;
 	signal freezer_access_type: std_logic_vector(1 downto 0);
 	signal freezer_access_address: std_logic_vector(16 downto 0);
@@ -355,8 +356,9 @@ BEGIN
 		end if;
 	end process;
 
+	atari_dma_access <= not(or_reduce(addr_next(23 downto 18)));
 	atari_clk_enable <= notify_cpu or notify_antic; -- i.e. we enable cart and freezer on the final cycle of a 6502 or antic access
-	emu_pbi_clk_enable <= notify_cpu or notify_antic or notify_dma;
+	atari_with_dma_clk_enable <= notify_cpu or notify_antic or (notify_dma and atari_dma_access);
 
 	-- float bus when no ram
 	process(last_bus_reg,atari_clk_enable,data_write_next,memory_data_int,write_enable_next)
@@ -375,7 +377,7 @@ BEGIN
 	process(axlon_bank_reg,notify_cpu,notify_antic,notify_dma,data_write_next,addr_next,write_enable_next)
 	begin
 		axlon_bank_next <= axlon_bank_reg;
-		if (notify_cpu = '1') or (notify_antic = '1') or (notify_dma = '1') then
+		if atari_with_dma_clk_enable = '1' then
 			if (write_enable_next = '1') and (addr_next(15 downto 4) = x"CFF") then
 				axlon_bank_next <= data_write_next(7 downto 0);
 			end if;
@@ -432,7 +434,7 @@ BEGIN
 	
 	emu_pbi_rom: entity work.PBIROM
 	port map (clk => clk,
-		clk_enable => emu_pbi_clk_enable,
+		clk_enable => atari_with_dma_clk_enable,
 		reset_n => reset_n,
 		a => addr_next(10 downto 0),
 		rw => emu_cart_rw, -- OK to reuse?
@@ -597,7 +599,8 @@ BEGIN
 				width_16bit_next <= '0';
 				width_32bit_next <= '0';	
 				data_WRITE_next <= (others => '0');
-				addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);				
+				-- This is confusing, does not seem to be needed?
+				-- addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);
 				
 				--case fetch_priority is
 				--when "100"|"101"|"110"|"111" => -- antic wins
@@ -956,8 +959,7 @@ end generate;
 			basic_next <= not(portb(1)); -- Only update basic flag when not accessing extended ram (depending on mode)
 		end if;
 		
-	--	if (addr_next(23 downto 17) = "0000000" ) then -- bit 16 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
-		if (or_reduce(addr_next(23 downto 18)) = '0' ) then -- bit 16,17 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
+		if (atari_dma_access = '1' ) then -- bit 16,17 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
 
 		SDRAM_ADDR(13 downto 0) <= addr_next(13 downto 0);
 		SDRAM_ADDR(22 downto 14) <= extended_bank;
