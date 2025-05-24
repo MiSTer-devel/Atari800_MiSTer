@@ -382,7 +382,7 @@ BEGIN
 	end process;
 
 	-- Capture Axlon bank register write
-	process(axlon_bank_reg,notify_cpu,notify_antic,notify_dma,data_write_next,addr_next,write_enable_next)
+	process(axlon_bank_reg,atari_with_dma_clk_enable,data_write_next,addr_next,write_enable_next)
 	begin
 		axlon_bank_next <= axlon_bank_reg;
 		if atari_with_dma_clk_enable = '1' then
