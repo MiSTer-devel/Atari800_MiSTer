@@ -25,7 +25,7 @@ PORT
 	ANTIC_REFRESH : IN STD_LOGIC;
 	MEMORY_READY_CPU : IN STD_LOGIC;          -- during memory wait states keep CPU awake
 	MEMORY_READY_ANTIC : IN STD_LOGIC;          -- during memory wait states keep CPU awake
-	MEMORY_READY_VBXE : IN STD_LOGIC := '0';
+	MEMORY_READY_VBXE : IN STD_LOGIC;
 	PAUSE_6502 : in std_logic;
 	THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0);
 
@@ -129,7 +129,7 @@ begin
 	begin
 
 		if (enable_179 = '1') then -- synchronize (TODO with phase shift?)
-			vbxe_shift_temp(cycle_length-1 downto 0) := (0 => '1', others => '0');
+			vbxe_shift_temp(cycle_length-1 downto 0) := (1 => '1', others => '0');
 			-- vbxe_shift_temp(0) := '1';
 		else
 			vbxe_shift_temp := vbxe_shift_reg;

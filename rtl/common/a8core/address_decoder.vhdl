@@ -40,6 +40,19 @@ PORT
 	DMA_8BIT_WRITE_ENABLE : in std_logic; -- for hardware regs	
 	DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
 	
+	-- VBXE, including the registers (excl. below)
+	VBXE_SWITCH : in std_logic := '0'; -- On / off
+	VBXE_REG_BASE : in std_logic := '0'; -- 0 -> $D640, 1 -> $D740
+	VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
+	-- CACHE_VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
+	VBXE_WRITE_ENABLE : out std_logic;
+	-- VBXE VRAM access
+	VBXE_MEMORY_ADDR : in std_logic_vector(18 downto 0) := (others => '0');
+	VBXE_FETCH : in std_logic := '0';
+	MEMORY_READY_VBXE : out std_logic;
+	VBXE_MEMORY_WRITE_ENABLE : in std_logic := '0';
+	VBXE_WRITE_DATA : in std_logic_vector(7 downto 0) := (others => '0');
+
 	-- sources of data
 	ROM_DATA : IN STD_LOGIC_VECTOR(7 downto 0);	-- flash rom
 	GTIA_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
@@ -141,7 +154,7 @@ PORT
 	freezer_state_out: out std_logic_vector(2 downto 0);
 
 	-- debugging!
-	state_reg_out: out std_logic_vector(1 downto 0)
+	state_reg_out: out std_logic_vector(2 downto 0)
 );
 
 END address_decoder;
@@ -169,6 +182,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal notify_antic : std_logic;
 	signal notify_DMA : std_logic;
 	signal notify_cpu : std_logic;
+	signal notify_VBXE : std_logic;
 	signal start_request : std_logic;
 	signal pbi_cycle_next : std_logic;
 	signal pbi_cycle_reg : std_logic;
@@ -193,12 +207,13 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal axlon_bank_next : std_logic_vector(7 downto 0);
 	
 	-- even though we have 3 targets (flash, ram, rom) and 3 masters, only allow access to one a a time - simpler.
-	signal state_next : std_logic_vector(1 downto 0);
-	signal state_reg : std_logic_vector(1 downto 0);
-	constant state_idle : std_logic_vector(1 downto 0) := "00";
-	constant state_waiting_cpu : std_logic_vector(1 downto 0) := "01";
-	constant state_waiting_DMA : std_logic_vector(1 downto 0) := "10";
-	constant state_waiting_antic : std_logic_vector(1 downto 0) := "11";
+	signal state_next : std_logic_vector(2 downto 0);
+	signal state_reg : std_logic_vector(2 downto 0);
+	constant state_idle : std_logic_vector(2 downto 0) := "000";
+	constant state_waiting_cpu : std_logic_vector(2 downto 0) := "001";
+	constant state_waiting_DMA : std_logic_vector(2 downto 0) := "010";
+	constant state_waiting_antic : std_logic_vector(2 downto 0) := "011";
+	constant state_waiting_VBXE : std_logic_vector(2 downto 0) := "100";
 		
 	signal ram_chip_select : std_logic;
 	signal sdram_chip_select : std_logic;
@@ -206,11 +221,6 @@ ARCHITECTURE vhdl OF address_decoder IS
 --	signal sdram_request_next : std_logic;
 --	signal sdram_request_reg : std_logic;
 --	signal SDRAM_REQUEST_COMPLETE	: std_logic;
-	
-	--signal fetch_priority : std_logic_vector(2 downto 0);
-	
-	--signal fetch_wait_next : std_logic_vector(8 downto 0);
-	--signal fetch_wait_reg : std_logic_vector(8 downto 0);	
 	
 	signal antic_fetch_real_next : std_logic;
 	signal antic_fetch_real_reg : std_logic;
@@ -312,7 +322,6 @@ BEGIN
 			write_enable_freezer_reg <= '0';
 			data_write_reg <= (others=> '0');
 			--sdram_request_reg <= '0';
-			--fetch_wait_reg <= (others=>'0');
 
 			cpu_fetch_real_reg <= '0';
 			antic_fetch_real_reg <= '0';	
@@ -335,7 +344,6 @@ BEGIN
 			write_enable_freezer_reg <= write_enable_freezer_next;
 			data_write_reg <= data_WRITE_next;
 			--sdram_request_reg <= sdram_request_next;
-			--fetch_wait_reg <= fetch_wait_next;
 			
 			cpu_fetch_real_reg <= cpu_fetch_real_next;
 			antic_fetch_real_reg <= antic_fetch_real_next;
@@ -566,16 +574,17 @@ BEGIN
 	
 	-- state machine impl
 	pbi_takeover_adj <= (pbi_takeover) when (freezer_enable='0' or not(freezer_disable_atari)) else '0';
-	--fetch_priority <= ANTIC_FETCH&DMA_FETCH&CPU_FETCH;
-	process(antic_fetch, dma_fetch, cpu_fetch, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg)
+
+	process(antic_fetch, dma_fetch, cpu_fetch, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
+				vbxe_fetch, vbxe_memory_addr, vbxe_write_data, vbxe_memory_write_enable)
 	begin
 		start_request <= '0';
 		pbi_request <= '0';
 		notify_antic <= '0';
 		notify_cpu <= '0';
 		notify_DMA <= '0';
+		notify_VBXE <= '0';
 		state_next <= state_reg;
-		--fetch_wait_next <= std_logic_vector(unsigned(fetch_wait_reg) + to_unsigned(1,9));
 		pbi_cycle_next <= pbi_cycle_reg;
 
 		addr_next <= addr_reg;
@@ -602,9 +611,6 @@ BEGIN
 				-- This is confusing, does not seem to be needed?
 				-- addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);
 				
-				--case fetch_priority is
-				--when "100"|"101"|"110"|"111" => -- antic wins
-				--when "100" | "101" => -- antic wins
 				if antic_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
@@ -618,8 +624,6 @@ BEGIN
 					end if;
 					antic_fetch_real_next <= '1';
 					cpu_fetch_real_next <= '0';
-				--when "010"|"011" => -- DMA wins (DMA usually accesses own ROM memory - this is NOT a DMA_fetch)
-				--when "010"  => -- DMA wins (DMA usually accesses own ROM memory - this is NOT a DMA_fetch)
 				elsif dma_fetch = '1' then
 					-- It seems it does not matter which priority DMA has
 					-- the important one is that ANTIC comes before CPU
@@ -640,8 +644,6 @@ BEGIN
 					else
 						state_next <= state_waiting_DMA;
 					end if;					
-				--when "001" => -- 6502 wins
-				-- when "001"|"011" => -- 6502 wins
 				elsif cpu_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
@@ -659,12 +661,19 @@ BEGIN
 					end if;
 					cpu_fetch_real_next <= '1';
 					antic_fetch_real_next <= '0';
+				elsif vbxe_fetch = '1' then
+					start_request <= '1';
+					addr_next <= "11110" & vbxe_memory_addr;
+					write_enable_next <= vbxe_memory_write_enable;
+					width_8bit_next <= '1';
+					data_WRITE_next(7 downto 0) <= vbxe_write_data;
+					-- This will always access memory and take a cycle?
+					if (request_complete = '1') then
+						notify_VBXE <= '1';
+					else
+						state_next <= state_waiting_VBXE;
+					end if;
 				end if;
-				--when "000" =>
-				--	-- no requests
-				--when others =>
-				--	-- nop
-				--end case;
 			when state_waiting_antic =>
 				notify_antic <= request_complete;
 				if (pbi_release = '1' or request_complete = '1') then
@@ -682,6 +691,11 @@ BEGIN
 					state_next <= state_idle;
 					pbi_cycle_next <= '0';
 				end if;
+			when state_waiting_VBXE =>
+				notify_VBXE <= request_complete;
+				if (request_complete = '1') then
+					state_next <= state_idle;
+				end if;
 			when others =>
 				-- NOP
 		end case;
@@ -691,6 +705,7 @@ BEGIN
 	MEMORY_READY_ANTIC <= notify_antic;
 	MEMORY_READY_DMA <= notify_DMA;
 	MEMORY_READY_CPU <= notify_cpu;
+	MEMORY_READY_VBXE <= notify_VBXE;
 	
 	RAM_REQUEST <= ram_chip_select;
 		
@@ -879,6 +894,7 @@ end generate;
 		GTIA_DATA,POKEY_DATA,POKEY2_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
 		CACHE_GTIA_DATA,CACHE_POKEY_DATA,CACHE_POKEY2_DATA,CACHE_ANTIC_DATA,
 		LAST_BUS_REG,ULTIME_DATA,
+		VBXE_SWITCH,VBXE_REG_BASE,VBXE_DATA,
 		
 		-- input data from n sources complete?
 		-- hardware regs take 1 cycle, so always complete		
@@ -926,7 +942,8 @@ end generate;
 		ULTIME_WR_ENABLE <= '0';
 		D6_WR_ENABLE <= '0';
 		ROM_WR_ENABLE <= '0';
-
+		VBXE_WRITE_ENABLE <= '0';
+		
 		RAM_WR_ENABLE <= write_enable_next;
 		SDRAM_WRITE_EN <= write_enable_next;		
 		
@@ -1111,10 +1128,15 @@ end generate;
 							end if;
 						end if;
 					end if;
-					
-				when X"D6" =>
-					D6_WR_ENABLE <= write_enable_next;
-					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
+
+				when X"D6"|X"D7"	=>
+					if (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
+						VBXE_WRITE_ENABLE <= write_enable_next;
+						MEMORY_DATA_INT(7 downto 0) <= VBXE_DATA;
+					else
+						D6_WR_ENABLE <= write_enable_next and addr_next(8);
+						MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
+					end if;
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';	
 					request_complete <= '1';
@@ -1525,7 +1547,6 @@ end generate;
 					ram_chip_select <= start_request;
 					request_complete <= ram_request_COMPLETE;									
 					RAM_ADDR <= addr_next(18 downto 0);
-
 				when "010"|"011" => -- flash rom, 4MB/internal rom
 					request_complete <= ROM_REQUEST_COMPLETE;
 					MEMORY_DATA_INT(7 downto 0) <= ROM_DATA;

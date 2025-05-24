@@ -34,6 +34,7 @@ set_global_assignment -name VHDL_FILE rtl/common/a8core/reg_file.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/shared_enable.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/simple_counter.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/ultime.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/vbxe.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/wide_delay_line.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/syncreset_enable_divider.vhd
 set_global_assignment -name VHDL_FILE rtl/common/components/complete_address_decoder.vhdl
