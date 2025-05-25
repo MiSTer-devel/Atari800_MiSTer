@@ -7,6 +7,7 @@ entity VBXE is
 port (
 	clk : in std_logic;
 	clk_enable : in std_logic;
+	enable_179 : in std_logic;
 	reset_n : in std_logic;
 	addr : in std_logic_vector(4 downto 0); -- 32 registers based at $D640/$D740
 	data_in: in std_logic_vector(7 downto 0); -- for register write
@@ -31,11 +32,13 @@ signal blit_started : std_logic;
 signal blit_data : std_logic_vector(7 downto 0);
 signal blit_miss : std_logic_vector(7 downto 0);
 signal memory_request : std_logic;
+signal memory_dir : std_logic;
 
 begin
 
 -- data_out <= data_reg_out;
-memory_fetch <= clk_enable and memory_request;
+--memory_fetch <= clk_enable and memory_request;
+memory_fetch <= memory_request;
 
 
 --process(wr_en, data_in, spi_en_reg, spi_clk_reg, spi_in_reg)
@@ -68,43 +71,35 @@ begin
 end process;
 
 -- Senseless 1 cell blitter just to see how we keep up with clock cycles
-process(reset_n,clk,clk_enable)
+process(reset_n,clk,clk_enable,enable_179)
 	variable miss_counter : integer range 0 to 255;
+	variable memory_counter : integer range 0 to 524287;
 begin
 	if reset_n = '0' then
 		memory_addr <= "1110000000000000000"; -- $70000
-		blit_started <= '0';
-		blit_next <= '0';
+		memory_wr_en <= '1';
+		memory_dir <= '1';
+		--blit_started <= '0';
+		--blit_next <= '0';
 		-- blit_data <= (others => '0');
-		memory_request <= '0';
+		memory_request <= '1';
 		blit_miss <= (others => '0');
 		miss_counter := 0;
+		memory_counter := 0;
 	else
 		if rising_edge(clk) then
+--			if clk_enable = '1' and memory_ready = '1' then
 			if memory_ready = '1' then
-				if blit_next = '0' then
-					blit_data <= memory_data_in;
-					memory_addr <= "1110000000000000001";
-				else
-					memory_data_out <= blit_data;
-					memory_addr <= "1110000000000000000";
-				end if;
-				memory_request <= '1';
-				blit_next <= not(blit_next);
-			else
-				if blit_started = '0' then
-					if clk_enable = '1' then
-						memory_request <= '1';
-						blit_started <= '1';
-					end if;
-				else
-				   -- memory not ready but should be?
-					if clk_enable = '1' then
-						miss_counter := miss_counter + 1;
-					end if;
-				end if;
+				memory_wr_en <= memory_dir;
+				memory_dir <= not(memory_dir);
+				miss_counter := miss_counter + 1;
+				memory_counter := memory_counter + 1;
+				memory_addr <= std_logic_vector(to_unsigned(memory_counter,19));
 			end if;
-			blit_miss <= std_logic_vector(to_unsigned(miss_counter,8));
+			if enable_179 = '1' then
+				blit_miss <= std_logic_vector(to_unsigned(miss_counter,8));
+				miss_counter := 0;
+			end if;
 		end if;
 	end if;
 end process;

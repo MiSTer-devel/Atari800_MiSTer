@@ -663,11 +663,11 @@ BEGIN
 					antic_fetch_real_next <= '0';
 				elsif vbxe_fetch = '1' then
 					start_request <= '1';
-					addr_next <= "11110" & vbxe_memory_addr;
+					addr_next <= "11110" & vbxe_memory_addr; -- SDRAM slot
+					-- addr_next <= "00100" & vbxe_memory_addr; -- SRAM
 					write_enable_next <= vbxe_memory_write_enable;
 					width_8bit_next <= '1';
 					data_WRITE_next(7 downto 0) <= vbxe_write_data;
-					-- This will always access memory and take a cycle?
 					if (request_complete = '1') then
 						notify_VBXE <= '1';
 					else
