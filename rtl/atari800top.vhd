@@ -273,7 +273,8 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	internal_ram => 327680
+	--internal_ram => 327680
+	internal_ram => 0
 )
 PORT MAP
 (

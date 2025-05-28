@@ -123,20 +123,18 @@ begin
 		speed_shift_next(0) <= speed_shift;
 	end process;
 
-	-- TODO the issue is that this is likely not going to work together with CPU throttling
 	process(vbxe_shift_reg, enable_179)
 		variable vbxe_shift_temp : std_logic_vector(cycle_length-1 downto 0);
 	begin
 
-		if (enable_179 = '1') then -- synchronize (TODO with phase shift?)
+		if (enable_179 = '1') then
 			vbxe_shift_temp(cycle_length-1 downto 0) := (0 => '1', others => '0');
-			-- vbxe_shift_temp(0) := '1';
 		else
 			vbxe_shift_temp := vbxe_shift_reg;
 		end if;
 
 		vbxe_shift_next(cycle_length-1 downto 1) <= vbxe_shift_temp(cycle_length-2 downto 0);
-		vbxe_shift_next(0) <= vbxe_shift_temp(cycle_length/16-1);
+		vbxe_shift_next(0) <= vbxe_shift_temp(cycle_length/8-1);
 		
 	end process;
 
@@ -169,7 +167,8 @@ begin
 	cpu_enable <= (speed_shift_reg(0) or cpu_extra_enable_reg or enable_179) and not(skip_cycle);
 	cpu_extra_enable_next <= cpu_enable and not(memory_ready);
 
-	vbxe_enable <= (vbxe_shift_reg(0) or vbxe_extra_enable_reg);
+	vbxe_enable <= vbxe_shift_reg(0);
+--	vbxe_enable <= (vbxe_shift_reg(0) or vbxe_extra_enable_reg);
 --	vbxe_enable <= enable_179;
 	vbxe_extra_enable_next <= vbxe_enable and not(memory_ready_vbxe);
 
