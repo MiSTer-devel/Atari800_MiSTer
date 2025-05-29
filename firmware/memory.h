@@ -1,7 +1,7 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#define SRAM_BASE ((void*) 0x200000)
+// #define SRAM_BASE ((void*) 0x200000)
 #define SDRAM_BASE ((void*) 0x800000)
 
 // Memory usage...
