@@ -233,7 +233,6 @@ void memset32(void *address, int value, int length)
 
 void clear_main_ram()
 {
-	memset8(SRAM_BASE, 0, main_ram_size); // SRAM, if present (TODO)
 	memset32(SDRAM_BASE, 0x00FF00FF, main_ram_size/4);
 }
 
