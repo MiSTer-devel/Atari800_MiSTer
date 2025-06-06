@@ -624,7 +624,8 @@ PORT MAP(CLK => CLK,
 		 COLOUR_out => COLOUR,
 		 DATA_OUT => GTIA_DO);
 
-GTIA_SOUND <= CONSOL_OUT(3);
+-- Both negated and non-negated works, but technically it should be negated (or?)
+GTIA_SOUND <= not(CONSOL_OUT(3));
 
 	-- colour palette
 
@@ -703,6 +704,7 @@ covox1 : entity work.covox
 	PORT map
 	( 
 		clk => clk,
+		reset_n => reset_n,
 		addr => pbi_addr_int(1 downto 0),
 		data_in => WRITE_DATA(7 DOWNTO 0),
 		wr_en => covox_write_enable,
