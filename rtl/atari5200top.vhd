@@ -157,7 +157,11 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	internal_ram => 65536
+	-- For the size, doing anything else than 16K (single Atari bank)
+	-- would require a different code and new branches in the 
+	-- address decoder to handle SDRAM correctly, and we need SDRAM
+	-- for larger carts (Super Cart 512K).
+	internal_ram => 16384 -- 65536
 )
 PORT MAP
 (
