@@ -283,6 +283,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal bank1reg : std_logic_vector(1 downto 0);
 	signal bank1next : std_logic_vector(1 downto 0);
 	signal bbtype : std_logic;
+	signal sctype : std_logic;
 BEGIN
 	-- register
 	process(clk,reset_n)
@@ -335,8 +336,11 @@ BEGIN
 
 			if addr_next(23 downto 12) = x"804" then
 				bbtype <= '0';
-			elsif addr_next(23 downto 16) = x"81" then
+				sctype <= '0';
+			elsif addr_next(23 downto 16) = x"90" then
 				bbtype <= '1';
+			elsif addr_next(23 downto 16) = x"A0" then
+				sctype <= '1';
 			end if;
 		end if;
 	end process;
@@ -837,7 +841,7 @@ end generate;
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
 		
-		bbtype,bank0reg,bank1reg,bank0next,bank1next,
+		bbtype,sctype,bank0reg,bank1reg,bank0next,bank1next,
 
 		STEREO,
 
@@ -1331,6 +1335,16 @@ end generate;
 							SDRAM_ADDR(15 downto 12) <= "11"&bank1next;
 							RAM_ADDR(15 downto 12)   <= "11"&bank1next;
 						end if;
+					elsif sctype = '1' then
+						if bank0next(0) = '1' then
+							SDRAM_ADDR(15) <= not(addr_next(15));
+							RAM_ADDR(15) <= not(addr_next(15));
+						end if;
+						-- Because we use only 16K of basic RAM, all this is going to be
+						-- in SDRAM anyhow, the fact that we truncate access to basic RAM
+						-- should not matter, it's not used (but it is technically wrong).
+						SDRAM_ADDR(19 downto 16) <= '0' & bank1next & bank0next(1);
+						RAM_ADDR(18 downto 16) <= bank1next & bank0next(1);
 					end if;
 
 					if (write_enable_next = '1') then
@@ -1361,6 +1375,25 @@ end generate;
 					X"b0"|X"b1"|X"b2"|X"b3"|X"b4"|X"b5"|X"b6"|X"b7"|
 					X"b8"|X"b9"|X"bA"|X"bB"|X"bC"|X"bD"|X"bE"|X"bF" =>
 
+					if sctype = '1' then
+						if addr_next(15 downto 0) >= x"BFD0" and addr_next(15 downto 0) <= x"BFDF" then
+							bank0next <= addr_next(3 downto 2);
+						elsif addr_next(15 downto 0) >= x"BFC0" and addr_next(15 downto 0) <= x"BFCF" then
+							bank1next <= addr_next(3 downto 2);
+						elsif addr_next(15 downto 0) >= x"BFE0" and addr_next(15 downto 0) <= x"BFFF" then
+							bank0next <= "11";
+							bank1next <= "11";
+						end if;
+						if bank0next(0) = '1' then
+							SDRAM_ADDR(15) <= not(addr_next(15));
+							SDRAM_ADDR(19 downto 16) <= std_logic_vector(unsigned('0' & bank1next & bank0next)+1)(4 downto 1);
+							RAM_ADDR(15) <= not(addr_next(15));
+							RAM_ADDR(18 downto 16) <= std_logic_vector(unsigned('0' & bank1next & bank0next)+1)(3 downto 1);
+						else
+							SDRAM_ADDR(19 downto 16) <= '0' & bank1next & bank0next(1);
+							RAM_ADDR(18 downto 16) <= bank1next & bank0next(1);
+						end if;
+					end if;
 					if (write_enable_next = '1') then
 						sdram_chip_select <= '0';
 						Ram_chip_select <= '0';							

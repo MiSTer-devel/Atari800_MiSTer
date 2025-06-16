@@ -249,13 +249,14 @@ localparam CONF_STR = {
 
 wire locked;
 wire clk_sys;
-wire clk_mem = clk_sys;
+wire clk_mem;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys),
+	.outclk_1(clk_mem),
 	.locked(locked)
 );
 
