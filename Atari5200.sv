@@ -265,8 +265,12 @@ wire reset = RESET | status[0] | buttons[1];
 //////////////////   HPS I/O   ///////////////////
 wire [20:0] joy_0;
 wire [20:0] joy_1;
+wire [20:0] joy_2;
+wire [20:0] joy_3;
 wire [15:0] joya_0;
 wire [15:0] joya_1;
+wire [15:0] joya_2;
+wire [15:0] joya_3;
 wire  [1:0] buttons;
 wire [63:0] status;
 wire [24:0] ps2_mouse;
@@ -293,8 +297,12 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.joystick_0(joy_0),
 	.joystick_1(joy_1),
+	.joystick_2(joy_2),
+	.joystick_3(joy_3),
 	.joystick_l_analog_0(joya_0),
 	.joystick_l_analog_1(joya_1),
+	.joystick_l_analog_2(joya_2),
+	.joystick_l_analog_3(joya_3),
 
 	.buttons(buttons),
 	.status(status),
@@ -328,6 +336,8 @@ assign CLK_VIDEO = clk_sys;
 
 wire joy_d1ena = ~&joya_0;
 wire joy_d2ena = ~&joya_1;
+wire joy_d3ena = ~&joya_2;
+wire joy_d4ena = ~&joya_3;
 
 wire cpu_halt;
 
@@ -391,9 +401,15 @@ atari5200top atari5200top
 	.JOY1Y(ay),
 	.JOY2X(joya_1[7:0]),
 	.JOY2Y(joya_1[15:8]),
+	.JOY3X(joya_2[7:0]),
+	.JOY3Y(joya_2[15:8]),
+	.JOY4X(joya_3[7:0]),
+	.JOY4Y(joya_3[15:8]),
 
 	.JOY1(j0    & {17'b11111111111111111, {4{joy_d1ena}}}),
-	.JOY2(joy_1 & {17'b11111111111111111, {4{joy_d2ena}}})
+	.JOY2(joy_1 & {17'b11111111111111111, {4{joy_d2ena}}}),
+	.JOY3(joy_2 & {17'b11111111111111111, {4{joy_d3ena}}}),
+	.JOY4(joy_3 & {17'b11111111111111111, {4{joy_d4ena}}})
 );
 
 altddio_out
