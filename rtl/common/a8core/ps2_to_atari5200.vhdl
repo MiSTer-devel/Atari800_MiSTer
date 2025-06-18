@@ -199,7 +199,7 @@ end generate;
 			atari_keyboard(3)<=(ps2_keys_reg(16#1a#) and ps2_keys_reg(16#14#))  or JOY3(6);  --z 
 			atari_keyboard(2)<=(ps2_keys_reg(16#22#) and ps2_keys_reg(16#14#))  or JOY3(11);  --x
 			atari_keyboard(1)<=(ps2_keys_reg(16#21#) and ps2_keys_reg(16#14#))  or JOY3(7);  --c
-			fire_pressed_sel <= '0';
+			fire_pressed_sel <= JOY3(5);
 		when "11" =>
 			atari_keyboard(12)<=(ps2_keys_reg(16#0c#) and ps2_keys_reg(16#14#)) or JOY4(8); -- f4
 			atari_keyboard(8)<=(ps2_keys_reg(16#03#) and ps2_keys_reg(16#14#))  or JOY4(9);  -- f5
@@ -216,7 +216,7 @@ end generate;
 			atari_keyboard(3)<=(ps2_keys_reg(16#2a#) and ps2_keys_reg(16#14#))  or JOY4(6);  -- v
 			atari_keyboard(2)<=(ps2_keys_reg(16#32#) and ps2_keys_reg(16#14#))  or JOY4(11);  -- b
 			atari_keyboard(1)<=(ps2_keys_reg(16#31#) and ps2_keys_reg(16#14#))  or JOY4(7);  -- n
-			fire_pressed_sel <= '0';
+			fire_pressed_sel <= JOY4(5);
 		when others =>
 		end case;
 
