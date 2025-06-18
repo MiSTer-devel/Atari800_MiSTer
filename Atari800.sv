@@ -276,7 +276,7 @@ localparam CONF_STR = {
 	"P4O34,Stereo mix,None,25%,50%,100%;",
 	"P5,Input;",
 	"P5-;",
-	"P5OL,Swap Joysticks,No,Yes;",
+	"P5OL,Swap Joysticks 1&2,No,Yes;",
 	"P5O6,Mouse Y,Normal,Inverted;",
 	"-;",
 	"r7,Warm Reset (F9);",
@@ -314,8 +314,12 @@ end
 //////////////////   HPS I/O   ///////////////////
 wire [15:0] joy_0;
 wire [15:0] joy_1;
+wire [15:0] joy_2;
+wire [15:0] joy_3;
 wire [15:0] joya_0;
 wire [15:0] joya_1;
+wire [15:0] joya_2;
+wire [15:0] joya_3;
 wire  [1:0] buttons;
 wire [63:0] status;
 wire [24:0] ps2_mouse;
@@ -347,8 +351,12 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.joystick_0(joy_0),
 	.joystick_1(joy_1),
+	.joystick_2(joy_2),
+	.joystick_3(joy_3),
 	.joystick_l_analog_0(joya_0),
 	.joystick_l_analog_1(joya_1),
+	.joystick_l_analog_2(joya_2),
+	.joystick_l_analog_3(joya_3),
 
 	.buttons(buttons),
 	.status(status),
@@ -480,9 +488,15 @@ atari800top atari800top
 	.JOY1Y(status[21] ? joya_1[15:8] : ay),
 	.JOY2X(status[21] ? ax : joya_1[7:0] ),
 	.JOY2Y(status[21] ? ay : joya_1[15:8]),
+	.JOY3X(joya_2[7:0]),
+	.JOY3Y(joya_2[15:8]),
+	.JOY4X(joya_3[7:0]),
+	.JOY4Y(joya_3[15:8]),
 
 	.JOY1(status[21] ? joy_1[13:0] : j0),
-	.JOY2(status[21] ? j0 : joy_1[13:0])
+	.JOY2(status[21] ? j0 : joy_1[13:0]),
+	.JOY3(joy_2[13:0]),
+	.JOY4(joy_3[13:0])
 );
 
 altddio_out
