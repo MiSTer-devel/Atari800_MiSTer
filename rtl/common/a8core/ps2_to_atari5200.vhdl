@@ -30,7 +30,9 @@ PORT
 	
 	JOY1  : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
 	JOY2  : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
-	
+	JOY3  : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
+	JOY4  : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
+
 	INPUT : IN STD_LOGIC_VECTOR(31 downto 0) := (others=>'0');
 	
 	KEYBOARD_SCAN : IN STD_LOGIC_VECTOR(5 downto 0);
@@ -139,7 +141,7 @@ end generate;
 	end process;
 
 	-- map to atari key code
-	process(ps2_keys_reg, JOY1, JOY2, controller_select)
+	process(ps2_keys_reg, JOY1, JOY2, JOY3, JOY4, controller_select)
 	begin
 		atari_keyboard <= (others=>'0');
 
@@ -182,39 +184,39 @@ end generate;
 			atari_keyboard(1)<=(ps2_keys_reg(16#31#) and not(ps2_keys_reg(16#14#)))  or JOY2(7);  -- n
 			fire_pressed_sel <= JOY2(5);
 		when "10" =>
-			atari_keyboard(12)<=ps2_keys_reg(16#05#) and ps2_keys_reg(16#14#); --f1
-			atari_keyboard(8)<=ps2_keys_reg(16#06#) and ps2_keys_reg(16#14#);  --f2
-			atari_keyboard(4)<=ps2_keys_reg(16#04#) and ps2_keys_reg(16#14#);  --f3
-			atari_keyboard(15)<=ps2_keys_reg(16#16#) and ps2_keys_reg(16#14#); --1
-			atari_keyboard(14)<=ps2_keys_reg(16#1E#) and ps2_keys_reg(16#14#); --2
-			atari_keyboard(13)<=ps2_keys_reg(16#26#) and ps2_keys_reg(16#14#); --3
-			atari_keyboard(11)<=ps2_keys_reg(16#15#) and ps2_keys_reg(16#14#); --q
-			atari_keyboard(10)<=ps2_keys_reg(16#1D#) and ps2_keys_reg(16#14#); --w
-			atari_keyboard(9)<=ps2_keys_reg(16#24#) and ps2_keys_reg(16#14#);  --e
-			atari_keyboard(7)<=ps2_keys_reg(16#1c#) and ps2_keys_reg(16#14#);  --a
-			atari_keyboard(6)<=ps2_keys_reg(16#1b#) and ps2_keys_reg(16#14#);  --s
-			atari_keyboard(5)<=ps2_keys_reg(16#23#) and ps2_keys_reg(16#14#);  --d
-			atari_keyboard(3)<=ps2_keys_reg(16#1a#) and ps2_keys_reg(16#14#);  --z 
-			atari_keyboard(2)<=ps2_keys_reg(16#22#) and ps2_keys_reg(16#14#);  --x
-			atari_keyboard(1)<=ps2_keys_reg(16#21#) and ps2_keys_reg(16#14#);  --c
-			fire_pressed_sel <= '0';
+			atari_keyboard(12)<=(ps2_keys_reg(16#05#) and ps2_keys_reg(16#14#)) or JOY3(8); --f1
+			atari_keyboard(8)<=(ps2_keys_reg(16#06#) and ps2_keys_reg(16#14#))  or JOY3(9);  --f2
+			atari_keyboard(4)<=(ps2_keys_reg(16#04#) and ps2_keys_reg(16#14#))  or JOY3(10);  --f3
+			atari_keyboard(15)<=(ps2_keys_reg(16#16#) and ps2_keys_reg(16#14#)) or JOY3(12); --1
+			atari_keyboard(14)<=(ps2_keys_reg(16#1E#) and ps2_keys_reg(16#14#)) or JOY3(13); --2
+			atari_keyboard(13)<=(ps2_keys_reg(16#26#) and ps2_keys_reg(16#14#)) or JOY3(14); --3
+			atari_keyboard(11)<=(ps2_keys_reg(16#15#) and ps2_keys_reg(16#14#)) or JOY3(15); --q
+			atari_keyboard(10)<=(ps2_keys_reg(16#1D#) and ps2_keys_reg(16#14#)) or JOY3(16); --w
+			atari_keyboard(9)<=(ps2_keys_reg(16#24#) and ps2_keys_reg(16#14#))  or JOY3(17);  --e
+			atari_keyboard(7)<=(ps2_keys_reg(16#1c#) and ps2_keys_reg(16#14#))  or JOY3(18);  --a
+			atari_keyboard(6)<=(ps2_keys_reg(16#1b#) and ps2_keys_reg(16#14#))  or JOY3(19);  --s
+			atari_keyboard(5)<=(ps2_keys_reg(16#23#) and ps2_keys_reg(16#14#))  or JOY3(20);  --d
+			atari_keyboard(3)<=(ps2_keys_reg(16#1a#) and ps2_keys_reg(16#14#))  or JOY3(6);  --z 
+			atari_keyboard(2)<=(ps2_keys_reg(16#22#) and ps2_keys_reg(16#14#))  or JOY3(11);  --x
+			atari_keyboard(1)<=(ps2_keys_reg(16#21#) and ps2_keys_reg(16#14#))  or JOY3(7);  --c
+			fire_pressed_sel <= JOY3(5);
 		when "11" =>
-			atari_keyboard(12)<=ps2_keys_reg(16#0c#) and ps2_keys_reg(16#14#); -- f4
-			atari_keyboard(8)<=ps2_keys_reg(16#03#) and ps2_keys_reg(16#14#);  -- f5
-			atari_keyboard(4)<=ps2_keys_reg(16#0b#) and ps2_keys_reg(16#14#);  -- f6
-			atari_keyboard(15)<=ps2_keys_reg(16#25#) and ps2_keys_reg(16#14#); -- 4
-			atari_keyboard(14)<=ps2_keys_reg(16#2e#) and ps2_keys_reg(16#14#); -- 5
-			atari_keyboard(13)<=ps2_keys_reg(16#36#) and ps2_keys_reg(16#14#); -- 6
-			atari_keyboard(11)<=ps2_keys_reg(16#2d#) and ps2_keys_reg(16#14#); -- r
-			atari_keyboard(10)<=ps2_keys_reg(16#2c#) and ps2_keys_reg(16#14#); -- t 
-			atari_keyboard(9)<=ps2_keys_reg(16#35#) and ps2_keys_reg(16#14#);  -- y
-			atari_keyboard(7)<=ps2_keys_reg(16#2b#) and ps2_keys_reg(16#14#);  -- f
-			atari_keyboard(6)<=ps2_keys_reg(16#34#) and ps2_keys_reg(16#14#);  -- g
-			atari_keyboard(5)<=ps2_keys_reg(16#33#) and ps2_keys_reg(16#14#);  -- h
-			atari_keyboard(3)<=ps2_keys_reg(16#2a#) and ps2_keys_reg(16#14#);  -- v
-			atari_keyboard(2)<=ps2_keys_reg(16#32#) and ps2_keys_reg(16#14#);  -- b
-			atari_keyboard(1)<=ps2_keys_reg(16#31#) and ps2_keys_reg(16#14#);  -- n
-			fire_pressed_sel <= '0';
+			atari_keyboard(12)<=(ps2_keys_reg(16#0c#) and ps2_keys_reg(16#14#)) or JOY4(8); -- f4
+			atari_keyboard(8)<=(ps2_keys_reg(16#03#) and ps2_keys_reg(16#14#))  or JOY4(9);  -- f5
+			atari_keyboard(4)<=(ps2_keys_reg(16#0b#) and ps2_keys_reg(16#14#))  or JOY4(10);  -- f6
+			atari_keyboard(15)<=(ps2_keys_reg(16#25#) and ps2_keys_reg(16#14#)) or JOY4(12); -- 4
+			atari_keyboard(14)<=(ps2_keys_reg(16#2e#) and ps2_keys_reg(16#14#)) or JOY4(13); -- 5
+			atari_keyboard(13)<=(ps2_keys_reg(16#36#) and ps2_keys_reg(16#14#)) or JOY4(14); -- 6
+			atari_keyboard(11)<=(ps2_keys_reg(16#2d#) and ps2_keys_reg(16#14#)) or JOY4(15); -- r
+			atari_keyboard(10)<=(ps2_keys_reg(16#2c#) and ps2_keys_reg(16#14#)) or JOY4(16); -- t 
+			atari_keyboard(9)<=(ps2_keys_reg(16#35#) and ps2_keys_reg(16#14#))  or JOY4(17);  -- y
+			atari_keyboard(7)<=(ps2_keys_reg(16#2b#) and ps2_keys_reg(16#14#))  or JOY4(18);  -- f
+			atari_keyboard(6)<=(ps2_keys_reg(16#34#) and ps2_keys_reg(16#14#))  or JOY4(19);  -- g
+			atari_keyboard(5)<=(ps2_keys_reg(16#33#) and ps2_keys_reg(16#14#))  or JOY4(20);  -- h
+			atari_keyboard(3)<=(ps2_keys_reg(16#2a#) and ps2_keys_reg(16#14#))  or JOY4(6);  -- v
+			atari_keyboard(2)<=(ps2_keys_reg(16#32#) and ps2_keys_reg(16#14#))  or JOY4(11);  -- b
+			atari_keyboard(1)<=(ps2_keys_reg(16#31#) and ps2_keys_reg(16#14#))  or JOY4(7);  -- n
+			fire_pressed_sel <= JOY4(5);
 		when others =>
 		end case;
 
