@@ -219,7 +219,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X  XX XXXX       XXX  XXXXXXXXX    X
+// X  XXXXXXX       XXX  XXXXXXXXX    X
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -238,6 +238,7 @@ localparam CONF_STR = {
 	"OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
 	"O34,Stereo mix,None,25%,50%,100%;",
+	"O5,Swap Joysticks 1&2,No,Yes;",
 	"O6,Mouse Y,Normal,Inverted;",
 	"-;",
 	"R0,Reset;",
@@ -397,17 +398,17 @@ atari5200top atari5200top
 
 	.PS2_KEY(ps2_key),
 
-	.JOY1X(ax),
-	.JOY1Y(ay),
-	.JOY2X(joya_1[7:0]),
-	.JOY2Y(joya_1[15:8]),
+	.JOY1X(status[5] ? joya_1[7:0] : ax),
+	.JOY1Y(status[5] ? joya_1[15:8] : ay),
+	.JOY2X(status[5] ? ax : joya_1[7:0]),
+	.JOY2Y(status[5] ? ay : joya_1[15:8]),
 	.JOY3X(joya_2[7:0]),
 	.JOY3Y(joya_2[15:8]),
 	.JOY4X(joya_3[7:0]),
 	.JOY4Y(joya_3[15:8]),
 
-	.JOY1(j0    & {17'b11111111111111111, {4{joy_d1ena}}}),
-	.JOY2(joy_1 & {17'b11111111111111111, {4{joy_d2ena}}}),
+	.JOY1((status[5] ? joy_1 : j0) & {17'b11111111111111111, {4{joy_d1ena}}}),
+	.JOY2((status[5] ? j0 : joy_1) & {17'b11111111111111111, {4{joy_d2ena}}}),
 	.JOY3(joy_2 & {17'b11111111111111111, {4{joy_d3ena}}}),
 	.JOY4(joy_3 & {17'b11111111111111111, {4{joy_d4ena}}})
 );
