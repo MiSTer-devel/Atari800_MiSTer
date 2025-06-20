@@ -21,21 +21,25 @@
 
 #include "atx_eclaire.h"
 #include "atx.h"
+#include "regs.h"
+#include "pause.h"
+
+#define get_atx1050() (*zpu_in2 & 0x00000020)
 
 // number of angular units in a full disk rotation
 #define AU_FULL_ROTATION         26042
-// number of angular units to read one sector
-#define AU_ONE_SECTOR_READ       1208
-// number of ms for each angular unit
-#define MS_ANGULAR_UNIT_VAL      0.007999897601
-// number of milliseconds drive takes to process a request
-#define MS_DRIVE_REQUEST_DELAY   3.22
-// number of milliseconds to calculate CRC
-#define MS_CRC_CALCULATION       2
-// number of milliseconds drive takes to step 1 track
-#define MS_TRACK_STEP            5.3
-// number of milliseconds drive head takes to settle after track stepping
-#define MS_HEAD_SETTLE           0
+
+#define US_CS_CALC_1050 270 // According to Altirra
+#define US_CS_CALC_810 5136 // According to Altirra
+
+#define US_TRACK_STEP_810 5300 // number of microseconds drive takes to step 1 track
+#define US_TRACK_STEP_1050 20120 // According to Avery / Altirra
+#define US_HEAD_SETTLE_1050 20000
+#define US_HEAD_SETTLE_810 10000
+
+#define US_3FAKE_ROT_810 1566000
+#define US_2FAKE_ROT_1050 942000
+
 // mask for checking FDC status "data lost" bit
 #define MASK_FDC_DLOST           0x04
 // mask for checking FDC status "missing" bit
@@ -43,252 +47,369 @@
 // mask for checking FDC status extended data bit
 #define MASK_EXTENDED_DATA       0x40
 
-#define MAX_RETRIES_1050         1
+#define MASK_FDC_BUSY            0x01
+#define MASK_FDC_DRQ             0x02
+#define MASK_FDC_CRC             0x08
+#define MASK_FDC_REC             0x20
+#define MASK_FDC_WP              0x40
+#define MASK_RESERVED            0x80
+
+#define MAX_RETRIES_1050         2
 #define MAX_RETRIES_810          4
 
-struct atxTrackInfo {
-    u32 offset;   // absolute position within file for start of track header
-};
+#define MAX_TRACK                42
+
+enum atx_density { atx_single, atx_medium, atx_double };
 
 extern unsigned char atari_sector_buffer[256];
-extern u16 last_angle_returned; // extern so we can display it on the screen
 
-u16 gBytesPerSector;                                 // number of bytes per sector
-u08 gSectorsPerTrack;                                // number of sectors in each track
-struct atxTrackInfo gTrackInfo[NUM_ATX_DRIVES][40];  // pre-calculated info for each track and drive
-                                                     // support slot D1 and D2 only because of insufficient RAM!
-u16 gLastAngle;
-u08 gCurrentHeadTrack;
+struct {
+	u16 bytesPerSector; // number of bytes per sector
+	u08 sectorsPerTrack; // number of sectors in each track
+	u32 trackOffset[MAX_TRACK]; // pre-calculated info for each track and drive
+	u08 currentHeadTrack;
+	u08 density;
+} atx_info[NUM_ATX_DRIVES];
 
-u16 loadAtxFile(u08 drive) {
-    struct atxFileHeader *fileHeader;
-    struct atxTrackHeader *trackHeader;
+struct {
+	u32 stamp;
+	u16 angle;
+} headPosition;
 
-    // read the file header
-    faccess_offset(FILE_ACCESS_READ, 0, sizeof(struct atxFileHeader));
-    byteSwapAtxFileHeader((struct atxFileHeader *) atari_sector_buffer);
-
-    // validate the ATX file header
-    fileHeader = (struct atxFileHeader *) atari_sector_buffer;
-    if (fileHeader->signature[0] != 'A' ||
-        fileHeader->signature[1] != 'T' ||
-        fileHeader->signature[2] != '8' ||
-        fileHeader->signature[3] != 'X' ||
-        fileHeader->version != ATX_VERSION ||
-        fileHeader->minVersion != ATX_VERSION) {
-        return 0;
-    }
-
-    // enhanced density is 26 sectors per track, single and double density are 18
-    gSectorsPerTrack = (fileHeader->density == 1) ? (u08) 26 : (u08) 18;
-    // single and enhanced density are 128 bytes per sector, double density is 256
-    gBytesPerSector = (fileHeader->density == 1) ? (u16) 256 : (u16) 128;
-
-    // calculate track offsets
-    u32 startOffset = fileHeader->startData;
-    while (1) {
-        if (!faccess_offset(FILE_ACCESS_READ, startOffset, sizeof(struct atxTrackHeader))) {
-            break;
-        }
-        trackHeader = (struct atxTrackHeader *) atari_sector_buffer;
-        byteSwapAtxTrackHeader(trackHeader);
-        gTrackInfo[drive][trackHeader->trackNumber].offset = startOffset;
-        startOffset += trackHeader->size;
-    }
-
-    return gBytesPerSector;
+static void getCurrentHeadPosition()
+{
+	u32 s = *zpu_timer;
+	headPosition.stamp = s;
+	headPosition.angle = (u16)((s >> 3) % AU_FULL_ROTATION);
 }
 
-u16 loadAtxSector(u08 drive, u16 num, unsigned short *sectorSize, u08 *status) {
-    struct atxTrackHeader *trackHeader;
-    struct atxSectorListHeader *slHeader;
-    struct atxSectorHeader *sectorHeader;
-    struct atxTrackChunk *extSectorData;
-
-    u16 i;
-    u16 tgtSectorIndex = 0;         // the index of the target sector within the sector list
-    u32 tgtSectorOffset = 0;        // the offset of the target sector data
-    BOOL hasError = (BOOL) FALSE;   // flag for drive status errors
-
-    // local variables used for weak data handling
-    u08 extendedDataRecords = 0;
-    int16_t weakOffset = -1;
-
-    // calculate track and relative sector number from the absolute sector number
-    u08 tgtTrackNumber = (num - 1) / gSectorsPerTrack + 1;
-    u08 tgtSectorNumber = (num - 1) % gSectorsPerTrack + 1;
-
-    // set initial status (in case the target sector is not found)
-    *status = 0x10;
-    // set the sector size
-    *sectorSize = gBytesPerSector;
-
-    // immediately fail on track read > 40
-    if (tgtTrackNumber > 40) {
-        return 0;
-    }
-
-    // delay for the time the drive takes to process the request
-    _delay_ms(MS_DRIVE_REQUEST_DELAY);
-
-    // delay for track stepping if needed
-    if (gCurrentHeadTrack != tgtTrackNumber) {
-        signed char diff;
-        diff = tgtTrackNumber - gCurrentHeadTrack;
-        if (diff < 0) diff *= -1;
-        // wait for each track (this is done in a loop since _delay_ms needs a compile-time constant)
-        for (i = 0; i < diff; i++) {
-            _delay_ms(MS_TRACK_STEP);
-        }
-        // delay for head settling
-        _delay_ms(MS_HEAD_SETTLE);
-    }
-
-    // set new head track position
-    gCurrentHeadTrack = tgtTrackNumber;
-
-    // sample current head position
-    u16 headPosition = getCurrentHeadPosition();
-
-    // read the track header
-    u32 currentFileOffset = gTrackInfo[drive][tgtTrackNumber - 1].offset;
-    faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxTrackHeader));
-    trackHeader = (struct atxTrackHeader *) atari_sector_buffer;
-    byteSwapAtxTrackHeader(trackHeader);
-    u16 sectorCount = trackHeader->sectorCount;
-
-    // if there are no sectors in this track or the track number doesn't match, return error
-    if (trackHeader->trackNumber == tgtTrackNumber - 1) {
-        // read the sector list header if there are sectors for this track
-        if (sectorCount > 0) {
-            currentFileOffset += trackHeader->headerSize;
-            faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxSectorListHeader));
-            slHeader = (struct atxSectorListHeader *) atari_sector_buffer;
-            byteSwapAtxSectorListHeader(slHeader);
-
-            // sector list header is variable length, so skip any extra header bytes that may be present
-            currentFileOffset += slHeader->next - sectorCount * sizeof(struct atxSectorHeader);
-        }
-
-        int pTT = 0;
-        int retries = MAX_RETRIES_810;
-
-        // if we are still below the maximum number of retries that would be performed by the drive firmware...
-        u32 retryOffset = currentFileOffset;
-        while (retries > 0) {
-            retries--;
-            currentFileOffset = retryOffset;
-            // iterate through all sector headers to find the target sector
-            for (i=0; i < sectorCount; i++) {
-                if (faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxSectorHeader))) {
-                    sectorHeader = (struct atxSectorHeader *) atari_sector_buffer;
-                    byteSwapAtxSectorHeader(sectorHeader);
-                    // if the sector is not flagged as missing and its number matches the one we're looking for...
-                    if (!(sectorHeader->status & MASK_FDC_MISSING) && sectorHeader->number == tgtSectorNumber) {
-                        // check if it's the next sector that the head would encounter angularly...
-                        int tt = sectorHeader->timev - headPosition;
-                        if (pTT == 0 || (tt > 0 && pTT < 0) || (tt > 0 && pTT > 0 && tt < pTT) || (tt < 0 && pTT < 0 && tt < pTT)) {
-                            pTT = tt;
-                            gLastAngle = sectorHeader->timev;
-                            *status = sectorHeader->status;
-                            // On an Atari 810, we have to do some specific behavior 
-                            // when a long sector is encountered (the lost data bit 
-                            // is set):
-                            //   1. ATX images don't normally set the DRQ status bit
-                            //      because the behavior is different on 810 vs.
-                            //      1050 drives. In the case of the 810, the DRQ bit 
-                            //      should be set.
-                            //   2. The 810 is "blind" to CRC errors on long sectors
-                            //      because it interrupts the FDC long before 
-                            //      performing the CRC check.
-                            if (*status & MASK_FDC_DLOST) {
-                                *status |= 0x02;
-                            }
-                            // if the extended data flag is set, increment extended record count for later reading
-                            if (*status & MASK_EXTENDED_DATA) {
-                                extendedDataRecords++;
-                            }
-                            tgtSectorIndex = i;
-                            tgtSectorOffset = sectorHeader->data;
-                        }
-                    }
-                    currentFileOffset += sizeof(struct atxSectorHeader);
-                }
-            }
-            // if the sector status is bad, delay for a full disk rotation
-            if (*status) {
-                waitForAngularPosition(incAngularDisplacement(getCurrentHeadPosition(), AU_FULL_ROTATION));
-            // otherwise, no need to retry
-            } else {
-                retries = 0;
-            }
-        }
-
-        // store the last angle returned for the debugging window
-        last_angle_returned = gLastAngle;
-
-        // if the status is bad, flag as error
-        if (*status) {
-            hasError = (BOOL) TRUE;
-        }
-
-        // if an extended data record exists for this track, iterate through all track chunks to search
-        // for those records (note that we stop looking for chunks when we hit the 8-byte terminator; length == 0)
-        if (extendedDataRecords > 0) {
-            currentFileOffset = gTrackInfo[drive][tgtTrackNumber - 1].offset + trackHeader->headerSize;
-            do {
-                faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxTrackChunk));
-                extSectorData = (struct atxTrackChunk *) atari_sector_buffer;
-                byteSwapAtxTrackChunk(extSectorData);
-                if (extSectorData->size > 0) {
-                    // if the target sector has a weak data flag, grab the start weak offset within the sector data
-                    if (extSectorData->sectorIndex == tgtSectorIndex && extSectorData->type == 0x10) {
-                        weakOffset = extSectorData->data;
-                    }
-                    currentFileOffset += extSectorData->size;
-                }
-            } while (extSectorData->size > 0);
-        }
-
-        // read the data (re-using tgtSectorIndex variable here to reduce stack consumption)
-        if (tgtSectorOffset) {
-            tgtSectorIndex = (u16) faccess_offset(FILE_ACCESS_READ, gTrackInfo[drive][tgtTrackNumber - 1].offset + tgtSectorOffset, gBytesPerSector);
-        }
-        if (hasError) {
-            tgtSectorIndex = 0;
-        }
-
-        // if a weak offset is defined, randomize the appropriate data
-        if (weakOffset > -1) {
-            for (i = (u16) weakOffset; i < gBytesPerSector; i++) {
-                atari_sector_buffer[i] = (unsigned char) (rand() % 256);
-            }
-        }
-
-        // calculate rotational delay of sector seek
-        u16 rotationDelay;
-        if (gLastAngle > headPosition) {
-            rotationDelay = (gLastAngle - headPosition);
-        } else {
-            rotationDelay = (AU_FULL_ROTATION - headPosition + gLastAngle);
-        }
-
-        // determine the angular position we need to wait for by summing the head position, rotational delay and the number 
-        // of rotational units for a sector read. Then wait for the head to reach that position.
-        // (Concern: can the SD card read take more time than the amount the disk would have rotated?)
-        waitForAngularPosition(incAngularDisplacement(incAngularDisplacement(headPosition, rotationDelay), AU_ONE_SECTOR_READ));
-
-        // delay for CRC calculation
-        _delay_ms(MS_CRC_CALCULATION);
-    }
-
-    // the Atari expects an inverted FDC status byte
-    *status = ~(*status);
-
-    // return the number of bytes read
-    return tgtSectorIndex;
+static void wait_from_stamp(u32 us_delay)
+{
+	u32 t = *zpu_timer - headPosition.stamp;
+	t = us_delay - t;
+	// If, for whatever reason, we are already too late, just skip
+	if(t <= us_delay)
+	{
+		wait_us(t);
+	}
 }
 
+u08 loadAtxFile(u08 drive)
+{
+	struct atxFileHeader *fileHeader;
+	struct atxTrackHeader *trackHeader;
+	u08 r = 0;
+
+	// read the file header
+	if(!faccess_offset(FILE_ACCESS_READ, 0, sizeof(struct atxFileHeader)))
+	{
+		return r;
+	}
+	byteSwapAtxFileHeader((struct atxFileHeader *) atari_sector_buffer);
+
+	// validate the ATX file header
+	fileHeader = (struct atxFileHeader *) atari_sector_buffer;
+	if (fileHeader->signature[0] != 'A' ||
+		fileHeader->signature[1] != 'T' ||
+		fileHeader->signature[2] != '8' ||
+		fileHeader->signature[3] != 'X' ||
+		fileHeader->version != ATX_VERSION ||
+		fileHeader->minVersion != ATX_VERSION)
+	{
+		return r;
+	}
+	r = fileHeader->density;
+	// enhanced density is 26 sectors per track, single and double density are 18
+	atx_info[drive].sectorsPerTrack = (r == atx_medium) ? (u08) 26 : (u08) 18;
+	// single and enhanced density are 128 bytes per sector, double density is 256
+	atx_info[drive].bytesPerSector = (r == atx_double) ? (u16) 256 : (u16) 128;
+	atx_info[drive].density = r;
+	atx_info[drive].currentHeadTrack = 0;
+
+	// calculate track offsets
+	u32 startOffset = fileHeader->startData;
+	int track;
+	for(track = 0; track < MAX_TRACK ; track++) {
+		if (!faccess_offset(FILE_ACCESS_READ, startOffset, sizeof(struct atxTrackHeader)))
+		{
+			break;
+		}
+		trackHeader = (struct atxTrackHeader *) atari_sector_buffer;
+		byteSwapAtxTrackHeader(trackHeader);
+		atx_info[drive].trackOffset[track] = startOffset;
+		startOffset += trackHeader->size;
+	}
+
+	return r;
+}
+
+// Return 0 on full success, 1 on "Atari disk problem" (may have data)
+// -1 on internal storage problem (corrupt ATX) 
+int loadAtxSector(u08 drive, u16 num, u08 *status)
+{
+
+	struct atxTrackHeader *trackHeader;
+	struct atxSectorListHeader *slHeader;
+	struct atxSectorHeader *sectorHeader;
+	struct atxTrackChunk *extSectorData;
+
+	u16 i;
+	int r = 1;
+	u08 is1050 = get_atx1050();
+
+	// calculate track and relative sector number from the absolute sector number
+	u08 tgtTrackNumber = (num - 1) / atx_info[drive].sectorsPerTrack;
+	u08 tgtSectorNumber = (num - 1) % atx_info[drive].sectorsPerTrack + 1;
+
+	// set initial status (in case the target sector is not found)
+	*status = MASK_FDC_MISSING;
+
+	u16 atxSectorSize = atx_info[drive].bytesPerSector;
+
+	// delay for track stepping if needed
+	int diff = tgtTrackNumber - atx_info[drive].currentHeadTrack;
+	if (diff)
+	{
+		if (diff > 0)
+		{
+			diff += (is1050 ? 1 : 0);
+		}
+		else
+		{
+			diff = -diff;
+		}
+		wait_us(is1050 ? (diff*US_TRACK_STEP_1050 + US_HEAD_SETTLE_1050) : (diff*US_TRACK_STEP_810 + US_HEAD_SETTLE_810));
+	}
+
+	getCurrentHeadPosition();
+
+	// set new head track position
+	atx_info[drive].currentHeadTrack = tgtTrackNumber;
+	u16 sectorCount = 0;
+	// read the track header
+	u32 currentFileOffset = atx_info[drive].trackOffset[tgtTrackNumber];
+	
+	if (currentFileOffset)
+	{
+		if(faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxTrackHeader)))
+		{
+			trackHeader = (struct atxTrackHeader *) atari_sector_buffer;
+			byteSwapAtxTrackHeader(trackHeader);
+			sectorCount = trackHeader->sectorCount;	    
+		}
+		else
+		{
+			r = -1;
+		}
+	}
+
+	if (trackHeader->trackNumber != tgtTrackNumber || atx_info[drive].density != ((trackHeader->flags & 0x2) ? atx_medium : atx_single))
+	{
+		sectorCount = 0;
+	}
+
+	u32 trackHeaderSize = trackHeader->headerSize;
+
+	if (sectorCount)
+	{
+		currentFileOffset += trackHeaderSize;
+		if(faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxSectorListHeader)))
+		{
+			slHeader = (struct atxSectorListHeader *) atari_sector_buffer;
+			byteSwapAtxSectorListHeader(slHeader);
+			// sector list header is variable length, so skip any extra header bytes that may be present
+			currentFileOffset += slHeader->next - sectorCount * sizeof(struct atxSectorHeader);
+		}
+		else
+		{
+			sectorCount = 0;
+			r = -1;
+		}
+	}
+
+	u32 tgtSectorOffset;        // the offset of the target sector data
+	int16_t weakOffset;
+
+	u08 retries = is1050 ? MAX_RETRIES_1050 : MAX_RETRIES_810;
+
+	u32 retryOffset = currentFileOffset;
+	u16 extSectorSize;
+
+	while (retries > 0)
+	{
+		retries--;
+		currentFileOffset = retryOffset;
+		int pTT;
+		u16 tgtSectorIndex = 0;         // the index of the target sector within the sector list
+		tgtSectorOffset = 0;
+		weakOffset = -1;
+		// iterate through all sector headers to find the target sector
+
+		if(sectorCount)
+		{
+			for (i=0; i < sectorCount; i++)
+			{
+				if(!faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxSectorHeader)))
+				{
+					r = -1;
+					break;
+				}
+				sectorHeader = (struct atxSectorHeader *)atari_sector_buffer;
+				byteSwapAtxSectorHeader(sectorHeader);
+
+				// if the sector is not flagged as missing and its number matches the one we're looking for...
+				if (sectorHeader->number == tgtSectorNumber)
+				{
+					if(sectorHeader->status & MASK_FDC_MISSING)
+					{
+						currentFileOffset += sizeof(struct atxSectorHeader);
+						continue;
+					}
+					// check if it's the next sector that the head would encounter angularly...
+					int tt = sectorHeader->timev - headPosition.angle;
+					if (!tgtSectorOffset || (tt > 0 && pTT <= 0) || (tt > 0 && pTT > 0 && tt < pTT) || (tt <= 0 && pTT <= 0 && tt < pTT))
+					{
+						pTT = tt;
+						*status = sectorHeader->status;
+						tgtSectorIndex = i;
+						tgtSectorOffset = sectorHeader->data;
+					}
+				}
+				currentFileOffset += sizeof(struct atxSectorHeader);
+			}
+		}
+	
+		u16 actSectorSize = atxSectorSize;
+		extSectorSize = 0;
+		// if an extended data record exists for this track, iterate through all track chunks to search
+		// for those records (note that we stop looking for chunks when we hit the 8-byte terminator; length == 0)
+		if (*status & MASK_EXTENDED_DATA)
+		{
+			currentFileOffset = atx_info[drive].trackOffset[tgtTrackNumber] + trackHeaderSize;
+			do {
+				if(!faccess_offset(FILE_ACCESS_READ, currentFileOffset, sizeof(struct atxTrackChunk)))
+				{
+					r = -1;
+					break;
+				}
+				extSectorData = (struct atxTrackChunk *) atari_sector_buffer;
+				byteSwapAtxTrackChunk(extSectorData);
+				if (extSectorData->size)
+				{
+					// if the target sector has a weak data flag, grab the start weak offset within the sector data
+					if (extSectorData->sectorIndex == tgtSectorIndex)
+					{
+						if(extSectorData->type == 0x10)
+						{ // weak sector
+							weakOffset = extSectorData->data;
+						}
+						else if(extSectorData->type == 0x11)
+						{ // extended sector
+							extSectorSize = 128 << extSectorData->data;
+							// 1050 waits for long sectors, 810 does not
+							if(is1050 ? (extSectorSize > actSectorSize) : (extSectorSize < actSectorSize))
+							{
+								actSectorSize = extSectorSize;
+							}
+						}
+					}
+					currentFileOffset += extSectorData->size;
+				}
+			} while (extSectorData->size);
+		}
+
+		if (tgtSectorOffset)
+		{
+			if(!faccess_offset(FILE_ACCESS_READ, atx_info[drive].trackOffset[tgtTrackNumber] + tgtSectorOffset, atxSectorSize))
+			{
+				r = -1;
+				tgtSectorOffset = 0;
+			}
+
+			u16 au_one_sector_read = (23+actSectorSize)*(atx_info[drive].density == atx_single ? 8 : 4)+2;
+			// We will need to circulate around the disk one more time if we are re-reading the just written sector	    
+			wait_from_stamp((au_one_sector_read + pTT + (pTT > 0 ? 0 : AU_FULL_ROTATION))*8);
+
+			if(*status)
+			{		    
+				// This is according to Altirra, but it breaks DjayBee's test J in 1050 mode?!
+				// wait_us(is1050 ? (US_TRACK_STEP_1050+US_HEAD_SETTLE_1050) : (AU_FULL_ROTATION*8));
+				// This is what seems to work:
+				wait_us(AU_FULL_ROTATION*8);
+			}
+		}
+		else
+		{
+			// No matching sector found at all or the track does not match the disk density
+			wait_from_stamp(is1050 ? US_2FAKE_ROT_1050 : US_3FAKE_ROT_810);
+			if(is1050 || retries == 2)
+			{
+				// Repositioning the head for the target track
+				if(!is1050)
+				{
+					wait_us((43+tgtTrackNumber)*US_TRACK_STEP_810+US_HEAD_SETTLE_810);
+				}
+				else if(tgtTrackNumber)
+				{
+					wait_us((2*tgtTrackNumber+1)*US_TRACK_STEP_1050+US_HEAD_SETTLE_1050);
+				}
+			}
+		}
+	
+		getCurrentHeadPosition();
+
+		if(!*status || r < 0)
+		{
+			break;
+		}	
+	}
+
+	*status &= ~(MASK_RESERVED | MASK_EXTENDED_DATA);
+
+	if (*status & MASK_FDC_DLOST)
+	{
+		if(is1050)
+		{
+			*status |= MASK_FDC_DRQ;
+		}
+		else
+		{
+			*status &= ~(MASK_FDC_DLOST | MASK_FDC_CRC);
+			*status |= MASK_FDC_BUSY;
+		}
+	}
+	if(!is1050 && (*status & MASK_FDC_REC))
+	{
+		*status |= MASK_FDC_WP;
+	}
+
+	if (tgtSectorOffset && !*status && r >= 0)
+	{
+		r = 0;
+	}
+
+	// if a weak offset is defined, randomize the appropriate data
+	if (weakOffset > -1)
+	{
+		for (i = (u16) weakOffset; i < atxSectorSize; i++)
+		{
+			atari_sector_buffer[i] = (u08) (rand() & 0xFF);
+		}
+	}
+
+	wait_from_stamp(is1050 ? US_CS_CALC_1050 : US_CS_CALC_810);
+	// There is no file reading since last time stamp, so the alternative
+	// below is probably equally good
+	//wait_us(is1050 ? US_CS_CALC_1050 : US_CS_CALC_810);
+
+	// the Atari expects an inverted FDC status byte
+	*status = ~(*status);
+
+	// return the number of bytes read
+	return r;
+}
+
+/*
 u16 incAngularDisplacement(u16 start, u16 delta) {
     // increment an angular position by a delta taking a full rotation into consideration
     u16 ret = start + delta;
@@ -297,3 +418,4 @@ u16 incAngularDisplacement(u16 start, u16 delta) {
     }
     return ret;
 }
+*/

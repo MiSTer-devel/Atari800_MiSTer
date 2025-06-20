@@ -219,7 +219,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X  XX XXXX       XXX  XXXXXXXXX
+// X  XXXXXXX       XXX  XXXXXXXXX    X
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -232,11 +232,13 @@ localparam CONF_STR = {
 	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
+	"o2,Clip Sides,Off,On;",
 	"d0OO,Vertical Crop,Disabled,216p(5x);",
 	"d0OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
 	"OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
 	"O34,Stereo mix,None,25%,50%,100%;",
+	"O5,Swap Joysticks 1&2,No,Yes;",
 	"O6,Mouse Y,Normal,Inverted;",
 	"-;",
 	"R0,Reset;",
@@ -248,13 +250,14 @@ localparam CONF_STR = {
 
 wire locked;
 wire clk_sys;
-wire clk_mem = clk_sys;
+wire clk_mem;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys),
+	.outclk_1(clk_mem),
 	.locked(locked)
 );
 
@@ -263,8 +266,12 @@ wire reset = RESET | status[0] | buttons[1];
 //////////////////   HPS I/O   ///////////////////
 wire [20:0] joy_0;
 wire [20:0] joy_1;
+wire [20:0] joy_2;
+wire [20:0] joy_3;
 wire [15:0] joya_0;
 wire [15:0] joya_1;
+wire [15:0] joya_2;
+wire [15:0] joya_3;
 wire  [1:0] buttons;
 wire [63:0] status;
 wire [24:0] ps2_mouse;
@@ -291,8 +298,12 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.joystick_0(joy_0),
 	.joystick_1(joy_1),
+	.joystick_2(joy_2),
+	.joystick_3(joy_3),
 	.joystick_l_analog_0(joya_0),
 	.joystick_l_analog_1(joya_1),
+	.joystick_l_analog_2(joya_2),
+	.joystick_l_analog_3(joya_3),
 
 	.buttons(buttons),
 	.status(status),
@@ -326,6 +337,8 @@ assign CLK_VIDEO = clk_sys;
 
 wire joy_d1ena = ~&joya_0;
 wire joy_d2ena = ~&joya_1;
+wire joy_d3ena = ~&joya_2;
+wire joy_d4ena = ~&joya_3;
 
 wire cpu_halt;
 
@@ -370,6 +383,7 @@ atari5200top atari5200top
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
 
+	.CLIP_SIDES(status[34]),
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
 
@@ -384,13 +398,19 @@ atari5200top atari5200top
 
 	.PS2_KEY(ps2_key),
 
-	.JOY1X(ax),
-	.JOY1Y(ay),
-	.JOY2X(joya_1[7:0]),
-	.JOY2Y(joya_1[15:8]),
+	.JOY1X(status[5] ? joya_1[7:0] : ax),
+	.JOY1Y(status[5] ? joya_1[15:8] : ay),
+	.JOY2X(status[5] ? ax : joya_1[7:0]),
+	.JOY2Y(status[5] ? ay : joya_1[15:8]),
+	.JOY3X(joya_2[7:0]),
+	.JOY3Y(joya_2[15:8]),
+	.JOY4X(joya_3[7:0]),
+	.JOY4Y(joya_3[15:8]),
 
-	.JOY1(j0    & {17'b11111111111111111, {4{joy_d1ena}}}),
-	.JOY2(joy_1 & {17'b11111111111111111, {4{joy_d2ena}}})
+	.JOY1((status[5] ? joy_1 : j0) & {17'b11111111111111111, {4{joy_d1ena}}}),
+	.JOY2((status[5] ? j0 : joy_1) & {17'b11111111111111111, {4{joy_d2ena}}}),
+	.JOY3(joy_2 & {17'b11111111111111111, {4{joy_d3ena}}}),
+	.JOY4(joy_3 & {17'b11111111111111111, {4{joy_d4ena}}})
 );
 
 altddio_out

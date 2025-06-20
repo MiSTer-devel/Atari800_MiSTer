@@ -58,7 +58,7 @@ void load_cartridge(int type)
 	
 			for (i=0; i!=0x2000; ++i) dest[i] = src[i];
 
-			*(unsigned char *)(0x10000 + SDRAM_BASE) = 0;
+			*(unsigned char *)(0x100000 + SDRAM_BASE) = 0;
 		}
 		break;
 	case 16: // 16k one chip
@@ -117,6 +117,20 @@ void load_cartridge(int type)
 			}
 		}
 		break;
+	case 71: case 72: case 73: case 74:
+		{
+			int fsize = files[4].size & 0xFFFF0000;
+			int i, j;
+			loadromfile(fsize, 0x4000);
+			unsigned char *src = (unsigned char *)(0x4000 + SDRAM_BASE);
+			for(i=0; i != (0x80000 / fsize - 1); i++)
+			{
+				unsigned char *dest = (unsigned char *)(0x4000 + (i+1)*fsize + SDRAM_BASE);
+				for(j=0; j != fsize; j++) dest[j] = src[j];
+			}
+			*(unsigned char *)(0x200000 + SDRAM_BASE) = 0;
+		}
+		break;
 	default:
 		{
 			clearscreen();
@@ -133,9 +147,13 @@ int select_cartridge()
 {
 	// work out the type
 	int type = -1;
-	int size = file_size(&files[4]);
+	int size = files[4].size;
 
-	if (size == 40960) type = 7;
+	if (size == 0x10000) type = 71;
+	else if (size == 0x20000) type = 72;
+	else if (size == 0x40000) type = 73;
+	else if (size == 0x80000) type = 74;
+	else if (size == 40960) type = 7;
 	else if (size == 32768) type = 4;
 	else if (size == 16384)
 	{
@@ -180,11 +198,11 @@ void actions()
 
 	if (get_hotkey_softboot())
 	{
-		reboot(0);	
+		reboot(0, 0);
 	}
 	else if (get_hotkey_coldboot())
 	{
-		reboot(1);	
+		reboot(1, 0);
 	}
 	
 	if (last_mount != mounted)
@@ -194,7 +212,7 @@ void actions()
 		set_pause_6502(1);
 		freeze();
 
-		set_sd_data_mode(1);
+		set_sd_data_mode_on();
 		files[4].size = *zpu_in3;
 		files[4].type = get_sd_filetype();
 		files[4].is_readonly = get_sd_readonly();
@@ -204,15 +222,14 @@ void actions()
 		select_cartridge();
 
 		restore();
-		reboot(1);	
+		reboot(1, 0);	
 	}
 }
 
 void mainloop()
 {
-	memset8(SRAM_BASE+0x4000, 0, 32768);
 	memset32(SDRAM_BASE+0x4000, 0, 32768/4);
 
-	reboot(1);
+	reboot(1, 0);
 	for (;;) actions();
 }

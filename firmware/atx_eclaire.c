@@ -3,7 +3,7 @@
 #include "regs.h"
 
 struct SimpleFile * gAtxFile;
-u16 last_angle_returned; // extern so we can display it on the screen
+// u16 last_angle_returned; // extern so we can display it on the screen
 
 extern unsigned char atari_sector_buffer[256];
 
@@ -24,6 +24,7 @@ void byteSwapAtxTrackHeader(struct atxTrackHeader * header)
     longbyteswap(&header->size); // used
     byteswap(&header->sectorCount); // used
     longbyteswap(&header->headerSize); // used
+    longbyteswap(&header->flags); // used
 }
 
 void byteSwapAtxSectorListHeader(struct atxSectorListHeader * header)
@@ -44,6 +45,7 @@ void byteSwapAtxTrackChunk(struct atxTrackChunk *header)
 }
 
 
+#if 0
 void waitForAngularPosition(u16 pos)
 {
     int where = getCurrentHeadPosition();
@@ -77,12 +79,14 @@ u16 getCurrentHeadPosition() {
     return res;
 }
 
+#endif
 
 int faccess_offset(int type, int offset, int bytes)
 {
 	int read = 0;
 
-    	*zpu_timer2_threshold = 208335;
+	// TODO This is probably not needed, at least not here!
+	//*zpu_timer2_threshold = 208335;
 
 	file_seek(gAtxFile,offset);
 	file_read(gAtxFile,&atari_sector_buffer[0],bytes,&read);

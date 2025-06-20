@@ -18,6 +18,8 @@ PORT
 	EN : IN STD_LOGIC;
 	WR_EN : IN STD_LOGIC;
 	
+	ENABLE_ORIG : IN STD_LOGIC;
+	
 	RESET_N : IN STD_LOGIC;
 	
 	CA1 : IN STD_LOGIC;
@@ -49,6 +51,15 @@ PORT
 END pia;
 
 ARCHITECTURE vhdl OF pia IS
+	component synchronizer IS
+	PORT 
+	( 
+		CLK : IN STD_LOGIC;
+		RAW : IN STD_LOGIC;
+		SYNC : OUT STD_LOGIC
+	);
+	END component;
+
 	COMPONENT complete_address_decoder IS
 	generic (width : natural := 1);
 	PORT 
@@ -86,6 +97,11 @@ ARCHITECTURE vhdl OF pia IS
 	signal irqa_reg : std_logic_vector(1 downto 0);
 	signal irqb_next : std_logic_vector(1 downto 0);
 	signal irqb_reg : std_logic_vector(1 downto 0);
+
+	signal CA1_SYNC : std_logic;
+	signal CA2_IN_SYNC : std_logic;
+	signal CB1_SYNC : std_logic;
+	signal CB2_IN_SYNC : std_logic;
 	
 	signal CA1_reg : std_logic;
 	signal CA2_reg : std_logic;
@@ -114,6 +130,15 @@ ARCHITECTURE vhdl OF pia IS
 	signal cb2_edge_reg : std_logic;
 	
 begin
+	ca1_synchronizer : synchronizer
+		port map (clk=>clk, raw=>CA1, sync=>CA1_SYNC);	
+	ca2_synchronizer : synchronizer
+		port map (clk=>clk, raw=>CA2_IN, sync=>CA2_IN_SYNC);	
+	cb1_synchronizer : synchronizer
+		port map (clk=>clk, raw=>CB1, sync=>CB1_SYNC);	
+	cb2_synchronizer : synchronizer
+		port map (clk=>clk, raw=>CB2_IN, sync=>CB2_IN_SYNC);	
+
 	-- register
 	process(clk,reset_n)
 	begin
@@ -159,10 +184,10 @@ begin
 			irqa_reg <= irqa_next;
 			irqb_reg <= irqb_next;
 	
-			CA1_reg	<= CA1;
-			CA2_reg	<= CA2_in;
-			CB1_reg	<= CB1;
-			CB2_reg	<= CB2_in;
+			CA1_reg	<= CA1_SYNC;
+			CA2_reg	<= CA2_in_SYNC;
+			CB1_reg	<= CB1_SYNC;
+			CB2_reg	<= CB2_in_SYNC;
 			
 			CA2_output_reg <= CA2_output_next;
 			CB2_output_reg <= CB2_output_next;
@@ -190,14 +215,14 @@ begin
 		porta_control_next(5 downto 0) <= porta_control_reg(5 downto 0);
 		portb_control_next(5 downto 0) <= portb_control_reg(5 downto 0);
 		
-		--write_ora <= '0';
+		write_ora <= '0';
 		write_orb <= '0';
 		
 		if (wr_en = '1') then
 			if(addr_decoded(0) = '1') then
 				if (porta_control_reg(2) = '1') then
 					porta_output_next <= cpu_data_in;
-					--write_ora <= '1';
+					write_ora <= '1';
 				else
 					porta_direction_next <= cpu_data_in;
 				end if;
@@ -250,11 +275,11 @@ begin
 			end if;
 
 			if (addr_decoded(2) = '1') then			
-				data_out <= irqa_reg(1)&(irqa_reg(0)and not(porta_control_reg(5)))&porta_control_reg;
+				data_out <= irqa_reg(1)&(irqa_reg(0) and not(porta_control_reg(5)))&porta_control_reg;
 			end if;
 
 			if (addr_decoded(3) = '1') then			
-				data_out <= irqb_reg(1)&(irqb_reg(0)and not(portb_control_reg(5)))&portb_control_reg;
+				data_out <= irqb_reg(1)&(irqb_reg(0) and not(portb_control_reg(5)))&portb_control_reg;
 			end if;
 		end if;
 		
@@ -262,35 +287,37 @@ begin
 	
 	-- irq handing
 	-- TODO REVIEW, this stuff is complicated! I think Atari does not need it anyway...
-	process (irqa_reg, porta_control_next, porta_control_reg, read_ora, write_ora, ca2_output_reg, CA1, CA1_reg, ca2_in, ca2_reg, ca1_edge_reg, ca2_edge_reg)
+	process (irqa_reg, porta_control_next, porta_control_reg, read_ora, write_ora, ca2_output_reg, CA1_SYNC, CA1_reg, ca2_in_SYNC, ca2_reg, ca1_edge_reg, ca2_edge_reg, ENABLE_ORIG)
+		variable irqa_next_proposed : std_logic_vector(1 downto 0);
 	begin
-		irqa_next(1) <= irqa_reg(1) and not(read_ora);
-		irqa_next(0) <= irqa_reg(0) and not(read_ora);
+		irqa_next_proposed(1) := irqa_reg(1) and not(read_ora);
+		irqa_next_proposed(0) := irqa_reg(0) and not(read_ora);
 				
 		ca2_output_next <= ca2_output_reg;
 
-		if (CA1 = '1' and CA1_reg = '0') then
-			irqa_next(1) <= ca1_edge_reg;
+		if (CA1_SYNC = '1' and CA1_reg = '0') then
+			irqa_next_proposed(1) := ca1_edge_reg or irqa_next_proposed(1);
 		end if;
-		if (CA1 = '0' and CA1_reg = '1') then
-			irqa_next(1) <= not(ca1_edge_reg);
-		end if;
-		
-		if (CA2_in = '1' and CA2_reg = '0') then
-			irqa_next(0) <= ca2_edge_reg;
+		if (CA1_SYNC = '0' and CA1_reg = '1') then
+			irqa_next_proposed(1) := not(ca1_edge_reg) or irqa_next_proposed(1);
 		end if;
 		
-		if (CA2_in = '0' and CA2_reg = '1') then
-			irqa_next(0) <= not(ca2_edge_reg);
-		end if;	
+		if (CA2_in_SYNC = '1' and CA2_reg = '0') then
+			irqa_next_proposed(0) := ca2_edge_reg or (irqa_next_proposed(0) and not(porta_control_reg(5)));
+		end if;
 		
-		ca1_edge_next <= porta_control_next(0); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
+		if (CA2_in_SYNC = '0' and CA2_reg = '1') then	
+			irqa_next_proposed(0) := not(ca2_edge_reg) or (irqa_next_proposed(0) and not(porta_control_reg(5)));
+		end if;
+		irqa_next <= irqa_next_proposed;
+		
+		ca1_edge_next <= porta_control_next(1); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
 		ca2_edge_next <= porta_control_next(4); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
 		
 		if (porta_control_next(5) = '0') then -- CA2 is an input					
 		else -- CA2 is an output
 			--irqa_next(0) <= '0';
-			
+						
 			case porta_control_next(4 downto 3) is
 				when "10" =>
 					ca2_output_next <= '0'; -- direct control
@@ -299,7 +326,7 @@ begin
 				when "01" =>
 					if (read_ora = '1') then
 						ca2_output_next <= '0';
-					else						
+					elsif (ENABLE_ORIG='1') then	
 						-- clock restore
 						ca2_output_next <= '1';
 					end if;
@@ -317,29 +344,32 @@ begin
 
 	end process;
 
-	process (irqb_reg, portb_control_next, portb_control_reg, read_orb, write_orb, cb2_output_reg, CB1, CB1_reg, cb2_in, cb2_reg, cb1_edge_reg, cb2_edge_reg)
+	process (irqb_reg, portb_control_next, portb_control_reg, read_orb, write_orb, cb2_output_reg, CB1_SYNC, CB1_reg, cb2_in_SYNC, cb2_reg, cb1_edge_reg, cb2_edge_reg,enable_orig)
+		variable irqb_next_proposed : std_logic_vector(1 downto 0);
 	begin
-		irqb_next(1) <= irqb_reg(1) and not(read_orb);
-		irqb_next(0) <= irqb_reg(0) and not(read_orb);
+		irqb_next_proposed(1) := irqb_reg(1) and not(read_orb);
+		irqb_next_proposed(0) := irqb_reg(0) and not(read_orb);
 				
 		cb2_output_next <= cb2_output_reg;
 
-		if (CB1 = '1' and CB1_reg = '0') then
-			irqb_next(1) <= cb1_edge_reg;
+		if (CB1_SYNC = '1' and CB1_reg = '0') then
+			irqb_next_proposed(1) := cb1_edge_reg or irqb_next_proposed(1);
 		end if;
-		if (CB1 = '0' and CB1_reg = '1') then
-			irqb_next(1) <= not(cb1_edge_reg);
+		if (CB1_SYNC = '0' and CB1_reg = '1') then
+			irqb_next_proposed(1) := not(cb1_edge_reg) or irqb_next_proposed(1);
+		end if;			
+		
+		if (CB2_in_SYNC = '1' and CB2_reg = '0') then
+			irqb_next_proposed(0) := cb2_edge_reg or (irqb_next_proposed(0) and not(portb_control_reg(5)));
 		end if;
 		
-		if (CB2_in = '1' and CB2_reg = '0') then
-			irqb_next(0) <= cb2_edge_reg;
-		end if;
-		
-		if (CB2_in = '0' and CB2_reg = '1') then
-			irqb_next(0) <= not(cb2_edge_reg);
-		end if;	
-		
-		cb1_edge_next <= portb_control_next(0); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
+		if (CB2_in_SYNC = '0' and CB2_reg = '1') then
+			irqb_next_proposed(0) := not(cb2_edge_reg) or (irqb_next_proposed(0) and not(portb_control_reg(5)));
+		end if;			
+
+		irqb_next <= irqb_next_proposed;
+
+		cb1_edge_next <= portb_control_next(1); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
 		cb2_edge_next <= portb_control_next(4); -- delay 1 cycle, so I am still set to detect falling edge on the rising edge
 		
 		if (portb_control_next(5) = '0') then -- CB2 is an input					
@@ -354,7 +384,7 @@ begin
 				when "01" =>
 					if (write_orb = '1') then
 						cb2_output_next <= '0';
-					else						
+					elsif (ENABLE_ORIG='1') then							
 						-- clock restore
 						cb2_output_next <= '1';
 					end if;
@@ -398,8 +428,8 @@ begin
 	portb_dir_out <= portb_direction_reg;
 	portb_input_next <= portb_in;
 	
-	irqa_n <= not(((irqa_reg(1) and porta_control_reg(0)) or (irqa_reg(0) and porta_control_reg(3))) and not(porta_control_reg(5)));
-	irqb_n <= not(((irqb_reg(1) and portb_control_reg(0)) or (irqb_reg(0) and portb_control_reg(3))) and not(portb_control_reg(5)));
+	irqa_n <= not((irqa_reg(1) and porta_control_reg(0)) or (irqa_reg(0) and porta_control_reg(3) and not(porta_control_reg(5))));
+	irqb_n <= not((irqb_reg(1) and portb_control_reg(0)) or (irqb_reg(0) and portb_control_reg(3) and not(portb_control_reg(5))));
 	
 end vhdl;
 

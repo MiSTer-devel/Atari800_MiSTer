@@ -10,8 +10,9 @@ USE ieee.std_logic_1164.all;
 
 ENTITY covox IS
 PORT 
-( 
+(
 	CLK : IN STD_LOGIC;
+	RESET_N : IN STD_LOGIC;
 	ADDR : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
 	DATA_IN : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 	WR_EN : IN STD_LOGIC;
@@ -74,9 +75,14 @@ BEGIN
 	end process;
 	
 	-- register
-	process(clk)
+	process(clk, reset_n)
 	begin
-		if (clk'event and clk='1') then
+		if reset_n = '0' then
+			channel0_reg <= (others => '0');
+			channel1_reg <= (others => '0');
+			channel2_reg <= (others => '0');
+			channel3_reg <= (others => '0');
+		elsif (clk'event and clk='1') then
 			channel0_reg <= channel0_next;
 			channel1_reg <= channel1_next;
 			channel2_reg <= channel2_next;

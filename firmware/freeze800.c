@@ -56,6 +56,9 @@ void freeze()
 		//antic
 		memcp8(custom_mirror,store_mem,0xd400,0x10);
 
+		//PBI ram and rom control
+		memcp8(custom_mirror,store_mem,0xd100,0x100);
+
 		// Write 0 to custom chip regs
 		memset8(atari_base+0xd000,0,0x20);
 		memset8(atari_base+0xd200,0,0x20);
@@ -106,25 +109,32 @@ void restore()
 		memcp8(store_mem,atari_base,0xd200,0x20);
 		// antic
 		memcp8(store_mem,atari_base,0xd400,0x10);
+
+		// PBI rom, order is important!
+		atari_base[0xd1ff] = store_mem[0xd1ff];
+		memcp8(store_mem,atari_base,0xd100,0xFF);
+		
 	}
 
 	*atari_portb = store_mem[0xd300];
 }
 
+#if 0
 void freeze_save(struct SimpleFile * file)
 {
-	if (file_size(file)>=65536 && file_readonly(file)==0)
+	if (file->size >= 65536 && !file->is_readonly)
 	{
 		int byteswritten = 0;
 		file_write(file,(void *)store_mem,65536,&byteswritten);
-		file_write_flush();
+		// file_write_flush();
 	}
 }
 void freeze_load(struct SimpleFile * file)
 {
-	if (file_size(file)>=65536)
+	if (file->size >= 65536)
 	{
 		int bytesread = 0;
 		file_read(file,(void *)store_mem,65536,&bytesread);
 	}
 }
+#endif

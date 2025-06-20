@@ -64,6 +64,7 @@ ARCHITECTURE vhdl OF sio_handler IS
 	signal addr_decoded : std_logic_vector(15 downto 0);
 
 	signal receive_enable : std_logic;
+	signal receive_detect : std_logic;
 	signal transmit_enable : std_logic;
 	
 	signal fifo_tx_write : std_logic;	
@@ -212,30 +213,32 @@ begin
 	end process;
 
 	-- Count command packets rather than storing command position in fifo
-	process(s2p_start,sio_command_reg,sio_command,sio_command_count_reg,sio_command_framing_error_reg,framing_error_clear)
+	process(s2p_start,fifo_tx_empty,sio_command_reg,sio_command,sio_command_count_reg,sio_command_framing_error_reg,framing_error_clear)
 	begin
 		sio_command_next <= sio_command;
 		sio_command_count_next <= sio_command_count_reg;
 		sio_command_framing_error_next <= sio_command_framing_error_reg;
 		sio_command_rising <= '0';
 
-		if (sio_command_reg='1') then -- not a command
-			sio_command_count_next <= (others=>'0');
-		end if;
-
-		if (s2p_start='1' and sio_command_reg='0') then
-			sio_command_count_next <= std_logic_vector(unsigned(sio_command_count_reg)+1);
-		end if;
-
-		if (sio_command_reg='0' and sio_command='1') then -- rising edge
-			sio_command_rising <= '1';
-			if (sio_command_count_reg /= "0000101") then 
-				sio_command_framing_error_next <= '1'; 
+		if (fifo_tx_empty = '1') then
+			if (sio_command_reg='1') then -- not a command
+				sio_command_count_next <= (others=>'0');
 			end if;
-		end if;
 
-		if (framing_error_clear='1') then
-			sio_command_framing_error_next <= '0';
+			if (s2p_start='1' and sio_command_reg='0') then
+				sio_command_count_next <= std_logic_vector(unsigned(sio_command_count_reg)+1);
+			end if;
+
+			if (sio_command_reg='0' and sio_command='1') then -- rising edge
+				sio_command_rising <= '1';
+				if (sio_command_count_reg /= "0000101") then 
+					sio_command_framing_error_next <= '1'; 
+				end if;
+			end if;
+
+			if (framing_error_clear='1') then
+				sio_command_framing_error_next <= '0';
+			end if;
 		end if;
 	end process;
 	
@@ -285,19 +288,19 @@ begin
 		end if;
 	end process;
 
-	process(sio_clk_out, sio_clk_out_reg)
+	process(fifo_tx_empty,sio_clk_out, sio_clk_out_reg)
 	begin
 		-- 0->1 pokey transmit
 		-- 1->0 receive...
 
 		receive_enable <= '0';
-		if (sio_clk_out_reg='1' and sio_clk_out='0') then
+		if (sio_clk_out_reg='1' and sio_clk_out='0' and fifo_tx_empty = '1') then
 			receive_enable <= '1';
 		end if;
 
 	end process;
 
-	process(pokey_enable,receive_enable,receive_divisor_reg,receive_divisor_count_reg)
+	process(pokey_enable,receive_enable,receive_detect,receive_divisor_reg,receive_divisor_count_reg)
 	begin
 		receive_divisor_next <= receive_divisor_reg;
 		receive_divisor_count_next <= receive_divisor_count_reg;
@@ -307,8 +310,11 @@ begin
 		end if;
 
 		if (receive_enable='1') then
-			receive_divisor_next <= receive_divisor_count_reg;
 			receive_divisor_count_next <= (others=>'0');
+		end if;
+
+		if (receive_enable='1' and receive_detect='1') then
+			receive_divisor_next <= receive_divisor_count_reg;
 		end if;
 
 	end process;
@@ -446,6 +452,7 @@ receive_fifo : entity work.fifo_receive
 
 		s2p_start <= '0';
 		s2p_write <= '0';
+		receive_detect <= '0';
 
 		if (framing_error_clear='1') then
 			s2p_framing_error_next <= '0';
@@ -461,10 +468,13 @@ receive_fifo : entity work.fifo_receive
 						s2p_start <= '1';
 					end if;
 				when S2P_STATE_SHIFT_0 =>
+					receive_detect <= '1';
 					s2p_state_next <= S2P_STATE_SHIFT_1;
 				when S2P_STATE_SHIFT_1 =>
+					receive_detect <= '1';
 					s2p_state_next <= S2P_STATE_SHIFT_2;
 				when S2P_STATE_SHIFT_2 =>
+					receive_detect <= '1';
 					s2p_state_next <= S2P_STATE_SHIFT_3;
 				when S2P_STATE_SHIFT_3 =>
 					s2p_state_next <= S2P_STATE_SHIFT_4;

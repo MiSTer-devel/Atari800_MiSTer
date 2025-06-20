@@ -16,8 +16,8 @@ static const int screen_address = 11328;
 #define zpu_out5 ((int volatile *)(14*4+zpu_regbase))
 #define zpu_out6 ((int volatile *)(15*4+zpu_regbase))
 
-#define zpu_pause ((int volatile *)(8*4+zpu_regbase))
-#define zpu_timer ((int volatile *)(8*4+zpu_regbase))
+#define zpu_pause ((u32 volatile *)(8*4+zpu_regbase))
+#define zpu_timer ((u32 volatile *)(8*4+zpu_regbase))
 
 #define zpu_spi_data ((int volatile *)(9*4+zpu_regbase))
 #define zpu_spi_state ((int volatile *)(10*4+zpu_regbase))
@@ -29,9 +29,9 @@ static const int screen_address = 11328;
 #define zpu_spi_dma ((int volatile *)(13*4+zpu_regbase))
 
 // read number of us
-#define zpu_timer2 ((int volatile *)(18*4+zpu_regbase))
+#define zpu_timer2 ((u32 volatile *)(18*4+zpu_regbase))
 // reset timer if > this many us (stored)
-#define zpu_timer2_threshold ((int volatile *)(18*4+zpu_regbase))
+#define zpu_timer2_threshold ((u32 volatile *)(18*4+zpu_regbase))
 
 // 8-bit random number lsfr
 #define zpu_rand ((int volatile *)(19*4+zpu_regbase))
@@ -57,6 +57,22 @@ static const int screen_address = 11328;
 #define atari_dmactl ((unsigned char volatile *)(0xd400 + atari_regbase))
 
 #define atari_cartswitch ((unsigned char volatile *)(0xd500 + atari_regbase))
+
+#define atari_coldst ((unsigned char volatile *)(0x244 + atari_regbase))
+#define atari_basicf ((unsigned char volatile *)(0x3F8 + atari_regbase))
+#define atari_gintlk ((unsigned char volatile *)(0x3FA + atari_regbase))
+#define atari_pupbt1 ((unsigned char volatile *)(0x33D + atari_regbase))
+#define atari_pupbt2 ((unsigned char volatile *)(0x33E + atari_regbase))
+#define atari_pupbt3 ((unsigned char volatile *)(0x33F + atari_regbase))
+#define atari_bootflag ((unsigned char volatile *)(0x09 + atari_regbase))
+#define atari_casinil ((unsigned char volatile *)(0x02 + atari_regbase))  
+#define atari_casinih ((unsigned char volatile *)(0x03 + atari_regbase))
+#define atari_dosvecl ((unsigned char volatile *)(0x0A + atari_regbase))  
+#define atari_dosvech ((unsigned char volatile *)(0x0B + atari_regbase))
+#define atari_runadl ((unsigned char volatile *)(0x2E0 + atari_regbase))  
+#define atari_runadh ((unsigned char volatile *)(0x2E1 + atari_regbase))
+#define atari_initadl ((unsigned char volatile *)(0x2E2 + atari_regbase))  
+#define atari_initadh ((unsigned char volatile *)(0x2E3 + atari_regbase))
 
 #ifdef FIRMWARE_5200
 // 5200: GTIA and POKEY are on different addresses

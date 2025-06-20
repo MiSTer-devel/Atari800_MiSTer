@@ -12,6 +12,7 @@ void actions();
 //-- 5 = framing error/clear (r)
 //		data_out(9 downto 0) <= fifo_rx_full&fifo_rx_empty&fifo_rx_count;
 
+/*
 void USART_Init( u08 value )
 {
 	// value is pokey div + 6
@@ -21,6 +22,7 @@ void USART_Init( u08 value )
 	val2=val2+1;
 	*zpu_uart_divisor = val2;
 }
+*/
 
 void USART_Transmit_Byte( unsigned char data )
 {
@@ -44,8 +46,9 @@ u32 USART_Receive_Byte( void )
 	return res;
 }
 
+/*
 int USART_Framing_Error()
 {
 	return *zpu_uart_framing_error;
 }
-
+*/
