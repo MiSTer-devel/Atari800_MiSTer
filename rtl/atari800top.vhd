@@ -70,9 +70,15 @@ PORT
 	JOY1Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2X      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY3X      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY3Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY4X      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY4Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
 	JOY1       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 	JOY2       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
+	JOY3       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
+	JOY4       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 
 	ROM_ADDR   : OUT STD_LOGIC_VECTOR(14 DOWNTO 0);
 	ROM_DO     : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -110,11 +116,17 @@ signal capsheld_reg : std_logic;
 
 signal JOY1_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
 signal JOY2_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
+signal JOY3_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
+signal JOY4_n :  STD_LOGIC_VECTOR(4 DOWNTO 0);
 signal JOY    :  STD_LOGIC_VECTOR(13 DOWNTO 0);
 signal JOY1_X :  STD_LOGIC_VECTOR(7 downto 0);
 signal JOY2_X :  STD_LOGIC_VECTOR(7 downto 0);
+signal JOY3_X :  STD_LOGIC_VECTOR(7 downto 0);
+signal JOY4_X :  STD_LOGIC_VECTOR(7 downto 0);
 signal JOY1_Y :  STD_LOGIC_VECTOR(7 downto 0);
 signal JOY2_Y :  STD_LOGIC_VECTOR(7 downto 0);
+signal JOY3_Y :  STD_LOGIC_VECTOR(7 downto 0);
+signal JOY4_Y :  STD_LOGIC_VECTOR(7 downto 0);
 
 SIGNAL KEYBOARD_RESPONSE :  STD_LOGIC_VECTOR(1 DOWNTO 0);
 SIGNAL KEYBOARD_SCAN :  STD_LOGIC_VECTOR(5 DOWNTO 0);
@@ -182,6 +194,8 @@ signal freezer_activate: std_logic;
 -- paddles
 signal paddle_1 : std_logic_vector(2 downto 0);
 signal paddle_2 : std_logic_vector(2 downto 0);
+signal paddle_3 : std_logic_vector(2 downto 0);
+signal paddle_4 : std_logic_vector(2 downto 0);
 
 signal areset_n   : std_logic;
 signal option_tmp : std_logic;
@@ -204,6 +218,8 @@ begin
 		if (old_reset = '1' and areset_n = '0') then
 			paddle_1 <= "000";
 			paddle_2 <= "000";
+			paddle_3 <= "000";
+			paddle_4 <= "000";
 			cnt := 0;
 			option_tmp <= '0';
 			warm_reset_request <= '0';
@@ -218,7 +234,17 @@ begin
 			if JOY2(5) = '1'             then paddle_2(1) <= '1';   end if;
 			if JOY2(6) = '1'             then paddle_2(2) <= '1';   end if;
 			if JOY2(8 downto 7) /= "00"  then paddle_2    <= "001"; end if;
-			
+
+			if JOY3(6 downto 4) /= "000" then paddle_3(0) <= '0';   end if;
+			if JOY3(5) = '1'             then paddle_3(1) <= '1';   end if;
+			if JOY3(6) = '1'             then paddle_3(2) <= '1';   end if;
+			if JOY3(8 downto 7) /= "00"  then paddle_3    <= "001"; end if;
+
+			if JOY4(6 downto 4) /= "000" then paddle_4(0) <= '0';   end if;
+			if JOY4(5) = '1'             then paddle_4(1) <= '1';   end if;
+			if JOY4(6) = '1'             then paddle_4(2) <= '1';   end if;
+			if JOY4(8 downto 7) /= "00"  then paddle_4    <= "001"; end if;
+
 			if cnt < 150000000 then
 				cnt := cnt + 1;
 				option_tmp <= option_tmp or option_force or JOY(5);
@@ -240,6 +266,14 @@ JOY1_Y <= JOY1Y when paddle_1(0) = '1' else X"80" when (paddle_1(2) = '0' or JOY
 JOY2_n <= '1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
 JOY2_X <= JOY2X when paddle_2(0) = '1' else X"80" when (paddle_2(1) = '0' or JOY2(5) = '1') else X"70";
 JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"80" when (paddle_2(2) = '0' or JOY2(6) = '1') else X"70";
+
+JOY3_n <= '1'&not(JOY3(8)&JOY3(7))&"11" when paddle_3(0) = '1' else not(JOY3(4)&JOY3(0)&JOY3(1)&JOY3(2)&JOY3(3)); --FRLDU
+JOY3_X <= JOY3X when paddle_3(0) = '1' else X"80" when (paddle_3(1) = '0' or JOY3(5) = '1') else X"70";
+JOY3_Y <= JOY3Y when paddle_3(0) = '1' else X"80" when (paddle_3(2) = '0' or JOY3(6) = '1') else X"70";
+
+JOY4_n <= '1'&not(JOY4(8)&JOY4(7))&"11" when paddle_4(0) = '1' else not(JOY4(4)&JOY4(0)&JOY4(1)&JOY4(2)&JOY4(3)); --FRLDU
+JOY4_X <= JOY4X when paddle_4(0) = '1' else X"80" when (paddle_4(1) = '0' or JOY4(5) = '1') else X"70";
+JOY4_Y <= JOY4Y when paddle_4(0) = '1' else X"80" when (paddle_4(2) = '0' or JOY4(6) = '1') else X"70";
 
 -- PS2 to pokey
 keyboard_map1 : entity work.ps2_to_atari800
@@ -299,11 +333,17 @@ PORT MAP
 
 	JOY1_n => JOY1_n,
 	JOY2_n => JOY2_n,
+	JOY3_n => JOY3_n,
+	JOY4_n => JOY4_n,
 
 	PADDLE0 => signed(JOY1_X),
 	PADDLE1 => signed(JOY1_Y),
 	PADDLE2 => signed(JOY2_X),
 	PADDLE3 => signed(JOY2_Y),
+	PADDLE4 => signed(JOY3_X),
+	PADDLE5 => signed(JOY3_Y),
+	PADDLE6 => signed(JOY4_X),
+	PADDLE7 => signed(JOY4_Y),
 
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
@@ -407,7 +447,7 @@ PORT MAP
 	reset_client_n => SDRAM_RESET_N
 );
 
-joy <= joy1 or joy2;
+joy <= joy1 or joy2 or joy3 or joy4;
 
 ROM_ADDR <= SDRAM_ADDR(14 downto 0);
 RAM_DATA <= x"FFFFFF"&ROM_DO when SDRAM_ADDR(22 downto 15) = "10000010" else

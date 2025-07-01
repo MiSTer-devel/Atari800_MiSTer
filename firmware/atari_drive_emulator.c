@@ -698,11 +698,13 @@ void handleDeviceInfo(struct command command, int driveNumber, struct SimpleFile
 	}
 }
 
+/*
 void handleDeviceStatus(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
 	memset8(action->sector_buffer, 0, action->bytes);
 	action->sector_buffer[0x0C] = 0x3F;
 }
+*/
 
 void handleGetStatus(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
 {
@@ -1049,10 +1051,12 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 		if(pbi && dstats == 0x40)
 			res = &handleDeviceInfo;
 		break;
+/*
 	case 0xEC: // PBI device status
 		if(pbi && dstats == 0x40)
 			res = &handleDeviceStatus;
 		break;
+*/
 	}
 
 	return res;
