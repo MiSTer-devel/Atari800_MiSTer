@@ -146,8 +146,8 @@ begin
 		if rising_edge(CLK) then
 			tick_us <= '0';
 			CLK_SUM := CLK_SUM + 1000000;
-			if CLK_SUM >= 57272728 then
-				CLK_SUM := CLK_SUM - 57272728;
+			if CLK_SUM >= 28636364 then
+				CLK_SUM := CLK_SUM - 28636364;
 				tick_us <= '1';
 			end if;
 		end if;
