@@ -184,6 +184,7 @@ begin
 access_8xxx <= ( s4_n = '0');
 access_axxx <= ( s5_n = '0');
 
+passthru <= cart_passthru;
 -- pass through s4/s5 if cart mode is off
 --set_passthrough: process(s4_n, s5_n, cart_mode)
 --begin
@@ -196,17 +197,9 @@ access_axxx <= ( s5_n = '0');
 --	end if;
 --end process set_passthrough;
 
-deinterleave_data: process(int_d_in, cart_mode)
-begin
-	case cart_mode is
-	when cart_mode_atrax_int_128 =>
-		int_d_out <= int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5);
-	when cart_mode_atrax_sdx_64 | cart_mode_atrax_sdx_128 =>
-		int_d_out <= int_d_in(2) & int_d_in(3) & int_d_in(6) & int_d_in(7) & int_d_in(1) & int_d_in(5) & int_d_in(0) & int_d_in(4);
-	when others =>
-		int_d_out <= int_d_in;
-	end case;
-end process deinterleave_data;
+int_d_out <= int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5) when cart_mode = cart_mode_atrax_int_128 else
+	     int_d_in(2) & int_d_in(3) & int_d_in(6) & int_d_in(7) & int_d_in(1) & int_d_in(5) & int_d_in(0) & int_d_in(4) when (cart_mode = cart_mode_atrax_sdx_64) or (cart_mode = cart_mode_atrax_sdx_128) else
+	     int_d_in;
 
 -- remember previous cartridge mode
 set_cart_mode_prev: process(clk)
@@ -228,9 +221,9 @@ end process generate_reset;
 
 -- read back config registers
 config_io: process(a, rw, cctl_n,
-	cfg_bank,
+	cfg_bank,cfg_enable,
 	cart_mode,
-	cart_8xxx_enable, cart_axxx_enable)
+	cart_8xxx_enable, cart_axxx_enable,cart_passthru)
 begin
 	cctl_dout_enable <= "000";
 	cctl_dout <= x"ff";
@@ -368,7 +361,7 @@ begin
 								mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
 								-- try to imitate the SRAM
 								if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
-									cart_write_enable <= '1';  
+									cart_write_enable <= '1';
 								end if;
 							end if;
 						end if;
@@ -606,13 +599,12 @@ access_cart_data: process(a, rw, access_8xxx, access_axxx,
 	cart_mode,
 	oss_bank,
 	cart_8xxx_enable, cart_axxx_enable,
-	cart_passthru,
+	disable_rom,mirror_8a,bb_bank_8x,bb_bank_9x,cart_write_enable,
 	master)
 
 variable bool_rd4: boolean;
 variable bool_rd5: boolean;
 begin
-	passthru <= '0';
 	cart_address <= cfg_bank & a(12 downto 0);
 	
 	if (cart_mode = cart_mode_atrax_int_128) then
@@ -772,10 +764,6 @@ begin
 	-- disable writes
 	if  (rw = '0' and cart_write_enable = '0') then
 		cart_address_enable <= false;
-	end if;
-	
-	if cart_passthru = '1' then
-		passthru <= '1';
 	end if;
 
 end process access_cart_data;
