@@ -452,11 +452,19 @@ BEGIN
 		data_out_enable => emu_pbi_data_out_enable
 	);	
 
-	process(emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n)
+	process(clk,emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
+		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
 	begin
+		emu_cart1_int_d_in <= (others => '0');
+		emu_cart2_int_d_in <= (others => '0');
+		emu_cart1_s4_n <= '1';
+		emu_cart1_s5_n <= '1';
+		emu_cart2_s4_n <= '1';
+		emu_cart2_s5_n <= '1';
+		--if rising_edge(clk) then
 		if atari800mode = '1' then
 			emu_cart1_s5_n <= emu_cart_s5_n;
-			emu_cart2_s5_n <= '1';
+			--emu_cart2_s5_n <= '1';
 			emu_cart1_s4_n <= emu_cart_s4_n;
 			emu_cart2_s4_n <= emu_cart_s4_n;
 			emu_cart_rd5 <= emu_cart1_rd5;
@@ -465,6 +473,7 @@ BEGIN
 			emu_cart_address <= emu_cart1_address;
 			emu_cart_address_enable <= emu_cart1_address_enable;
 			emu_cart1_int_d_in <= emu_cart_int_d_in;
+			--emu_cart2_int_d_in <= (others => '0');
 			emu_cart_int_d_out <= emu_cart1_int_d_out;
 			-- if the second/right cart is mounted line 4 reqests are its responsibility
 			if (cart2_select(7 downto 0) /= "00000000") then
@@ -475,11 +484,14 @@ BEGIN
 			if ((cart2_select(7 downto 0) /= "00000000") and (emu_cart_s4_n = '0')) then
 				emu_cart_address <= emu_cart2_address;
 				emu_cart_address_enable <= emu_cart2_address_enable;
+				--emu_cart1_int_d_in <= (others => '0');
 				emu_cart2_int_d_in <= emu_cart_int_d_in;
 				emu_cart_int_d_out <= emu_cart2_int_d_out;
 			end if;
 		else
 			if emu_cart_passthru = '1' then
+				--emu_cart1_s4_n <= '1';
+				--emu_cart1_s5_n <= '1';
 				emu_cart2_s4_n <= emu_cart_s4_n;
 				emu_cart2_s5_n <= emu_cart_s5_n;
 				emu_cart_rd4 <= emu_cart2_rd4;
@@ -488,11 +500,14 @@ BEGIN
 				emu_cart_address_enable <= emu_cart2_address_enable;
 				emu_cart_cctl_dout <= emu_cart2_cctl_dout;
 				emu_cart_cctl_dout_enable <= emu_cart2_cctl_dout_enable;
+				--emu_cart1_int_d_in <= (others => '0');
 				emu_cart2_int_d_in <= emu_cart_int_d_in;
 				emu_cart_int_d_out <= emu_cart2_int_d_out;
 			else
 				emu_cart1_s4_n <= emu_cart_s4_n;
 				emu_cart1_s5_n <= emu_cart_s5_n;
+				--emu_cart2_s4_n <= '1';
+				--emu_cart2_s5_n <= '1';
 				emu_cart_rd4 <= emu_cart1_rd4;
 				emu_cart_rd5 <= emu_cart1_rd5;
 				emu_cart_address <= emu_cart1_address;
@@ -500,12 +515,14 @@ BEGIN
 				emu_cart_cctl_dout <= emu_cart1_cctl_dout;
 				emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
 				emu_cart1_int_d_in <= emu_cart_int_d_in;
+				--emu_cart2_int_d_in <= (others => '0');
 				emu_cart_int_d_out <= emu_cart1_int_d_out;
 			end if;
 		end if;
+		--end if;
 	end process;
-	
-	process(cart_select,atari800mode)
+
+	process(cart_select,cart2_select,atari800mode)
 	begin
 		if (cart_select(7 downto 0) = "00000000") and ((atari800mode = '0') or (cart2_select(7 downto 0) = "00000000")) then
 			emu_cart_enable <= '0';
@@ -711,7 +728,7 @@ BEGIN
 	extended_access_cpu <= (extended_access_addr and cpu_fetch_real_next and not(portb(4)));
 	extended_access_either <= extended_access_addr and not(portb(4));
 	
-	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode)
+	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode,axlon_bank_reg)
 	begin	
 		extended_bank <= "0000000"&addr_next(15 downto 14);
 		extended_self_test <= '1';
@@ -852,6 +869,7 @@ end generate;
 		ram_c000,
 		has_ram,
 		axlon_bank_reg,
+		atari_dma_access,
 
 		-- cart stuff
 		emu_cart_rd4,emu_cart_rd5,
@@ -859,6 +877,8 @@ end generate;
 		emu_cart_enable,
 		emu_cart_address, emu_cart_address_enable,
 		emu_cart_cctl_dout, emu_cart_cctl_dout_enable,
+		emu_cart_int_d_out,
+		emu_cart_rtc_mode,
 
 		-- pbi emu
 		emu_pbi_enable,
@@ -1175,7 +1195,7 @@ end generate;
 						-- remap to SDRAM
 						if (emu_cart_address_enable) then
 							SDRAM_ADDR <= SDRAM_CART_ADDR;
-							emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
+							-- emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
 							MEMORY_DATA_INT(7 downto 0) <= emu_cart_int_d_out;
 							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;
@@ -1574,6 +1594,7 @@ end generate;
 		
 	end process;
 
+	emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
 	state_reg_out <= state_reg;
 	memory_data <= MEMORY_DATA_INT;
 END vhdl;
