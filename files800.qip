@@ -1,4 +1,3 @@
-set_global_assignment -name QIP_FILE rtl/t65/t65.qip
 set_global_assignment -name VHDL_FILE rtl/common/a8core/atari800core.vhd
 set_global_assignment -name VHDL_FILE rtl/common/a8core/atari800core_simple_sdram.vhd
 set_global_assignment -name VHDL_FILE rtl/common/a8core/internalromram.vhd
