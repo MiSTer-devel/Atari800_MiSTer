@@ -291,6 +291,7 @@ localparam CONF_STR = {
 wire locked;
 wire clk_sys;
 wire clk_mem;
+wire clk_vdo;
 
 pll pll
 (
@@ -298,6 +299,7 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_mem),
+	.outclk_2(clk_vdo),
 	.locked(locked)
 );
 
@@ -307,7 +309,7 @@ reg initReset_n = 0;
 always @(posedge clk_sys) begin
 	integer timeout = 0;
 	
-	if(timeout < 5000000) timeout <= timeout + 1;
+	if(timeout < 2500000) timeout <= timeout + 1;
 	else initReset_n <= 1;
 end
 
@@ -392,7 +394,7 @@ wire HBlank,VBlank,HBlank_o,VBlank_o;
 wire VSync, HSync, VSync_o, HSync_o;
 wire ce_pix;
 
-assign CLK_VIDEO = clk_sys;
+assign CLK_VIDEO = clk_vdo;
 
 wire cpu_halt;
 
