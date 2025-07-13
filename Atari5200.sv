@@ -253,6 +253,7 @@ localparam CONF_STR = {
 wire locked;
 wire clk_sys;
 wire clk_mem;
+wire clk_vdo;
 
 pll pll
 (
@@ -260,6 +261,7 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_mem),
+	.outclk_2(clk_vdo),
 	.locked(locked)
 );
 
@@ -335,7 +337,7 @@ wire HBlank,VBlank;
 wire VSync, HSync;
 wire ce_pix;
 
-assign CLK_VIDEO = clk_sys;
+assign CLK_VIDEO = clk_vdo;
 
 wire joy_d1ena = ~&joya_0;
 wire joy_d2ena = ~&joya_1;

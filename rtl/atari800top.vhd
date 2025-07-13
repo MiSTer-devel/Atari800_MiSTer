@@ -245,7 +245,7 @@ begin
 			if JOY4(6) = '1'             then paddle_4(2) <= '1';   end if;
 			if JOY4(8 downto 7) /= "00"  then paddle_4    <= "001"; end if;
 
-			if cnt < 150000000 then
+			if cnt < 75000000 then
 				cnt := cnt + 1;
 				option_tmp <= option_tmp or option_force or JOY(5);
 			else
