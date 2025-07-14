@@ -55,7 +55,7 @@ begin
 pbi_rom_address <= pbi_rom_bank & a(10 downto 0);
 pbi_rom_address_enable <= d8xx and rw and pbi_rom_enable;
 
-process(a, rw, d1xx, pbi_rom_enable, pbi_ram)
+process(a, rw, d1xx, pbi_rom_enable, pbi_rom_bank, pbi_ram)
 begin
 	data_out_enable <= pbi_rom_enable;
 	data_out <= x"ff";

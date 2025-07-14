@@ -245,7 +245,7 @@ begin
 			if JOY4(6) = '1'             then paddle_4(2) <= '1';   end if;
 			if JOY4(8 downto 7) /= "00"  then paddle_4    <= "001"; end if;
 
-			if cnt < 150000000 then
+			if cnt < 75000000 then
 				cnt := cnt + 1;
 				option_tmp <= option_tmp or option_force or JOY(5);
 			else
@@ -303,7 +303,7 @@ PORT MAP
 atarixl_simple_sdram1 : entity work.atari800core_simple_sdram
 GENERIC MAP
 (
-	cycle_length => 32,
+	cycle_length => 16,
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
@@ -531,7 +531,7 @@ port map
 );
 
 enable_179_clock_div_zpu_pokey : entity work.enable_divider
-	generic map (COUNT=>32) -- cycle_length
+	generic map (COUNT=>16) -- cycle_length
 	port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>zpu_pokey_enable);
 
 END vhdl;

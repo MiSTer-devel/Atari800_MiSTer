@@ -156,7 +156,7 @@ process(clk)
 begin
 	if rising_edge(clk) then
 		seconds_tick <= '0';
-		if clk_counter = 57272728 then
+		if clk_counter = 28636364 then
 			seconds_tick <= '1';
 			clk_counter := 0;
 		else

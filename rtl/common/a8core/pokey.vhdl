@@ -798,7 +798,7 @@ BEGIN
 	end process;
 	
 	-- Read from registers
-	process(addr_decoded,kbcode,RAND_OUT,IRQST_REG,key_held,shift_held,sio_in_reg,serin_reg,keyboard_overrun_reg, serial_ip_framing_reg, serial_ip_overrun_reg, waiting_for_start_bit, pot_in, pot0_reg, pot1_reg, pot2_reg, pot3_reg, pot4_reg, pot5_reg, pot6_reg, pot7_reg, allpot_reg)
+	process(addr_decoded,kbcode,RAND_OUT,IRQST_REG,key_held,shift_held,sio_in_reg,serin_reg,keyboard_overrun_reg, serial_ip_framing_reg, serial_ip_overrun_reg, waiting_for_start_bit, pot_in, pot0_reg, pot1_reg, pot2_reg, pot3_reg, pot4_reg, pot5_reg, pot6_reg, pot7_reg, allpot_reg, serout_active_next)
 	begin
 		data_out <= X"FF";
 
