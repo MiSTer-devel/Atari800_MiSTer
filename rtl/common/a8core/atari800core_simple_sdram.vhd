@@ -74,10 +74,16 @@ ENTITY atari800core_simple_sdram is
 		-- JOYSTICK
 		JOY1_n : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
 		JOY2_n : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
+		JOY3_n : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
+		JOY4_n : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
 		PADDLE0 : IN signed(7 downto 0) := to_signed(-128,8);
 		PADDLE1 : IN signed(7 downto 0) := to_signed(-128,8);
 		PADDLE2 : IN signed(7 downto 0) := to_signed(-128,8);
 		PADDLE3 : IN signed(7 downto 0) := to_signed(-128,8);
+		PADDLE4 : IN signed(7 downto 0) := to_signed(-128,8);
+		PADDLE5 : IN signed(7 downto 0) := to_signed(-128,8);
+		PADDLE6 : IN signed(7 downto 0) := to_signed(-128,8);
+		PADDLE7 : IN signed(7 downto 0) := to_signed(-128,8);
 
 		-- Pokey keyboard matrix
 		-- Standard component available to connect this to PS2
@@ -154,9 +160,16 @@ ENTITY atari800core_simple_sdram is
 		-- Special config params
 		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
+		EXT_ANTIC : in STD_LOGIC;
+		CLIP_SIDES : in STD_LOGIC;
+		RESET_RNMI : in STD_LOGIC;
+		ATARI800MODE : in STD_LOGIC := '0';
+		PBI_ROM_MODE : in STD_LOGIC := '0';
+		RTC : in std_logic_vector(64 downto 0);
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
-		emulated_cartridge_select: in std_logic_vector(5 downto 0);
+		emulated_cartridge_select: in std_logic_vector(7 downto 0);
+		emulated_cartridge2_select: in std_logic_vector(7 downto 0);
 		freezer_enable: in std_logic := '0';
 		freezer_activate: in std_logic := '0'
 	);
@@ -177,8 +190,8 @@ ARCHITECTURE vhdl OF atari800core_simple_sdram IS
 	SIGNAL	PORTA_DIR_OUT :  STD_LOGIC_VECTOR(7 DOWNTO 0);
 	SIGNAL	PORTB_IN :  STD_LOGIC_VECTOR(7 DOWNTO 0);
 	SIGNAL	PORTB_OUT :  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	--SIGNAL	PORTB_DIR_OUT :  STD_LOGIC_VECTOR(7 DOWNTO 0);
-	
+	SIGNAL	PORTB_DIR_OUT :  STD_LOGIC_VECTOR(7 DOWNTO 0);
+		
 	-- GTIA
 	signal GTIA_TRIG : std_logic_vector(3 downto 0);
 	
@@ -207,6 +220,7 @@ ARCHITECTURE vhdl OF atari800core_simple_sdram IS
 	-- POTS
 	SIGNAL POT_RESET : STD_LOGIC;
 	SIGNAL POT_IN : STD_LOGIC_VECTOR(7 downto 0);
+	SIGNAL POT_IN_EXT : STD_LOGIC_VECTOR(3 downto 0);
 
 BEGIN
 
@@ -216,15 +230,16 @@ CB1_IN <= SIO_IRQ;
 CA2_IN <= CA2_OUT when CA2_DIR_OUT='1' else '1';
 CB2_IN <= CB2_OUT when CB2_DIR_OUT='1' else '1';
 SIO_COMMAND <= CB2_OUT;
-SIO_MOTOR <= CA2_OUT;
-PORTA_IN <= ((JOY2_n(3)&JOY2_n(2)&JOY2_n(1)&JOY2_n(0)&JOY1_n(3)&JOY1_n(2)&JOY1_n(1)&JOY1_n(0)) and not (porta_dir_out)) or (porta_dir_out and porta_out);
-PORTB_IN <= PORTB_OUT;
+SIO_MOTOR <= not(CA2_OUT);
+
+PORTA_IN <= (not(PORTA_DIR_OUT) or PORTA_OUT) and (JOY2_n(3)&JOY2_n(2)&JOY2_n(1)&JOY2_n(0)&JOY1_n(3)&JOY1_n(2)&JOY1_n(1)&JOY1_n(0));
+PORTB_IN <= PORTB_OUT when atari800mode = '0' else (not(PORTB_DIR_OUT) or PORTB_OUT) and (JOY4_n(3)&JOY4_n(2)&JOY4_n(1)&JOY4_n(0)&JOY3_n(3)&JOY3_n(2)&JOY3_n(1)&JOY3_n(0));
 
 -- ANTIC lightpen
 ANTIC_LIGHTPEN <= JOY2_n(4) and JOY1_n(4);
 
 -- GTIA triggers
-GTIA_TRIG <= "11"&JOY2_n(4)&JOY1_n(4);
+GTIA_TRIG <= "11"&JOY2_n(4)&JOY1_n(4) when atari800mode = '0' else JOY4_n(4)&JOY3_n(4)&JOY2_n(4)&JOY1_n(4);
 
 -- Since we're not exposing PBI, expose a few key parts needed for SDRAM
 SDRAM_DI <= PBI_WRITE_DATA;
@@ -293,7 +308,72 @@ PORT MAP
 	POS => PADDLE3,
 	POT_HIGH => POT_IN(3)
 );
-POT_IN(7 downto 4) <= (others=>'0');
+
+pot4 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE4,
+	POT_HIGH => POT_IN_EXT(0)
+);
+
+pot5 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE5,
+	POT_HIGH => POT_IN_EXT(1)
+);
+
+pot6 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE6,
+	POT_HIGH => POT_IN_EXT(2)
+);
+
+pot7 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	reverse => 1
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => '1',
+	POT_RESET => POT_RESET,
+	POS => PADDLE7,
+	POT_HIGH => POT_IN_EXT(3)
+);
+
+POT_IN(7 downto 4) <= (others=>'0') when atari800mode = '0' else POT_IN_EXT;
 
 -- Internal rom/ram
 internalromram1 : entity work.internalromram
@@ -371,7 +451,7 @@ PORT MAP
 	PORTA_DIR_OUT => PORTA_DIR_OUT,
 	PORTA_OUT => PORTA_OUT,
 	PORTB_IN => PORTB_IN,
-	PORTB_DIR_OUT => open,--PORTB_DIR_OUT,
+	PORTB_DIR_OUT => PORTB_DIR_OUT,
 	PORTB_OUT => PORTB_OUT,
 
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
@@ -412,6 +492,7 @@ PORT MAP
 	
 	ANTIC_LIGHTPEN => ANTIC_LIGHTPEN,
 	ANTIC_REFRESH => SDRAM_REFRESH,
+	ANTIC_RNMI_N => not(RESET_RNMI),
 
 	SDRAM_REQUEST => SDRAM_REQUEST,
 	SDRAM_REQUEST_COMPLETE => SDRAM_REQUEST_COMPLETE,
@@ -443,7 +524,13 @@ PORT MAP
 
 	RAM_SELECT => RAM_SELECT,
 	CART_EMULATION_SELECT => emulated_cartridge_select,
+	CART2_EMULATION_SELECT => emulated_cartridge2_select,
 	PAL => PAL,
+	EXT_ANTIC => EXT_ANTIC,
+	CLIP_SIDES => CLIP_SIDES,
+	ATARI800MODE => ATARI800MODE,
+	PBI_ROM_MODE => PBI_ROM_MODE,
+	RTC => RTC,
 	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT,

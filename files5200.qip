@@ -1,4 +1,3 @@
-set_global_assignment -name QIP_FILE rtl/t65/t65.qip
 set_global_assignment -name VHDL_FILE rtl/common/a8core/atari5200core.vhd
 set_global_assignment -name VHDL_FILE rtl/common/a8core/atari5200core_simplesdram.vhd
 set_global_assignment -name VHDL_FILE rtl/common/a8core/internalromram.vhd
@@ -17,6 +16,7 @@ set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia_palette.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia_player.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia_priority.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/irq_glue.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pbi_rom.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pia.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_countdown_timer.vhdl

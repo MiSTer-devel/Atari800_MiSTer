@@ -17,6 +17,6 @@ void freeze();
 void restore();
 
 // Store system ram to a file for debugging (base 64k only)
-void freeze_save(struct SimpleFile * file);
-void freeze_load(struct SimpleFile * file);
+//void freeze_save(struct SimpleFile * file);
+//void freeze_load(struct SimpleFile * file);
 

@@ -190,14 +190,19 @@ ENTITY atari800core IS
    		RAM_SELECT : in std_logic_vector(2 downto 0); 
 			-- XL/XE mode  : 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 			-- 400/800 mode: 16K,32K,48K,52K,...? 
-		CART_EMULATION_SELECT : in std_logic_vector(5 downto 0);
+		CART_EMULATION_SELECT : in std_logic_vector(7 downto 0);
+		CART2_EMULATION_SELECT : in std_logic_vector(7 downto 0);
 		PAL :  in STD_LOGIC;
+		EXT_ANTIC :  in STD_LOGIC;
+		CLIP_SIDES : in STD_LOGIC;
 		ROM_IN_RAM : in std_logic;
 		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0);
 		HALT : in std_logic;
 		freezer_enable: in std_logic;
 		freezer_activate: in std_logic;
 		ATARI800MODE : in std_logic := '0';
+		PBI_ROM_MODE : in std_logic := '0';
+		RTC : IN STD_LOGIC_VECTOR(64 DOWNTO 0);
 
 		-- debugging
 		freezer_state_out: out std_logic_vector(2 downto 0);
@@ -308,6 +313,10 @@ SIGNAL	PIA_WRITE_ENABLE :  STD_LOGIC;
 SIGNAL PORTB_OUT_INT : STD_LOGIC_VECTOR(7 downto 0);
 SIGNAL PORTB_OPTIONS : STD_LOGIC_VECTOR(7 downto 0);
 
+-- ULTIME EMU
+SIGNAL	ULTIME_DO : STD_LOGIC_VECTOR(7 downto 0);
+SIGNAL	ULTIME_WRITE_ENABLE : STD_LOGIC;
+
 -- PBI
 SIGNAL PBI_ADDR_INT : std_logic_vector(15 downto 0);
 
@@ -362,6 +371,7 @@ PORT MAP(CLK => CLK,
 		 MEMORY_READY_CPU => MEMORY_READY_CPU,
 		 ANTIC_ENABLE_179 => ANTIC_ENABLE_179,
 		 PAL => PAL,
+		 EXT_ANTIC => EXT_ANTIC,
 		 lightpen => ANTIC_LIGHTPEN,
 		 ADDR => PBI_ADDR_INT(3 DOWNTO 0),
 		 CPU_DATA_IN => WRITE_DATA(7 DOWNTO 0),
@@ -373,7 +383,7 @@ PORT MAP(CLK => CLK,
 		 HIGHRES_COLOUR_CLOCK_OUT => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
 		 dma_fetch_out => ANTIC_FETCH,
 		 HBLANK => HBLANK,
-		 VBLANK => VBLANK,
+		 VBLANK_OUT => VBLANK,
 		 refresh_out => ANTIC_REFRESH_CYCLE,
 		 turbo_out => ANTIC_TURBO,
 		 AN => ANTIC_AN,
@@ -416,8 +426,6 @@ PORT MAP(CLK => CLK,
 		 CHANNEL_3_OUT => POKEY2_CHANNEL3,
 		 DATA_OUT => POKEY2_DO,
 		 SIO_IN1 => '1',
-		 SIO_IN2 => '1',
-		 SIO_IN3 => '1',
 		 keyboard_response => "00",
 		 pot_in=>"00000000");
 
@@ -426,6 +434,7 @@ PORT MAP(CLK => CLK,
 		 EN => PIA_READ_ENABLE,
 		 WR_EN => PIA_WRITE_ENABLE,
 		 RESET_N => RESET_N,
+		 ENABLE_ORIG => ENABLE_179_MEMWAIT,
 		 CA1 => CA1_IN,
 		 CB1 => CB1_IN,
 		 CA2_DIR_OUT => CA2_DIR_OUT,
@@ -445,6 +454,16 @@ PORT MAP(CLK => CLK,
 		 PORTB_IN => PORTB_IN,
 		 PORTB_DIR_OUT => PORTB_DIR_OUT,
 		 PORTB_OUT => PORTB_OUT_INT);
+
+ultimate_rtc : entity work.DS1305Redux
+PORT MAP(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	DATA_IN => WRITE_DATA(7 DOWNTO 0),
+	WR_EN => ULTIME_WRITE_ENABLE,
+	DATA_OUT => ULTIME_DO,
+	RTC_IN => RTC
+);
 
 mmu1 : entity work.address_decoder
 GENERIC MAP(low_memory => low_memory, sdram_start_bank => sdram_start_bank)
@@ -478,6 +497,7 @@ PORT MAP(CLK => CLK,
 		 GTIA_DATA => GTIA_DO,
 		 CACHE_GTIA_DATA => CACHE_GTIA_DO,
 		 PIA_DATA => PIA_DO,
+		 ULTIME_DATA => ULTIME_DO,
 		 STEREO => STEREO,
 		 POKEY2_DATA => POKEY2_DO,
 		 CACHE_POKEY2_DATA => CACHE_POKEY2_DO,
@@ -487,6 +507,7 @@ PORT MAP(CLK => CLK,
 		 RAM_DATA => RAM_DO,
 		 ram_select => RAM_SELECT(2 downto 0),
 		 ATARI800MODE => ATARI800MODE,
+		 PBI_ROM_MODE => PBI_ROM_MODE,
 		 ROM_DATA => ROM_DO,
 		 SDRAM_DATA => SDRAM_DO,
 		 DMA_ADDR => DMA_ADDR,
@@ -500,6 +521,7 @@ PORT MAP(CLK => CLK,
 		 ANTIC_WR_ENABLE => ANTIC_WRITE_ENABLE,
 		 PIA_WR_ENABLE => PIA_WRITE_ENABLE,
 		 PIA_RD_ENABLE => PIA_READ_ENABLE,
+		 ULTIME_WR_ENABLE => ULTIME_WRITE_ENABLE,
 		 RAM_WR_ENABLE => RAM_WRITE_ENABLE,
 		 ROM_WR_ENABLE => ROM_WRITE_ENABLE,
 		 PBI_WR_ENABLE => PBI_WRITE_ENABLE,
@@ -521,6 +543,7 @@ PORT MAP(CLK => CLK,
 		 WRITE_DATA => WRITE_DATA,
 		 d6_wr_enable => covox_write_enable,
 		 cart_select => CART_EMULATION_SELECT,
+		 cart2_select => CART2_EMULATION_SELECT,
 		 rom_in_ram => ROM_IN_RAM,
 		 freezer_enable => freezer_enable,
 		 freezer_activate => freezer_activate,
@@ -548,8 +571,6 @@ PORT MAP(CLK => CLK,
 		 WR_EN => POKEY_WRITE_ENABLE,
 		 RESET_N => RESET_N,
 		 SIO_IN1 => SIO_RXD,
-		 SIO_IN2 => '1',
-		 SIO_IN3 => '1',
 		 SIO_CLOCKIN_IN => SIO_CLOCKIN_IN,
 		 SIO_CLOCKIN_OUT => SIO_CLOCKIN_OUT,
 		 SIO_CLOCKIN_OE => SIO_CLOCKIN_OE,
@@ -579,6 +600,7 @@ PORT MAP(CLK => CLK,
 		 CPU_ENABLE_ORIGINAL => ENABLE_179_MEMWAIT, -- for subsequent pmg fetches
 		 RESET_N => RESET_N,
 		 PAL => PAL,
+		 CLIP_SIDES => CLIP_SIDES,
 		 ENABLE_179 => ANTIC_ENABLE_179,
 		 COLOUR_CLOCK_ORIGINAL => ANTIC_ORIGINAL_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK => ANTIC_COLOUR_CLOCK_OUT,
@@ -594,13 +616,16 @@ PORT MAP(CLK => CLK,
 		 HSYNC => VIDEO_HS,
 		 CSYNC => VIDEO_CS,
 		 BLANK => VIDEO_BLANK,
+		 HBLANK => open,
+		 VBLANK => open,
 		 BURST => VIDEO_BURST,
 		 START_OF_FIELD => VIDEO_START_OF_FIELD,
 		 ODD_LINE => VIDEO_ODD_LINE,
 		 COLOUR_out => COLOUR,
 		 DATA_OUT => GTIA_DO);
 
-GTIA_SOUND <= CONSOL_OUT(3);
+-- Both negated and non-negated works, but technically it should be negated (or?)
+GTIA_SOUND <= not(CONSOL_OUT(3));
 
 	-- colour palette
 
@@ -679,6 +704,7 @@ covox1 : entity work.covox
 	PORT map
 	( 
 		clk => clk,
+		reset_n => reset_n,
 		addr => pbi_addr_int(1 downto 0),
 		data_in => WRITE_DATA(7 DOWNTO 0),
 		wr_en => covox_write_enable,

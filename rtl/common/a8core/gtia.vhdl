@@ -26,6 +26,7 @@ PORT
 	RESET_N : IN STD_LOGIC;
 	
 	PAL : IN STD_LOGIC;
+	CLIP_SIDES : IN STD_LOGIC;
 	
 	-- ANTIC interface
 	COLOUR_CLOCK_ORIGINAL : in std_logic;
@@ -52,7 +53,11 @@ PORT
 	BLANK : out std_logic;
 	BURST : out std_logic;
 	START_OF_FIELD : out std_logic;
-	ODD_LINE : out std_logic
+	ODD_LINE : out std_logic;
+
+	-- special for MISTER!
+	HBLANK : out std_logic;
+	VBLANK : out std_logic
 );
 END gtia;
 
@@ -393,6 +398,7 @@ ARCHITECTURE vhdl OF gtia IS
 	
 	-- visible region (no collision detection outside this)
 	signal visible_live : std_logic;
+	signal invisible_clip : std_logic;
 	
 	-- antic input decode
 	signal an_prev3_next : std_logic_vector(2 downto 0);
@@ -722,7 +728,7 @@ begin
 	
 		
 	-- decode antic input
-	process (AN, COLOUR_CLOCK, COLOUR_CLOCK_ORIGINAL, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, hpos_reg)
+	process (AN, COLOUR_CLOCK, COLOUR_CLOCK_ORIGINAL, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, invisible_clip, clip_sides, hpos_reg)
 	begin	
 		hblank_next <= hblank_reg;
 		reset_counter <= '0';
@@ -1009,6 +1015,19 @@ begin
 ----			visible_live <= '0';
 ----		end if;		
 --	end process;
+
+	process(hpos_reg, clip_sides)
+	begin		
+		invisible_clip <= '0';
+		
+		if (unsigned(hpos_reg) <= to_unsigned(44,8)) then
+			invisible_clip <= clip_sides;
+		end if;
+		
+		if (unsigned(hpos_reg) > to_unsigned(215,8)) then
+			invisible_clip <= clip_sides;
+		end if;		
+	end process;
 	
 	-- generate hsync and csync
 	process(hpos_reg, hsync_reg, hsync_end, csync_reg, csync_end, burst_reg, burst_end, vsync_reg, vsync_next)
@@ -1178,7 +1197,7 @@ begin
 		port map(clk=>clk, colour_enable=>colour_clock, prior=>prior_delayed_reg,p0=>active_pm0_live,p1=>active_pm1_live,p2=>active_pm2_live,p3=>active_pm3_live,pf0=>active_pf0_live,pf1=>active_pf1_live,pf2=>active_pf2_live,pf3=>active_pf3_live,bk=>active_bk_live,p0_out=>set_p0,p1_out=>set_p1,p2_out=>set_p2,p3_out=>set_p3,pf0_out=>set_pf0,pf1_out=>set_pf1,pf2_out=>set_pf2,pf3_out=>set_pf3,bk_out=>set_bk);	
 
 	trigger_secondhalf <= colour_clock_HIGHRES and not colour_clock;
-	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,highres_reg, active_hr_reg, colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg, trigger_secondhalf, colour_clock, COLOUR_REG, hrcolour_reg, visible_live, active_bk_modify_next, active_bk_valid_next, gractl_reg)
+	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,highres_reg, active_hr_reg, colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg, trigger_secondhalf, colour_clock, COLOUR_REG, hrcolour_reg, visible_live, invisible_clip, active_bk_modify_next, active_bk_valid_next, gractl_reg)
 	begin
 		colour_next <= colour_reg;
 		hrcolour_next <= hrcolour_reg;
@@ -1235,7 +1254,7 @@ begin
 				end if;
 			end if;				
 			
-			if (visible_live = '0') then
+			if (visible_live = '0' or invisible_clip = '1') then
 				colour_next <= X"00";
 				hrcolour_next <= X"00";
 			end if;			
@@ -1823,5 +1842,9 @@ begin
 	odd_line<=odd_scanline_reg;
 	
 	consol_out <= consol_output_reg;
+
+	-- special for MISTER
+	hblank<=hblank_reg;
+	vblank<=vsync_reg;
 
 end vhdl;

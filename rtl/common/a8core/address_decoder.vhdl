@@ -54,6 +54,8 @@ PORT
 	RAM_DATA : IN STD_LOGIC_VECTOR(15 downto 0);
 	PBI_DATA : in std_logic_Vector(7 downto 0);
 	STEREO : in std_logic;
+	ULTIME_DATA : in std_logic_vector(7 downto 0);
+	ULTIME_WR_ENABLE : out std_logic;
 
 	-- pbi external acccess!
 	PBI_TAKEOVER : in std_logic;
@@ -72,8 +74,10 @@ PORT
 	rom_in_ram : in std_logic;
 
 	atari800mode : in std_logic := '0';
-	
-	cart_select : in std_logic_vector(5 downto 0);
+	pbi_rom_mode : in std_logic := '0';
+
+	cart_select : in std_logic_vector(7 downto 0);
+	cart2_select : in std_logic_vector(7 downto 0);
 	
 	ram_select : in std_logic_vector(2 downto 0);
 	
@@ -179,8 +183,14 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal extended_self_test : std_logic;
 	signal extended_bank : std_logic_vector(8 downto 0); -- ONLY "000" - "103" valid...
 
+	signal basic_next : std_logic;
+	signal basic_reg : std_logic;
+	signal basic_latched_when_banking : std_logic;
+
 	signal ram_c000 : std_logic;
 	signal has_ram : std_logic;
+	signal axlon_bank_reg : std_logic_vector(7 downto 0);
+	signal axlon_bank_next : std_logic_vector(7 downto 0);
 	
 	-- even though we have 3 targets (flash, ram, rom) and 3 masters, only allow access to one a a time - simpler.
 	signal state_next : std_logic_vector(1 downto 0);
@@ -220,16 +230,54 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart_rw: std_logic;
 	signal emu_cart_s4_n: std_logic;
 	signal emu_cart_s5_n: std_logic;
-	signal emu_cart_s4_n_out: std_logic;
-	signal emu_cart_s5_n_out: std_logic;
+	--signal emu_cart_s4_n_out: std_logic;
+	--signal emu_cart_s5_n_out: std_logic;
 	signal emu_cart_rd4: std_logic;
 	signal emu_cart_rd5: std_logic;
 	signal emu_cart_address: std_logic_vector(20 downto 0);
 	signal emu_cart_address_enable: boolean;
 	signal emu_cart_cctl_dout: std_logic_vector(7 downto 0);
-	signal emu_cart_cctl_dout_enable: boolean;
+	signal emu_cart_cctl_dout_enable: std_logic_vector(2 downto 0);
+	signal emu_cart_int_d_in: std_logic_vector(7 downto 0);
+	signal emu_cart_int_d_out: std_logic_vector(7 downto 0);
+	signal emu_cart_passthru : std_logic;
+	signal emu_cart_rtc_mode : std_logic_vector(1 downto 0);
 
+	signal emu_cart1_s4_n: std_logic;
+	signal emu_cart1_s5_n: std_logic;
+	signal emu_cart1_rd4: std_logic;
+	signal emu_cart1_rd5: std_logic;
+	signal emu_cart1_address: std_logic_vector(20 downto 0);
+	signal emu_cart1_address_enable: boolean;
+	signal emu_cart1_cctl_dout: std_logic_vector(7 downto 0);
+	signal emu_cart1_cctl_dout_enable: std_logic_vector(2 downto 0);
+	signal emu_cart1_int_d_in: std_logic_vector(7 downto 0);
+	signal emu_cart1_int_d_out: std_logic_vector(7 downto 0);
+
+	signal emu_cart2_s4_n: std_logic;
+	signal emu_cart2_s5_n: std_logic;
+	signal emu_cart2_rd4: std_logic;
+	signal emu_cart2_rd5: std_logic;
+	signal emu_cart2_address: std_logic_vector(20 downto 0);
+	signal emu_cart2_address_enable: boolean;
+	signal emu_cart2_cctl_dout: std_logic_vector(7 downto 0);
+	signal emu_cart2_cctl_dout_enable: std_logic_vector(2 downto 0);
+	signal emu_cart2_int_d_in: std_logic_vector(7 downto 0);
+	signal emu_cart2_int_d_out: std_logic_vector(7 downto 0);
+
+	signal emu_pbi_enable : std_logic;
+	signal emu_pbi_d1xx : std_logic;
+	signal emu_pbi_d8xx : std_logic;
+	signal emu_pbi_rom_address : std_logic_vector(12 downto 0);
+	signal emu_pbi_rom_address_enable : std_logic;
+	signal emu_pbi_data_out : std_logic_vector(7 downto 0);
+	signal emu_pbi_cache_data_out : std_logic_vector(7 downto 0);
+	signal emu_pbi_data_out_enable : std_logic;
+	signal pbi_mpd : std_logic;
+	
 	signal atari_clk_enable: std_logic;
+	signal atari_dma_access : std_logic;
+	signal atari_with_dma_clk_enable : std_logic;
 	signal freezer_disable_atari: boolean;
 	signal freezer_access_type: std_logic_vector(1 downto 0);
 	signal freezer_access_address: std_logic_vector(16 downto 0);
@@ -250,6 +298,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal bank1reg : std_logic_vector(1 downto 0);
 	signal bank1next : std_logic_vector(1 downto 0);
 	signal bbtype : std_logic;
+	signal sctype : std_logic;
 BEGIN
 	-- register
 	process(clk,reset_n)
@@ -271,9 +320,11 @@ BEGIN
 			pbi_cycle_reg <= '0';
 
 			last_bus_reg <= (others=>'0');
+			axlon_bank_reg <= (others=>'0');
 
 			bank0reg <= (others=>'0');
 			bank1reg <= (others=>'0');
+			basic_reg <= '0';
 
 		elsif rising_edge(clk) then
 			addr_reg <= addr_next;
@@ -292,19 +343,26 @@ BEGIN
 			pbi_cycle_reg <= pbi_cycle_next;
 
 			last_bus_reg <= last_bus_next;
+			axlon_bank_reg <= axlon_bank_next;
 
 			bank0reg <= bank0next;
 			bank1reg <= bank1next;
+			basic_reg <= basic_next;
 
 			if addr_next(23 downto 12) = x"804" then
 				bbtype <= '0';
-			elsif addr_next(23 downto 16) = x"81" then
+				sctype <= '0';
+			elsif addr_next(23 downto 16) = x"90" then
 				bbtype <= '1';
+			elsif addr_next(23 downto 16) = x"A0" then
+				sctype <= '1';
 			end if;
 		end if;
 	end process;
 
+	atari_dma_access <= not(or_reduce(addr_next(23 downto 18)));
 	atari_clk_enable <= notify_cpu or notify_antic; -- i.e. we enable cart and freezer on the final cycle of a 6502 or antic access
+	atari_with_dma_clk_enable <= notify_cpu or notify_antic or (notify_dma and atari_dma_access);
 
 	-- float bus when no ram
 	process(last_bus_reg,atari_clk_enable,data_write_next,memory_data_int,write_enable_next)
@@ -319,36 +377,159 @@ BEGIN
 		end if;
 	end process;
 
-	-- emulated cart
-	emu_cart: entity work.CartLogic
+	-- Capture Axlon bank register write
+	process(axlon_bank_reg,atari_with_dma_clk_enable,data_write_next,addr_next,write_enable_next)
+	begin
+		axlon_bank_next <= axlon_bank_reg;
+		if atari_with_dma_clk_enable = '1' then
+			if (write_enable_next = '1') and (addr_next(15 downto 4) = x"CFF") then
+				axlon_bank_next <= data_write_next(7 downto 0);
+			end if;
+		end if;
+	end process;
+
+	-- emulated cart #1, master
+	emu_cart1: entity work.CartLogic
 	port map (clk => clk,
 		clk_enable => atari_clk_enable,
-		cart_mode => cart_select(5 downto 0),
+		cart_mode => cart_select(7 downto 0),
 		a => addr_next(12 downto 0),
 		cctl_n => emu_cart_cctl_n,
 		d_in => data_write_next(7 downto 0),
 		rw => emu_cart_rw,
-		s4_n => emu_cart_s4_n,
-		s5_n => emu_cart_s5_n,
+		s4_n => emu_cart1_s4_n,
+		s5_n => emu_cart1_s5_n,
 		--s4_n_out => emu_cart_s4_n_out,
 		--s5_n_out => emu_cart_s5_n_out,
-		rd4 => emu_cart_rd4,
-		rd5 => emu_cart_rd5,
-		cart_address => emu_cart_address,
-		cart_address_enable => emu_cart_address_enable,
-		cctl_dout => emu_cart_cctl_dout,
-		cctl_dout_enable => emu_cart_cctl_dout_enable
+		rd4 => emu_cart1_rd4,
+		rd5 => emu_cart1_rd5,
+		cart_address => emu_cart1_address,
+		cart_address_enable => emu_cart1_address_enable,
+		cctl_dout => emu_cart1_cctl_dout,
+		cctl_dout_enable => emu_cart1_cctl_dout_enable,
+		int_d_in => emu_cart1_int_d_in,
+		int_d_out => emu_cart1_int_d_out,
+		master => '1',
+		passthru => emu_cart_passthru,
+		rtc_mode => emu_cart_rtc_mode
 	);
 
-	process(cart_select)
+	-- emulated cart #2, slave / stacked
+	emu_cart2: entity work.CartLogic
+	port map (clk => clk,
+		clk_enable => atari_clk_enable,
+		cart_mode => cart2_select(7 downto 0),
+		a => addr_next(12 downto 0),
+		cctl_n => emu_cart_cctl_n,
+		d_in => data_write_next(7 downto 0),
+		rw => emu_cart_rw,
+		s4_n => emu_cart2_s4_n,
+		s5_n => emu_cart2_s5_n,
+		rd4 => emu_cart2_rd4,
+		rd5 => emu_cart2_rd5,
+		cart_address => emu_cart2_address,
+		cart_address_enable => emu_cart2_address_enable,
+		cctl_dout => emu_cart2_cctl_dout,
+		cctl_dout_enable => emu_cart2_cctl_dout_enable,
+		int_d_in => emu_cart2_int_d_in,
+		int_d_out => emu_cart2_int_d_out,
+		master => '0'
+	);
+
+	emu_pbi_rom: entity work.PBIROM
+	port map (clk => clk,
+		clk_enable => atari_with_dma_clk_enable,
+		reset_n => reset_n,
+		a => addr_next(10 downto 0),
+		rw => emu_cart_rw, -- OK to reuse?
+		data_in => data_write_next(7 downto 0),
+		d1xx => emu_pbi_d1xx,
+		d8xx => emu_pbi_d8xx,
+		pbi_rom_address => emu_pbi_rom_address,
+		pbi_rom_address_enable => emu_pbi_rom_address_enable,
+		data_out => emu_pbi_data_out,
+		cache_data_out => emu_pbi_cache_data_out,
+		data_out_enable => emu_pbi_data_out_enable
+	);	
+
+	process(clk,emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
+		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
 	begin
-		if (cart_select(5 downto 0) = "000000") then
+		emu_cart1_int_d_in <= (others => '0');
+		emu_cart2_int_d_in <= (others => '0');
+		emu_cart1_s4_n <= '1';
+		emu_cart1_s5_n <= '1';
+		emu_cart2_s4_n <= '1';
+		emu_cart2_s5_n <= '1';
+		if atari800mode = '1' then
+		    emu_cart1_s5_n <= emu_cart_s5_n;
+		    emu_cart1_s4_n <= emu_cart_s4_n;
+		    emu_cart2_s4_n <= emu_cart_s4_n;
+		    emu_cart_rd5 <= emu_cart1_rd5;
+		    emu_cart_cctl_dout <= emu_cart1_cctl_dout;
+		    emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
+		    emu_cart_address <= emu_cart1_address;
+		    emu_cart_address_enable <= emu_cart1_address_enable;
+		    emu_cart1_int_d_in <= emu_cart_int_d_in;
+		    emu_cart_int_d_out <= emu_cart1_int_d_out;
+		    -- if the second/right cart is mounted line 4 reqests are its responsibility
+		    if (cart2_select(7 downto 0) /= "00000000") then
+			emu_cart_rd4 <= emu_cart2_rd4;
+		    else
+			emu_cart_rd4 <= emu_cart1_rd4;
+		    end if;
+		    if ((cart2_select(7 downto 0) /= "00000000") and (emu_cart_s4_n = '0')) then
+			emu_cart_address <= emu_cart2_address;
+			emu_cart_address_enable <= emu_cart2_address_enable;
+			emu_cart2_int_d_in <= emu_cart_int_d_in;
+			emu_cart_int_d_out <= emu_cart2_int_d_out;
+		    end if;
+		else
+		    if emu_cart_passthru = '1' then
+			emu_cart2_s4_n <= emu_cart_s4_n;
+			emu_cart2_s5_n <= emu_cart_s5_n;
+			emu_cart_rd4 <= emu_cart2_rd4;
+			emu_cart_rd5 <= emu_cart2_rd5;
+			emu_cart_address <= emu_cart2_address;
+			emu_cart_address_enable <= emu_cart2_address_enable;
+			emu_cart_cctl_dout <= emu_cart2_cctl_dout;
+			emu_cart_cctl_dout_enable <= emu_cart2_cctl_dout_enable;
+			emu_cart2_int_d_in <= emu_cart_int_d_in;
+			emu_cart_int_d_out <= emu_cart2_int_d_out;
+		    else
+			emu_cart1_s4_n <= emu_cart_s4_n;
+			emu_cart1_s5_n <= emu_cart_s5_n;
+			emu_cart_rd4 <= emu_cart1_rd4;
+			emu_cart_rd5 <= emu_cart1_rd5;
+			emu_cart_address <= emu_cart1_address;
+			emu_cart_address_enable <= emu_cart1_address_enable;
+			emu_cart_cctl_dout <= emu_cart1_cctl_dout;
+			emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
+			emu_cart1_int_d_in <= emu_cart_int_d_in;
+			emu_cart_int_d_out <= emu_cart1_int_d_out;
+		    end if;
+		end if;
+	end process;
+
+	process(cart_select,cart2_select,atari800mode)
+	begin
+		if (cart_select(7 downto 0) = "00000000") and ((atari800mode = '0') or (cart2_select(7 downto 0) = "00000000")) then
 			emu_cart_enable <= '0';
 		else
 			emu_cart_enable <= '1';
 		end if;
 	end process;
 
+	process(pbi_mpd_n,pbi_rom_mode,emu_pbi_rom_address_enable)
+	begin
+			emu_pbi_enable <= '0';
+			pbi_mpd <= not(pbi_mpd_n);
+			if pbi_rom_mode = '1' then
+				emu_pbi_enable <= '1';
+				pbi_mpd <= emu_pbi_rom_address_enable;
+			end if;
+	end process;
+	
 	-- freezer
 	freezer_activate_n <= not (freezer_enable and freezer_activate);
 	freezer: entity work.FreezerLogic
@@ -428,7 +609,8 @@ BEGIN
 				width_16bit_next <= '0';
 				width_32bit_next <= '0';	
 				data_WRITE_next <= (others => '0');
-				addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);				
+				-- This is confusing, does not seem to be needed?
+				-- addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);
 				
 				case fetch_priority is
 				when "100"|"101"|"110"|"111" => -- antic wins
@@ -535,10 +717,11 @@ BEGIN
 	extended_access_cpu <= (extended_access_addr and cpu_fetch_real_next and not(portb(4)));
 	extended_access_either <= extended_access_addr and not(portb(4));
 	
-	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode)
+	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode,axlon_bank_reg)
 	begin	
 		extended_bank <= "0000000"&addr_next(15 downto 14);
 		extended_self_test <= '1';
+		basic_latched_when_banking <= '1';
 		ram_c000 <= '0';
 		has_ram <= '1';
 
@@ -555,8 +738,15 @@ BEGIN
 				when "011" => -- 48k
 					has_ram <= not(addr_next(15)) or not(addr_next(14));
 				when "100" => -- 52k
+					null;
 					-- yes we have 64k here, but its hidden!
-				--TODO -- 800 memory expansions - axlon??
+				when "101" => -- 4MB Axlon
+					-- 48K Basic RAM
+					has_ram <= not(addr_next(15)) or not(addr_next(14));
+					-- Plus full Axlon extension
+					if (extended_access_addr='1') then
+						extended_bank <= std_logic_vector("000000100" + unsigned('0'&axlon_bank_reg(7 downto 0)));
+					end if;
 				when others =>
 			end case;
 		else
@@ -582,19 +772,21 @@ BEGIN
 						extended_bank <= std_logic_vector("000000100" + unsigned("0000"&portb(7 downto 6)&portb(3 downto 1)));
 						extended_self_test <= '0';
 					end if;
+					basic_latched_when_banking <= '0';
 				when "101" => -- 576k rambo
 					if (extended_access_either='1') then
 						extended_bank <= std_logic_vector("000000100" + unsigned("0000"&portb(6 downto 5)&portb(3 downto 1)));
 					end if;
+					basic_latched_when_banking <= '0';
 				when "110" => -- 1088k rambo
 					if (extended_access_either='1') then
 						extended_bank <= std_logic_vector("000000100" + unsigned("000"&portb(7 downto 5)&portb(3 downto 1)));
 						extended_self_test <= '0';
 					end if;
-				when "111" => -- 4MB!	
+					basic_latched_when_banking <= '0';
+				when "111" => -- 4MB Axlon!	
 					if (extended_access_addr='1') then
-						extended_bank <= std_logic_vector("000000100" + unsigned('0'&portb(7 downto 0)));
-						extended_self_test <= and_reduce(portb(6 downto 4));	 -- which means self-test is in the middle of half the banks - euuugh, oh well!						
+						extended_bank <= std_logic_vector("000000100" + unsigned('0'&axlon_bank_reg(7 downto 0)));
 					end if;
 				when others =>
 					-- TODO - portc!
@@ -665,6 +857,8 @@ end generate;
 		atari800mode,
 		ram_c000,
 		has_ram,
+		axlon_bank_reg,
+		atari_dma_access,
 
 		-- cart stuff
 		emu_cart_rd4,emu_cart_rd5,
@@ -672,14 +866,21 @@ end generate;
 		emu_cart_enable,
 		emu_cart_address, emu_cart_address_enable,
 		emu_cart_cctl_dout, emu_cart_cctl_dout_enable,
+		emu_cart_int_d_out,
+		emu_cart_rtc_mode,
 
+		-- pbi emu
+		emu_pbi_enable,
+		emu_pbi_rom_address, emu_pbi_rom_address_enable,
+		emu_pbi_data_out, emu_pbi_data_out_enable,
+		emu_pbi_cache_data_out,
 		-- pbi stuff
-		pbi_mpd_n,
+		pbi_mpd,
 		
 		-- input data from n sources
 		GTIA_DATA,POKEY_DATA,POKEY2_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
 		CACHE_GTIA_DATA,CACHE_POKEY_DATA,CACHE_POKEY2_DATA,CACHE_ANTIC_DATA,
-		LAST_BUS_REG,
+		LAST_BUS_REG,ULTIME_DATA,
 		
 		-- input data from n sources complete?
 		-- hardware regs take 1 cycle, so always complete		
@@ -694,11 +895,12 @@ end generate;
 		
 		-- SDRAM base addresses
 		extended_self_test,extended_bank,
+		basic_reg,basic_latched_when_banking,
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
 		
-		bbtype,bank0reg,bank1reg,bank0next,bank1next,
+		bbtype,sctype,bank0reg,bank1reg,bank0next,bank1next,
 
 		STEREO,
 
@@ -723,6 +925,7 @@ end generate;
 		ANTIC_WR_ENABLE <= '0';
 		PIA_WR_ENABLE <= '0';
 		PIA_RD_ENABLE <= '0';
+		ULTIME_WR_ENABLE <= '0';
 		D6_WR_ENABLE <= '0';
 		ROM_WR_ENABLE <= '0';
 
@@ -733,7 +936,9 @@ end generate;
 		emu_cart_s5_n <= '1';
 
 		emu_cart_cctl_n <= '1';
-
+		emu_pbi_d1xx <= '0';
+		emu_pbi_d8xx <= '0';
+		
 		if (write_enable_next = '1') then
 			emu_cart_rw <= '0';
 		else
@@ -749,9 +954,14 @@ end generate;
 
 		bank0next <= bank0reg;
 		bank1next <= bank1reg;
+
+		basic_next <= basic_reg;
+
+		if (portb(4)='1' or basic_latched_when_banking='1') then
+			basic_next <= not(portb(1)); -- Only update basic flag when not accessing extended ram (depending on mode)
+		end if;
 		
-	--	if (addr_next(23 downto 17) = "0000000" ) then -- bit 16 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
-		if (or_reduce(addr_next(23 downto 18)) = '0' ) then -- bit 16,17 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
+		if (atari_dma_access = '1' ) then -- bit 16,17 left out on purpose, so the Atari 64k is available as 64k-128k for zpu. The zpu has rom at 0-64k...
 
 		SDRAM_ADDR(13 downto 0) <= addr_next(13 downto 0);
 		SDRAM_ADDR(22 downto 14) <= extended_bank;
@@ -769,6 +979,7 @@ end generate;
 				request_complete <= ram_request_COMPLETE;
 			end if;
 		else
+			-- last_bus_reg seems to be the way to go here afterall
 			MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 			request_complete <= '1';
 		end if;
@@ -813,7 +1024,15 @@ end generate;
 					ram_chip_select <= '0';	
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
-			
+					-- PBI BIOS rom emulation
+					if (emu_pbi_enable = '1') then
+						MEMORY_DATA_INT(15 downto 8) <= emu_pbi_cache_data_out;
+						emu_pbi_d1xx <= '1';
+						if (write_enable_next = '0') and (emu_pbi_data_out_enable = '1') then
+							MEMORY_DATA_INT(7 downto 0) <= emu_pbi_data_out;
+						end if;
+					end if;
+					
 				-- POKEY
 				when X"D2" =>				
 					if (STEREO = '0' or addr_next(4) = '0') then
@@ -827,16 +1046,21 @@ end generate;
 					end if;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
-					ram_chip_select <= '0';					
-	
+					ram_chip_select <= '0';
+
 				-- PIA
 				when X"D3" =>
-					PIA_WR_ENABLE <= write_enable_next;
-					PIA_RD_ENABLE <= '1';
-					MEMORY_DATA_INT(7 downto 0) <= PIA_DATA;
+					if (emu_cart_enable = '1') and (emu_cart_rtc_mode = "01") and (addr_next(7 downto 0) = x"E2") then -- Ultimate RT clock emulation
+						ULTIME_WR_ENABLE <= write_enable_next;
+						MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
+					else
+						PIA_WR_ENABLE <= write_enable_next;
+						PIA_RD_ENABLE <= '1';
+						MEMORY_DATA_INT(7 downto 0) <= PIA_DATA;
+					end if;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
-					ram_chip_select <= '0';					
+					ram_chip_select <= '0';
 					
 				-- ANTIC
 				when X"D4" =>
@@ -853,20 +1077,40 @@ end generate;
 					ram_chip_select <= '0';	
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
-	
+
 					if (emu_cart_enable = '1') then
-						emu_cart_cctl_n <= '0';
-						if write_enable_next = '1' then
-							-- TODO: write to both emulated and real cart
-							request_complete <= '1';
+						if (emu_cart_rtc_mode = "10") and (addr_next(7 downto 0) = x"E2") then -- SIDE(2) / SuperCart RTC
+							ULTIME_WR_ENABLE <= write_enable_next;
+							MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
 						else
-							-- read only from emulated
-							if emu_cart_cctl_dout_enable then
-								MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
+							emu_cart_cctl_n <= '0';
+							if write_enable_next = '1' then
+								-- TODO: write to both emulated and real cart
+								request_complete <= '1';
 							else
-								MEMORY_DATA_INT(7 downto 0) <= x"ff";
+								-- read only from emulated
+								if emu_cart_cctl_dout_enable /= "000" then
+									if emu_cart_cctl_dout_enable(2 downto 1) = "00" then
+										MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
+										request_complete <= '1';
+									else
+										SDRAM_ADDR <= SDRAM_CART_ADDR;
+										if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
+											-- read from B5xx
+											SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
+										end if;
+										if emu_cart_cctl_dout_enable(2) = '1' then -- AST 32 special case
+											SDRAM_ADDR(7 downto 0) <= ADDR_next(7 downto 0);
+										end if;
+										MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+										request_complete <= sdram_request_COMPLETE;
+										sdram_chip_select <= start_request;
+									end if;
+								else
+									MEMORY_DATA_INT(7 downto 0) <= x"ff";
+									request_complete <= '1';
+								end if;
 							end if;
-							request_complete <= '1';
 						end if;
 					end if;
 					
@@ -940,8 +1184,9 @@ end generate;
 						-- remap to SDRAM
 						if (emu_cart_address_enable) then
 							SDRAM_ADDR <= SDRAM_CART_ADDR;
-							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
-							request_complete <= sdram_request_COMPLETE;							
+							-- emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
+							MEMORY_DATA_INT(7 downto 0) <= emu_cart_int_d_out;
+							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;
 							ram_chip_select <= '0';
 						else
@@ -951,7 +1196,7 @@ end generate;
 							ram_chip_select <= '0';
 						end if;
 					else
-						if (atari800mode = '0' and portb(1) = '0') then
+						if (atari800mode = '0' and basic_reg = '1') then
 							sdram_chip_select <= '0';
 							ram_chip_select <= '0';							
 							--request_complete <= ROM_REQUEST_COMPLETE;
@@ -984,7 +1229,19 @@ end generate;
 				when 
 					X"D8"|X"D9"|X"DA"|X"DB"|X"DC"|X"DD"|X"DE"|X"DF" =>
 					
-					if (atari800mode='1' or (portb(0) = '1' and pbi_mpd_n='1')) then
+					if (emu_pbi_enable = '1') then
+						emu_pbi_d8xx <= '1';
+						-- remap to SDRAM
+						if (emu_pbi_rom_address_enable = '1') then
+							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR(22 downto 14) & '1' & emu_pbi_rom_address;
+							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+							request_complete <= sdram_request_COMPLETE;
+							sdram_chip_select <= start_request;
+							ram_chip_select <= '0';
+						end if;
+					end if;
+					
+					if (atari800mode='1' or (portb(0) = '1' and pbi_mpd='0')) then
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';																		
 						--request_complete <= ROM_REQUEST_COMPLETE;
@@ -1169,6 +1426,16 @@ end generate;
 							SDRAM_ADDR(15 downto 12) <= "11"&bank1next;
 							RAM_ADDR(15 downto 12)   <= "11"&bank1next;
 						end if;
+					elsif sctype = '1' then
+						if bank0next(0) = '1' then
+							SDRAM_ADDR(15) <= not(addr_next(15));
+							RAM_ADDR(15) <= not(addr_next(15));
+						end if;
+						-- Because we use only 16K of basic RAM, all this is going to be
+						-- in SDRAM anyhow, the fact that we truncate access to basic RAM
+						-- should not matter, it's not used (but it is technically wrong).
+						SDRAM_ADDR(19 downto 16) <= '0' & bank1next & bank0next(1);
+						RAM_ADDR(18 downto 16) <= bank1next & bank0next(1);
 					end if;
 
 					if (write_enable_next = '1') then
@@ -1199,6 +1466,25 @@ end generate;
 					X"b0"|X"b1"|X"b2"|X"b3"|X"b4"|X"b5"|X"b6"|X"b7"|
 					X"b8"|X"b9"|X"bA"|X"bB"|X"bC"|X"bD"|X"bE"|X"bF" =>
 
+					if sctype = '1' then
+						if addr_next(15 downto 0) >= x"BFD0" and addr_next(15 downto 0) <= x"BFDF" then
+							bank0next <= addr_next(3 downto 2);
+						elsif addr_next(15 downto 0) >= x"BFC0" and addr_next(15 downto 0) <= x"BFCF" then
+							bank1next <= addr_next(3 downto 2);
+						elsif addr_next(15 downto 0) >= x"BFE0" and addr_next(15 downto 0) <= x"BFFF" then
+							bank0next <= "11";
+							bank1next <= "11";
+						end if;
+						if bank0next(0) = '1' then
+							SDRAM_ADDR(15) <= not(addr_next(15));
+							SDRAM_ADDR(19 downto 16) <= std_logic_vector(unsigned('0' & bank1next & bank0next)+1)(4 downto 1);
+							RAM_ADDR(15) <= not(addr_next(15));
+							RAM_ADDR(18 downto 16) <= std_logic_vector(unsigned('0' & bank1next & bank0next)+1)(3 downto 1);
+						else
+							SDRAM_ADDR(19 downto 16) <= '0' & bank1next & bank0next(1);
+							RAM_ADDR(18 downto 16) <= bank1next & bank0next(1);
+						end if;
+					end if;
 					if (write_enable_next = '1') then
 						sdram_chip_select <= '0';
 						Ram_chip_select <= '0';							
@@ -1297,6 +1583,7 @@ end generate;
 		
 	end process;
 
+	emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
 	state_reg_out <= state_reg;
 	memory_data <= MEMORY_DATA_INT;
 END vhdl;

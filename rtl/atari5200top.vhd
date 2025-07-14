@@ -29,6 +29,7 @@ PORT
 	HBLANK     : OUT STD_LOGIC;
 	VBLANK     : OUT STD_LOGIC;
 
+	CLIP_SIDES : IN  STD_LOGIC;
 	AUDIO_L    : OUT STD_LOGIC_VECTOR(15 downto 0);
 	AUDIO_R    : OUT STD_LOGIC_VECTOR(15 downto 0);
 
@@ -52,9 +53,15 @@ PORT
 	JOY1Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2X      : IN  STD_LOGIC_VECTOR(7 downto 0);
 	JOY2Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY3X      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY3Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY4X      : IN  STD_LOGIC_VECTOR(7 downto 0);
+	JOY4Y      : IN  STD_LOGIC_VECTOR(7 downto 0);
 
 	JOY1       : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
 	JOY2       : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
+	JOY3       : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
+	JOY4       : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
 
 	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
 	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
@@ -124,7 +131,7 @@ signal RAM_DATA : std_logic_vector(31 downto 0);
 
 BEGIN
 
-JOY <= JOY1 or JOY2;
+JOY <= JOY1 or JOY2 or JOY3 or JOY4;
 
 -- PS2 to pokey
 keyboard_map1 : entity work.ps2_to_atari5200
@@ -137,6 +144,8 @@ PORT MAP
 
 	JOY1 => JOY1,
 	JOY2 => JOY2,
+	JOY3 => JOY3,
+	JOY4 => JOY4,
 
 	CONTROLLER_SELECT => CONTROLLER_SELECT, -- selected stick keyboard/shift button
 	
@@ -152,11 +161,15 @@ PORT MAP
 atarixl_simple_sdram1 : entity work.atari5200core_simplesdram
 GENERIC MAP
 (
-	cycle_length => 32,
+	cycle_length => 16,
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	internal_ram => 65536
+	-- For the size, doing anything else than 16K (single Atari bank)
+	-- would require a different code and new branches in the 
+	-- address decoder to handle SDRAM correctly, and we need SDRAM
+	-- for larger carts (Super Cart 512K).
+	internal_ram => 16384 -- 65536
 )
 PORT MAP
 (
@@ -175,16 +188,23 @@ PORT MAP
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
 
+	CLIP_SIDES => CLIP_SIDES,
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
 
 	JOY1_n => not(JOY1(4)&JOY1(0)&JOY1(1)&JOY1(2)&JOY1(3)), --FRLDU
 	JOY2_n => not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)), --FRLDU
+	JOY3_n => not(JOY3(4)&JOY3(0)&JOY3(1)&JOY3(2)&JOY3(3)), --FRLDU
+	JOY4_n => not(JOY4(4)&JOY4(0)&JOY4(1)&JOY4(2)&JOY4(3)), --FRLDU
 
 	JOY1_X => signed(joy1x),
 	JOY1_Y => signed(joy1y),
 	JOY2_X => signed(joy2x),
 	JOY2_Y => signed(joy2y),
+	JOY3_X => signed(joy3x),
+	JOY3_Y => signed(joy3y),
+	JOY4_X => signed(joy4x),
+	JOY4_Y => signed(joy4y),
 
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
@@ -337,7 +357,7 @@ port map
 );
 
 enable_179_clock_div_zpu_pokey : entity work.enable_divider
-	generic map (COUNT=>32) -- cycle_length
+	generic map (COUNT=>16) -- cycle_length
 	port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>zpu_pokey_enable);
 
 END vhdl;

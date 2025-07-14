@@ -33,6 +33,7 @@ PORT
 	ANTIC_ENABLE_179 : IN std_logic;
 	
 	PAL : IN STD_LOGIC;
+	EXT_ANTIC : IN STD_LOGIC;
 	
 	lightpen : in std_logic;
 	
@@ -48,7 +49,6 @@ PORT
 	HIGHRES_COLOUR_CLOCK_OUT : out std_logic; -- 2x to allow for half pixel modes
 	
 	HBLANK : OUT STD_LOGIC;
-	VBLANK : OUT STD_LOGIC;
 	
 	-- DMA fetch
 	dma_fetch_out : out std_logic;
@@ -62,6 +62,9 @@ PORT
 
 	-- if we are in turbo mode
 	turbo_out : out std_logic;
+
+	-- used to throttle in vblank mode
+	vblank_out : out std_logic;
 	
 	-- for debugging
 	shift_out : out std_logic_vector(7 downto 0);
@@ -702,7 +705,7 @@ BEGIN
 			dmactl_delayed_enabled <= '1';
 		when "10" =>
 			enable_dma <= colour_clock_1x;
-			colour_clock_selected <= colour_clock_2x;		
+			colour_clock_selected <= colour_clock_2x;
 			colour_clock_selected_highres <= colour_clock_4x;
 			dmactl_delayed_enabled <= '1';
 			playfield_dma_start <= playfield_dma_start_reg(3+24);
@@ -720,7 +723,7 @@ BEGIN
 			hscrol_adj <= "00"&hscrol_reg(3 downto 1);
 		when others =>
 			--nop
-		end case;		
+		end case;
 	end process;	
 
 	-- Counters (memory address for data, memory address for display list)
@@ -1733,7 +1736,7 @@ BEGIN
 	--dmactl_delayed_reg <= dmactl_raw_reg;
 		
 	-- Writes to registers
-	process(cpu_data_in,wr_en,addr_decoded,nmien_raw_reg,dmactl_raw_reg,chactl_reg,hscrol_reg,display_list_address_reg,chbase_raw_reg,pmbase_reg,vscrol_raw_reg, wsync_reg, wsync_delayed_write, wsync_reset)
+	process(cpu_data_in,wr_en,addr_decoded,nmien_raw_reg,dmactl_raw_reg,chactl_reg,hscrol_reg,display_list_address_reg,chbase_raw_reg,pmbase_reg,vscrol_raw_reg, wsync_reg, wsync_delayed_write, wsync_reset, EXT_ANTIC)
 	begin		
 		nmien_raw_next <= nmien_raw_reg;
 		dmactl_raw_next <= dmactl_raw_reg;
@@ -1751,7 +1754,8 @@ BEGIN
 	
 		if (wr_en = '1') then
 			if(addr_decoded(0) = '1') then
-				dmactl_raw_next <= cpu_data_in(6 downto 0);
+				dmactl_raw_next(5 downto 0) <= cpu_data_in(5 downto 0);
+				dmactl_raw_next(6) <= cpu_data_in(6) and EXT_ANTIC;
 			end if;	
 
 			if(addr_decoded(1) = '1') then
@@ -1820,7 +1824,7 @@ BEGIN
 		end if;
 
 		if(addr_decoded(15) = '1') then --NMIST
-			data_out <= nmist_reg&"00000";
+			data_out <= nmist_reg&"11111";
 		end if;
 		
 	end process;
@@ -1867,10 +1871,10 @@ BEGIN
 
 	turbo_out <= dmactl_raw_reg(6);
 
-	next_cycle_type <= (others=>'X'); -- TODO! Need to know after prior colour clock, if next one will be dma...
-
 	HBLANK <= hblank_ex_reg;
-	VBLANK <= vblank_reg;
+	vblank_out <= vblank_reg;
 
+	next_cycle_type <= (others=>'X'); -- TODO! Need to know after prior colour clock, if next one will be dma...
+	
 END vhdl;
 

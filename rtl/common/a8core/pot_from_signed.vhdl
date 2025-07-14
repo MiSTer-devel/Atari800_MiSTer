@@ -18,7 +18,7 @@ GENERIC
 	cycle_length : integer := 32;
 	line_length : integer := 114;
 	min_lines : integer := 0;
-	max_lines : integer := 227;
+	max_lines : integer := 228;
 	reverse : integer := 0;
 	force_to : signed(7 downto 0) := to_signed(127,8)
 );
@@ -46,7 +46,7 @@ ARCHITECTURE vhdl OF pot_from_signed IS
 	signal pot_out_reg : std_logic;
 	signal pot_out_next : std_logic;
 	
-	constant count_cycles : integer :=(max_lines-min_lines)*line_length/256; -- i.e. how many machines cycles for every change in POS
+	constant count_cycles : integer := 1 + ((max_lines-min_lines)*line_length+128)/256; -- i.e. how many machines cycles for every change in POS
 BEGIN
 
 enable_179_clock_div : entity work.enable_divider
@@ -81,9 +81,9 @@ pot_clock_div : entity work.enable_divider
 			pos2 := force_to;
 		end if;
 		
-		if pos2 = -128 then
-			pos2 := to_signed(-127,8);
-		end if;
+		--if pos2 = -128 then
+		--	pos2 := to_signed(-127,8);
+		--end if;
 
 		count_next <= count_reg;
 

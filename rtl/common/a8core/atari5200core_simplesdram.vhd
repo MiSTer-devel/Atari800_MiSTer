@@ -56,6 +56,8 @@ ENTITY atari5200core_simplesdram is
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
 
+		CLIP_SIDES : IN STD_LOGIC;
+
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
@@ -91,9 +93,15 @@ ENTITY atari5200core_simplesdram is
 		JOY1_Y : IN signed(7 downto 0);
 		JOY2_X : IN signed(7 downto 0);
 		JOY2_Y : IN signed(7 downto 0);
+		JOY3_X : IN signed(7 downto 0);
+		JOY3_Y : IN signed(7 downto 0);
+		JOY4_X : IN signed(7 downto 0);
+		JOY4_Y : IN signed(7 downto 0);
 
 		JOY1_N : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
 		JOY2_N : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
+		JOY3_N : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
+		JOY4_N : IN std_logic_vector(4 downto 0); -- FRLDU, 0=pressed
 
 		-- Pokey keyboard matrix
 		-- Standard component available to connect this to PS2
@@ -109,7 +117,7 @@ ARCHITECTURE vhdl OF atari5200core_simplesdram IS
 SIGNAL PBI_WRITE_DATA : std_logic_vector(31 downto 0);
 
 -- TRIG
-SIGNAL TRIG : STD_LOGIC_VECTOR(1 downto 0);
+SIGNAL TRIG : STD_LOGIC_VECTOR(3 downto 0);
 
 -- CONSOL
 SIGNAL CONSOL_OUT : STD_LOGIC_VECTOR(3 downto 0);
@@ -142,6 +150,8 @@ BEGIN
 -- triggers
 TRIG(0) <= JOY1_N(4);
 TRIG(1) <= JOY2_N(4);
+TRIG(2) <= JOY3_N(4);
+TRIG(3) <= JOY4_N(4);
 
 -- pots
 pot0 : entity work.pot_from_signed
@@ -219,7 +229,82 @@ PORT MAP
 	FORCE_HIGH => NOT(JOY2_N(1)),
 	POT_HIGH => POT_IN(3)
 );
-POT_IN(7 downto 4) <= (others=>'0');
+
+pot4 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	min_lines=>min_lines,
+	max_lines=>max_lines
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => CONSOL_OUT(2),
+	POT_RESET => POT_RESET,
+	POS => JOY3_X,
+	FORCE_LOW => NOT(JOY3_N(2)),
+	FORCE_HIGH => NOT(JOY3_N(3)),
+	POT_HIGH => POT_IN(4)
+);
+
+pot5 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	min_lines=>min_lines,
+	max_lines=>max_lines
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => CONSOL_OUT(2),
+	POT_RESET => POT_RESET,
+	POS => JOY3_Y,
+	FORCE_LOW => NOT(JOY3_N(0)),
+	FORCE_HIGH => NOT(JOY3_N(1)),
+	POT_HIGH => POT_IN(5)
+);
+
+pot6 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	min_lines=>min_lines,
+	max_lines=>max_lines
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => CONSOL_OUT(2),
+	POT_RESET => POT_RESET,
+	POS => JOY4_X,
+	FORCE_LOW => NOT(JOY4_N(2)),
+	FORCE_HIGH => NOT(JOY4_N(3)),
+	POT_HIGH => POT_IN(6)
+);
+
+pot7 : entity work.pot_from_signed
+GENERIC MAP
+(
+	cycle_length=>cycle_length,
+	min_lines=>min_lines,
+	max_lines=>max_lines
+)
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLED => CONSOL_OUT(2),
+	POT_RESET => POT_RESET,
+	POS => JOY4_Y,
+	FORCE_LOW => NOT(JOY4_N(0)),
+	FORCE_HIGH => NOT(JOY4_N(1)),
+	POT_HIGH => POT_IN(7)
+);
 
 -- Internal rom/ram
 internalromram1 : entity work.internalromram
@@ -277,6 +362,8 @@ PORT MAP
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
 
+	CLIP_SIDES => CLIP_SIDES,
+
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
 
@@ -311,7 +398,7 @@ PORT MAP
 	-- GTIA consol
 	CONSOL_OUT => CONSOL_OUT, -- TODO sound, pots(err, pokey?), 2bit controller keyboard select
 	CONSOL_IN => "1000",
-	GTIA_TRIG => "11"&TRIG, -- triggers (4 ports...)
+	GTIA_TRIG => TRIG, -- triggers (4 ports...)
 
 	-- ANTIC 
 	ANTIC_REFRESH => SDRAM_REFRESH,
