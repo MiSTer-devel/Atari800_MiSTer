@@ -407,6 +407,7 @@ wire [7:0] R,G,B, Ro,Go,Bo;
 wire HBlank,VBlank,HBlank_o,VBlank_o;
 wire VSync, HSync, VSync_o, HSync_o;
 wire ce_pix;
+wire ce_pix_raw;
 
 assign CLK_VIDEO = clk_vdo;
 
@@ -461,7 +462,7 @@ atari800top atari800top
 	.VGA_B(Bo),
 	.VGA_G(Go),
 	.VGA_R(Ro),
-	.VGA_PIXCE(ce_pix),
+	.VGA_PIXCE(ce_pix_raw),
 	.HBLANK(HBlank_o),
 	.VBLANK(VBlank_o),
 
@@ -549,6 +550,13 @@ assign VGA_F1 = 0;
 assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
 
 wire [2:0] scale = status[19:17];
+
+reg ce_pix_raw_old = 0;
+assign ce_pix = ce_pix_raw & ~ce_pix_raw_old;
+
+always @(posedge CLK_VIDEO) begin
+	ce_pix_raw_old <= ce_pix_raw;
+end
 
 reg hsync_o, vsync_o;
 always @(posedge CLK_VIDEO) begin
