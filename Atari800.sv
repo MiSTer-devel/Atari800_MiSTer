@@ -572,6 +572,7 @@ articolor articolor
 	.ce_pix(ce_pix),
 	
 	.enable(status[31]),
+	.pal(~status[5]),
 
 	.r_in(Ro),
 	.g_in(Go),
