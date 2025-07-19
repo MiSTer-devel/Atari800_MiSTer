@@ -24,7 +24,7 @@ module articolor
 	input ce_pix,
 	
 	input enable,
-	input pal,
+	input colorset,
 
 	input  [7:0] r_in,  g_in,  b_in,
 	input        hbl_in, vbl_in, hs_in, vs_in,
@@ -80,7 +80,7 @@ always @(posedge clk) begin
 		if(mix[1]) begin
 			if(mix[0]) begin
 				// This is more general and may work with colors other than B/W
-				if (pal) begin
+				if (colorset) begin
 					// PAL
 					r_out <= 0;
 					g_out <= (unsigned'(g_d[0] | g_d[1]) * 141) >> 8;
@@ -115,7 +115,7 @@ always @(posedge clk) begin
 			end
 			else begin
 				// This is more general and may work with colors other than B/W
-				if (pal) begin
+				if (colorset) begin
 					// PAL
 					r_out <= (unsigned'(r_d[0] | r_d[1]) * 207) >> 8;
 					g_out <= (unsigned'(g_d[0] | g_d[1]) * 109) >> 8;
