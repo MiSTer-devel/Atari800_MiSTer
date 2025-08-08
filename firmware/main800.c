@@ -431,7 +431,7 @@ void actions()
 				// Clean reboot, but hold it for now
 				reboot(1, 1);
 				// Reinitialize the whole memory to 0 rather than the DRAM pattern
-				memset32(SDRAM_BASE, 0x00, main_ram_size/4);
+				memset8(SDRAM_BASE, 0x00, main_ram_size);
 
 				xex_reloc = get_xexloc() ? 1 : XEX_LOADER_LOC;
 

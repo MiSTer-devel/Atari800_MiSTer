@@ -336,6 +336,7 @@ wire [7:0] R,G,B;
 wire HBlank,VBlank;
 wire VSync, HSync;
 wire ce_pix;
+wire ce_pix_raw;
 
 assign CLK_VIDEO = clk_vdo;
 
@@ -381,7 +382,7 @@ atari5200top atari5200top
 	.VGA_B(B),
 	.VGA_G(G),
 	.VGA_R(R),
-	.VGA_PIXCE(ce_pix),
+	.VGA_PIXCE(ce_pix_raw),
 	.HBLANK(HBlank),
 	.VBLANK(VBlank),
 
@@ -446,6 +447,13 @@ assign VGA_F1 = 0;
 assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
 
 wire [2:0] scale = status[19:17];
+
+reg ce_pix_raw_old = 0;
+assign ce_pix = ce_pix_raw & ~ce_pix_raw_old;
+
+always @(posedge CLK_VIDEO) begin
+	ce_pix_raw_old <= ce_pix_raw;
+end
 
 video_mixer #(.GAMMA(1)) video_mixer
 (
