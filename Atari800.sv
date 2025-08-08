@@ -220,7 +220,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -276,7 +276,7 @@ localparam CONF_STR = {
 	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P3OHJ,Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"P3OV,NTSC/PAL artifacting,No,Yes;",
-	"d3P3oK,Artifacting colors,Set 1,Set 2;",
+	"d3P3oN,Artifacting colors,Set 1,Set 2;",
 	"P3o2,Clip sides,Disabled,Enabled;",
 	"P3OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"d0P3OO,Vertical Crop,Disabled,216p(5x);",
@@ -573,7 +573,7 @@ articolor articolor
 	.ce_pix(ce_pix),
 	
 	.enable(status[31]),
-	.colorset(~status[52]),
+	.colorset(~status[55]),
 
 	.r_in(Ro),
 	.g_in(Go),
