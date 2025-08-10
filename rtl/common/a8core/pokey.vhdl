@@ -1309,11 +1309,7 @@ end generate;
 		
 		if (((enable_15 and not(skctl_reg(2))) or (enable_179 and skctl_reg(2))) = '1') then
 			pot_counter_next <= std_logic_vector(unsigned(pot_counter_reg) + 1);
-			if (pot_counter_reg = X"E4") then
-				pot_reset_next <= '1'; -- turn on pot dump transistors
-				allpot_next <= (others=>'0');
-			end if;
-			
+
 			if (pot_reset_reg = '0') then
 				if (pot_in(0) = '0') then -- pot now high, latch
 					pot0_next <= pot_counter_reg;
@@ -1340,17 +1336,20 @@ end generate;
 					pot7_next <= pot_counter_reg;
 				end if;
 
-				if (pot_counter_reg /= X"E4") then
-					allpot_next <= allpot_reg and not(pot_in);
-				end if;
-			end if;			
+				allpot_next <= allpot_reg and not(pot_in);
+			end if;
+
+			if (pot_counter_reg = X"E4") then
+				pot_reset_next <= '1'; -- turn on pot dump transistors
+				allpot_next <= (others=>'0');
+			end if;
 		end if;
-			
+
 		if (potgo_write = '1') then
 			pot_counter_next <= x"01";
 			pot_reset_next <= '0'; -- turn off pot dump transistors, so they start to get charged
 			allpot_next <= (others=>'1');
-		end if;		
+		end if;
 	end process;
 	
 	-- Outputs
@@ -1369,8 +1368,8 @@ end generate;
 	sio_clockin_oe <= not(clock_input);
 	sio_clockin_out <= serin_clock_reg;
 	
-	pot_reset <= pot_reset_reg;
-		
+	pot_reset <= pot_reset_reg and not(skctl_reg(2));
+
 END vhdl;
 
 
