@@ -1308,10 +1308,8 @@ end generate;
 		pot_counter_next <= pot_counter_reg;
 		
 		if (((enable_15 and not(skctl_reg(2))) or (enable_179 and skctl_reg(2))) = '1') then
-			if (pot_counter_reg /= X"E4") then
-				pot_counter_next <= std_logic_vector(unsigned(pot_counter_reg) + 1);
-			end if;
-			if (pot_counter_reg = X"E4") and (skctl_reg(2) = '0') then
+			pot_counter_next <= std_logic_vector(unsigned(pot_counter_reg) + 1);
+			if (pot_counter_reg = X"E4") then
 				pot_reset_next <= '1'; -- turn on pot dump transistors
 				allpot_next <= (others=>'0');
 			end if;
@@ -1342,7 +1340,9 @@ end generate;
 					pot7_next <= pot_counter_reg;
 				end if;
 
-				allpot_next <= allpot_reg and not(pot_in);
+				if (pot_counter_reg /= X"E4") then
+					allpot_next <= allpot_reg and not(pot_in);
+				end if;
 			end if;			
 		end if;
 			
