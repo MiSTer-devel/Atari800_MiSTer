@@ -29,6 +29,7 @@ A800: After mounting the disk, press F10 to boot.
 Some games don't like the Basic ROM. Keep F8(Option) pressed while pressing F10 to skip the Basic.
 You can also boot a disk directly from the D1: drive using the first menu entry, the F10 Reset and F8 Option keys are applied automatically, any mounted carts are unmounted.
 For ATX disk titles that are timing sensitive, you may also want to try to change the emulated drive timing between the older 810 disk drive, and the XL line 1050 one (this does not apply at all to non-ATX titles, the option has no effect). Moreover, some ATX titles will only load on the PAL or NTSC machine only, depending on which system they were designed for.
+**Note:** ATR images inside ZIP containers are mounted read-only (write-protected as far as the Atari OS is concerned), software that relies on being able to write to the disk might fail (sometimes ungracefully). Writing to disks is supported for ATR images outside containers, yet this can also be forced to be read-only with a menu option that makes all mounts write-protected. Finally, all ATX images are mounted read-only, ATX writing is not supported.
 
 ### Executable files
 A800: There is an entry to directly load the Atari OS executable files (the so called XEX files) using a high-speed direct memory access loader.
