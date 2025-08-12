@@ -409,14 +409,21 @@ void actions()
 		}
 		else if(num == 6)
 		{
-			set_pause_6502(1);
-			set_cart_select(0);
-			// TODO Unmount all the other drives?
-			set_drive_status(0, file->size ? file : 0);
-			reboot(1, 0);
-			// Important: if you set Option key before reset it will be cleared by reset
-			set_option_force_on();
-			set_option_force_off();
+			if(file->size)
+			{
+				set_pause_6502(1);
+				set_cart_select(0);
+				// TODO Unmount all the other drives?
+				set_drive_status(0, file);
+				reboot(1, 0);
+				// Important: if you set Option key before reset it will be cleared by reset
+				set_option_force_on();
+				set_option_force_off();
+			}
+			else
+			{
+				set_drive_status(0, 0);
+			}
 		}
 		else if(num == 5)
 		{
