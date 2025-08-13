@@ -351,7 +351,7 @@ int load_car(struct SimpleFile* file, u08 stacked)
 	if(carttype == 85)
 	{
 		memcp8((unsigned char *)(CARTRIDGE_MEM+0x80000), (unsigned char *)(CARTRIDGE_MEM+0x100000), 0, 0x2000);
-		memset32((unsigned char *)(CARTRIDGE_MEM+0x80000), 0, 0x20000);
+		memset8((unsigned char *)(CARTRIDGE_MEM+0x80000), 0, 0x80000);
 	}
 	//LOG("cart type: %d size: %dk\n", def->mode, def->size);
 	return mode;
@@ -413,6 +413,7 @@ void actions()
 			{
 				set_pause_6502(1);
 				set_cart_select(0);
+				set_cart2_select(0);
 				// TODO Unmount all the other drives?
 				set_drive_status(0, file);
 				reboot(1, 0);
@@ -434,6 +435,7 @@ void actions()
 
 				set_pause_6502(1);
 				set_cart_select(0);
+				set_cart2_select(0);
 
 				// Clean reboot, but hold it for now
 				reboot(1, 1);
