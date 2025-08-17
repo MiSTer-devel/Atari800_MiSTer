@@ -225,15 +225,31 @@ void memset8(void *address, int value, int length)
 	while (length--) *mem++=value;
 }
 
+// It is now the second time that this function turned out to be
+// troublesome, on the surface it seems it does its job once per core
+// load and for some reason later on seems to be ineffective, really
+// do not understand why... it may have something to do with how the SDRAM
+// is serviced in address_decoder.vhdl or perhaps something in there is not
+// reset properly. For now, let's just get rid of it and use the short version
+// or direct code for everything.
+/*
 void memset32(void *address, int value, int length)
 {
 	int *mem = address;
 	while (length--) *mem++=value;
 }
+*/
 
 void clear_main_ram()
 {
-	memset32(SDRAM_BASE, 0x00FF00FF, main_ram_size/4);
+//	memset32(SDRAM_BASE, 0x00FF00FF, main_ram_size/4);
+	int length = main_ram_size/2;
+	char *mem = SDRAM_BASE;
+	while (length--)
+	{
+		*mem++ = 0xFF;
+		*mem++ = 0x00;
+	}
 }
 
 void clearscreen()
