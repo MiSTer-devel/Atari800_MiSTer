@@ -1419,12 +1419,14 @@ end generate;
 							bank1next <= addr_next(3)&addr_next(0);
 						end if;
 
-						if(addr_next(12) = '0') then
-							SDRAM_ADDR(15 downto 12) <= "01"&bank0next;
-							RAM_ADDR(15 downto 12)   <= "01"&bank0next;
-						else
-							SDRAM_ADDR(15 downto 12) <= "11"&bank1next;
-							RAM_ADDR(15 downto 12)   <= "11"&bank1next;
+						if(addr_next(13) = '0') then
+							if(addr_next(12) = '0') then
+								SDRAM_ADDR(15 downto 12) <= "01"&bank0next;
+								RAM_ADDR(15 downto 12)   <= "01"&bank0next;
+							else
+								SDRAM_ADDR(15 downto 12) <= "11"&bank1next;
+								RAM_ADDR(15 downto 12)   <= "11"&bank1next;
+							end if;
 						end if;
 					elsif sctype = '1' then
 						if bank0next(0) = '1' then
