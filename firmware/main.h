@@ -259,6 +259,10 @@ void clearscreen()
 
 struct SimpleFile *xex_file;
 
+#ifndef FIRMWARE_5200
+unsigned char turbo_freezer_loaded;
+#endif
+
 void
 reboot(int cold, int pause)
 {
@@ -307,6 +311,11 @@ reboot(int cold, int pause)
 		set_reset_6502_off();
 #ifndef FIRMWARE_5200
 	}
+
+	if(cold && turbo_freezer_loaded)
+	{
+		set_freezer_enable_on();
+	}
 #endif
 	set_pause_6502(pause);
 }
@@ -348,6 +357,9 @@ int main(void)
 
 	last_mount = 0;
 	xex_file = 0;
+#ifndef FIRMWARE_5200
+	turbo_freezer_loaded = 0;
+#endif
 	mainloop();
 	return 0;
 }
