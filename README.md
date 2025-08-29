@@ -55,6 +55,7 @@ Practically, to use an HDD image with SDX you would first turn on the PBI, set t
 ### Differences from original version
 * Joystick/Paddle mode switched by joystick. Press **Paddle1/2** to switch to paddle mode (analog X/Y). Press **Fire** to switch to joystick mode (digital X/Y).
 * Use ` key as a **Break** on reduced keyboards.
+* The original core used the Win key for pausing, right Alt(Gr) does this instead.
 * Cursor keys are mapped to Atari cursor keys.
 * PAL/NTSC mode switch in settings menu (A800)
 * Video aspect ratio switch in settings menu
