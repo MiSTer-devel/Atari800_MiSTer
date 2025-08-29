@@ -492,8 +492,13 @@ PORT MAP
 
 	-- external control
 	-- switches etc. sector DMA blah blah.
+	-- Originally WinKey Left + Right (#11F + #127) for pausing the core
+	-- Potential alternatives for MiSTer not to conflict with Win+PrintScreen:
+	-- Right Ctrl #114, Home #16C, End #169, Right Alt #111, Scroll Lock #7E
+	-- Right Alt seems to be the only option to account for reduced keyboards
 	ZPU_IN1 => X"000"&
-			'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
+			--'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
+			'0'&ps2_keys(16#111#)&
 			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
 			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&(FKEYS(9) or cold_reset_request)&(FKEYS(8) or warm_reset_request)&FKEYS(7 downto 0),
 	ZPU_IN2 => X"0" & '0' & PBI_BOOT & PBI_DRIVES_MODE & ZPU_IN2 & PBI_SPLASH & PBI_MODE & ATX_MODE & XEX_LOC & OS_MODE_800 & DRV_SPEED,
