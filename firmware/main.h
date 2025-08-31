@@ -103,12 +103,12 @@ BIT_REG_RO(,0x1,7,hotkey_f8,zpu_in1)
 */
 #define get_hotkey_softboot() (*zpu_in1 & 0x00000100) 
 #define get_hotkey_coldboot() (*zpu_in1 & 0x00000200) 
-#define get_mod_win() (*zpu_in1 & 0x00040000) 
+#define get_hotkey_halt() (*zpu_in1 & 0x00040000) 
 //BIT_REG_RO(,0x1,8,hotkey_softboot,zpu_in1)
 //BIT_REG_RO(,0x1,9,hotkey_coldboot,zpu_in1)
 //BIT_REG_RO(,0x1,10,hotkey_fileselect,zpu_in1)
 //BIT_REG_RO(,0x1,11,hotkey_settings,zpu_in1)
-//BIT_REG_RO(,0x1,18,mod_win,zpu_in1)
+//BIT_REG_RO(,0x1,18,hotkey_halt,zpu_in1)
 
 //BIT_REG_RO(,0x3f,12,controls,zpu_in1) // (esc)FLRDU
 
