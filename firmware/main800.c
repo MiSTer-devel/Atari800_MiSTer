@@ -656,5 +656,5 @@ xex_eof:
 	}
 
 	//pause as WIN is held down
-	set_pause_6502(get_mod_win() ? 1 : 0);
+	set_pause_6502(get_hotkey_halt() ? 1 : 0);
 }
