@@ -282,8 +282,8 @@ port map
 	q => BIOS_DATA
 );
 
-RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001"  else
-            (others=>'1')        when SDRAM_ADDR(22 downto 20) = "111" else
+RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "100000101"  else
+            (others=>'1')        when SDRAM_ADDR(22 downto 16) = "1000001" else
             SDRAM_DO;
 
 zpu: entity work.zpucore

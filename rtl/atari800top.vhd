@@ -307,8 +307,8 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	--internal_ram => 327680
-	internal_ram => 0
+	internal_ram => 327680
+	--internal_ram => 0
 )
 PORT MAP
 (
@@ -451,7 +451,7 @@ joy <= joy1 or joy2 or joy3 or joy4;
 
 ROM_ADDR <= SDRAM_ADDR(14 downto 0);
 RAM_DATA <= x"FFFFFF"&ROM_DO when SDRAM_ADDR(22 downto 15) = "10000010" else
-            (others=>'1')    when SDRAM_ADDR(22 downto 15) = "10000011" else
+            (others=>'1')    when SDRAM_ADDR(22 downto 16) = "1000001" else
             SDRAM_DO;
 
 zpu: entity work.zpucore

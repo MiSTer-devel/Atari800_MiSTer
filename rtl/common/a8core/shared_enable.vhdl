@@ -167,8 +167,8 @@ begin
 	cpu_enable <= (speed_shift_reg(0) or cpu_extra_enable_reg or enable_179) and not(skip_cycle);
 	cpu_extra_enable_next <= cpu_enable and not(memory_ready);
 
-	vbxe_enable <= vbxe_shift_reg(0);
---	vbxe_enable <= (vbxe_shift_reg(0) or vbxe_extra_enable_reg);
+--	vbxe_enable <= vbxe_shift_reg(0);
+	vbxe_enable <= (vbxe_shift_reg(0) or vbxe_extra_enable_reg);
 --	vbxe_enable <= enable_179;
 	vbxe_extra_enable_next <= vbxe_enable and not(memory_ready_vbxe);
 
