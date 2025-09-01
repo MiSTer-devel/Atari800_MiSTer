@@ -221,7 +221,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X  XXXXXXX       XXX  XXXXXXXXX    X
+// X  XXXXXXX       XXX  XXXXXXXXX    X                     X
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -241,6 +241,7 @@ localparam CONF_STR = {
 	"-;",
 	"O34,Stereo mix,None,25%,50%,100%;",
 	"O5,Swap Joysticks 1&2,No,Yes;",
+	"oO,Mouse X,Normal,Inverted;",
 	"O6,Mouse Y,Normal,Inverted;",
 	"-;",
 	"R0,Reset;",
@@ -336,6 +337,7 @@ wire [7:0] R,G,B;
 wire HBlank,VBlank;
 wire VSync, HSync;
 wire ce_pix;
+wire ce_pix_raw;
 
 assign CLK_VIDEO = clk_vdo;
 
@@ -381,7 +383,7 @@ atari5200top atari5200top
 	.VGA_B(B),
 	.VGA_G(G),
 	.VGA_R(R),
-	.VGA_PIXCE(ce_pix),
+	.VGA_PIXCE(ce_pix_raw),
 	.HBLANK(HBlank),
 	.VBLANK(VBlank),
 
@@ -446,6 +448,13 @@ assign VGA_F1 = 0;
 assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
 
 wire [2:0] scale = status[19:17];
+
+reg ce_pix_raw_old = 0;
+assign ce_pix = ce_pix_raw & ~ce_pix_raw_old;
+
+always @(posedge CLK_VIDEO) begin
+	ce_pix_raw_old <= ce_pix_raw;
+end
 
 video_mixer #(.GAMMA(1)) video_mixer
 (
@@ -553,7 +562,7 @@ wire [20:0] j0 = emu ? {joy_0[20:6], ps2_mouse[1:0], joy_0[3:0]} : joy_0;
 reg  signed [8:0] mx = 0;
 wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};
 wire signed [8:0] mdx2 = (mdx > 10) ? 9'd10 : (mdx < -10) ? -8'd10 : mdx;
-wire signed [8:0] nmx = mx + mdx2;
+wire signed [8:0] nmx = status[56] ? (mx - mdx2) : (mx + mdx2);
 
 reg  signed [8:0] my = 0;
 wire signed [8:0] mdy = {ps2_mouse[5],ps2_mouse[5],ps2_mouse[23:17]};

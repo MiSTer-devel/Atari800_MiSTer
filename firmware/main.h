@@ -103,12 +103,12 @@ BIT_REG_RO(,0x1,7,hotkey_f8,zpu_in1)
 */
 #define get_hotkey_softboot() (*zpu_in1 & 0x00000100) 
 #define get_hotkey_coldboot() (*zpu_in1 & 0x00000200) 
-#define get_mod_win() (*zpu_in1 & 0x00040000) 
+#define get_hotkey_halt() (*zpu_in1 & 0x00040000) 
 //BIT_REG_RO(,0x1,8,hotkey_softboot,zpu_in1)
 //BIT_REG_RO(,0x1,9,hotkey_coldboot,zpu_in1)
 //BIT_REG_RO(,0x1,10,hotkey_fileselect,zpu_in1)
 //BIT_REG_RO(,0x1,11,hotkey_settings,zpu_in1)
-//BIT_REG_RO(,0x1,18,mod_win,zpu_in1)
+//BIT_REG_RO(,0x1,18,hotkey_halt,zpu_in1)
 
 //BIT_REG_RO(,0x3f,12,controls,zpu_in1) // (esc)FLRDU
 
@@ -225,15 +225,31 @@ void memset8(void *address, int value, int length)
 	while (length--) *mem++=value;
 }
 
+// It is now the second time that this function turned out to be
+// troublesome, on the surface it seems it does its job once per core
+// load and for some reason later on seems to be ineffective, really
+// do not understand why... it may have something to do with how the SDRAM
+// is serviced in address_decoder.vhdl or perhaps something in there is not
+// reset properly. For now, let's just get rid of it and use the short version
+// or direct code for everything.
+/*
 void memset32(void *address, int value, int length)
 {
 	int *mem = address;
 	while (length--) *mem++=value;
 }
+*/
 
 void clear_main_ram()
 {
-	memset32(SDRAM_BASE, 0x00FF00FF, main_ram_size/4);
+//	memset32(SDRAM_BASE, 0x00FF00FF, main_ram_size/4);
+	int length = main_ram_size/2;
+	char *mem = SDRAM_BASE;
+	while (length--)
+	{
+		*mem++ = 0xFF;
+		*mem++ = 0x00;
+	}
 }
 
 void clearscreen()
@@ -242,6 +258,10 @@ void clearscreen()
 }
 
 struct SimpleFile *xex_file;
+
+#ifndef FIRMWARE_5200
+unsigned char turbo_freezer_loaded;
+#endif
 
 void
 reboot(int cold, int pause)
@@ -291,6 +311,11 @@ reboot(int cold, int pause)
 		set_reset_6502_off();
 #ifndef FIRMWARE_5200
 	}
+
+	if(cold && turbo_freezer_loaded)
+	{
+		set_freezer_enable_on();
+	}
 #endif
 	set_pause_6502(pause);
 }
@@ -332,6 +357,9 @@ int main(void)
 
 	last_mount = 0;
 	xex_file = 0;
+#ifndef FIRMWARE_5200
+	turbo_freezer_loaded = 0;
+#endif
 	mainloop();
 	return 0;
 }

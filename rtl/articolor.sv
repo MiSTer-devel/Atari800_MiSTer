@@ -18,12 +18,46 @@
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
 
+//`define A1C1_R 0
+//`define A1C1_G 141
+//`define A1C1_B 255
+//
+//`define A1C2_R 207
+//`define A1C2_G 109
+//`define A1C2_B 3
+//
+//`define A2C1_R 134
+//`define A2C1_G 248
+//`define A2C1_B 113
+//
+//`define A2C2_R 255
+//`define A2C2_G 133
+//`define A2C2_B 250
+
+`define A1C1_R 0
+`define A1C1_G 155
+`define A1C1_B 203
+
+`define A1C2_R 239
+`define A1C2_G 51
+`define A1C2_B 0
+
+`define A2C1_R 0
+`define A2C1_G 171
+`define A2C1_B 0
+
+`define A2C2_R 219
+`define A2C2_G 78
+`define A2C2_B 236
+
 module articolor
 (
 	input clk,
 	input ce_pix,
 	
 	input enable,
+	input colorset,
+	input colorswap,
 
 	input  [7:0] r_in,  g_in,  b_in,
 	input        hbl_in, vbl_in, hs_in, vs_in,
@@ -40,14 +74,14 @@ always @(posedge clk) begin
 	
 	if(ce_pix) begin
 		n <= ~n;
-		if(~hs_out & hs_in) n <= 0;
+		if(~hs_out & hs_in) n <= colorswap;
 
 		mix <= 0;
 		if(enable) begin
-			if(r_d[0] >= 238 && g_d[0] >= 238 && b_d[0] >= 238 && !r_in && !g_in && !b_in && !r_d[1] && !g_d[1] && !b_d[1]) begin
+			if(r_d[0] >= 10 && r_d[0] > r_in && g_d[0] > g_in && b_d[0] > b_in && r_d[0] > r_d[1] && g_d[0] > g_d[1] && b_d[0] > b_d[1]) begin
 				mix <= {1'b1,n};
 			end 
-			else if(!r_d[0] && !g_d[0] && !b_d[0] && r_in >= 238 && g_in >= 238 && b_in >= 238 && r_d[1] >= 238 && g_d[1] >= 238 && b_d[1] >= 238) begin
+			else if(r_in >= 10 && r_in > r_d[0] && g_in > g_d[0] && b_in > b_d[0] && r_d[1] > r_d[0] && g_d[1] > g_d[0] && b_d[1] > b_d[0]) begin
 				mix <= {1'b1,~n};
 			end
 		end
@@ -78,14 +112,61 @@ always @(posedge clk) begin
 
 		if(mix[1]) begin
 			if(mix[0]) begin
-				r_out <= 0;
-				g_out <= 141;
-				b_out <= 255;
+				if (colorset) begin
+					// Set 1
+					if (r_d[0] > r_d[1]) begin
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A1C1_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A1C1_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A1C1_B) >> 8;
+					end
+					else begin
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A1C1_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A1C1_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A1C1_B) >> 8;
+					end
+				end
+				else begin
+					// Set 2
+					if (r_d[0] > r_d[1]) begin
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A2C1_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A2C1_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A2C1_B) >> 8;
+					end
+					else begin
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A2C1_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A2C1_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A2C1_B) >> 8;
+					end
+				end
 			end
 			else begin
-				r_out <= 207;
-				g_out <= 109;
-				b_out <= 3;
+				if (colorset) begin
+					// Set 1
+					if (r_d[0] > r_d[1]) begin
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A1C2_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A1C2_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A1C2_B) >> 8;
+					end
+					else begin
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A1C2_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A1C2_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A1C2_B) >> 8;
+					end
+				end
+				else begin
+					// Set 2
+					if (r_d[0] > r_d[1]) begin
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A2C2_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A2C2_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A2C2_B) >> 8;
+					end
+					else begin
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A2C2_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A2C2_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A2C2_B) >> 8;
+					end
+				end
+
 			end
 		end
 

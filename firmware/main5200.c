@@ -228,7 +228,7 @@ void actions()
 
 void mainloop()
 {
-	memset32(SDRAM_BASE+0x4000, 0, 32768/4);
+	memset8(SDRAM_BASE+0x4000, 0, 32768);
 
 	reboot(1, 0);
 	for (;;) actions();

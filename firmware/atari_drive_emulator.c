@@ -219,7 +219,7 @@ unsigned char hdd_partition_scan(struct SimpleFile *file, unsigned char info)
 		else
 		{
 			drive_infos[read].info = (info & 0xC0) | (atari_sector_buffer[i] & 0x40 ? INFO_META : 0) |
-			((atari_sector_buffer[i] & 0x30) || (atari_sector_buffer[i+12] & 0x80) ? INFO_RO : 0);
+				((atari_sector_buffer[i] & 0x30) || (atari_sector_buffer[i+12] & 0x80) ? INFO_RO : 0);
 			atari_sector_buffer[i] &= 0x8F;
 			if(atari_sector_buffer[i] > 3 || (atari_sector_buffer[i+1] != 0x00 && atari_sector_buffer[i+1] != 0x03) || !(atari_sector_buffer[i+12] & 0x40))
 			{
@@ -587,30 +587,22 @@ void handleSpeed(struct command command, int driveNumber, struct SimpleFile * fi
 
 void handleFormat(struct command command, int driveNumber, struct  SimpleFile * file, struct sio_action * action)
 {
-	if (drive_infos[driveNumber].info & INFO_RO) 
-	{
-		// fail, write protected
-		action->success = 0;
-	}
-	else
-	{
-		int i;
+	int i;
 
-		// fill image with zeros
-		memset8(action->sector_buffer, 0, drive_infos[driveNumber].sector_size);
-		int written = 0;
-		i = drive_infos[driveNumber].offset;
-		file_seek(file, i);
-		for (; i != file->size; i += 128)
-		{
-			file_write(file, &action->sector_buffer[0], 128, &written);
-		}
-
-		// return done
-		action->sector_buffer[0] = 0xff;
-		action->sector_buffer[1] = 0xff;
-		action->bytes = drive_infos[driveNumber].sector_size;
+	// fill image with zeros
+	memset8(action->sector_buffer, 0, drive_infos[driveNumber].sector_size);
+	int written = 0;
+	i = drive_infos[driveNumber].offset;
+	file_seek(file, i);
+	for (; i != file->size; i += 128)
+	{
+		file_write(file, &action->sector_buffer[0], 128, &written);
 	}
+
+	// return done
+	action->sector_buffer[0] = 0xff;
+	action->sector_buffer[1] = 0xff;
+	action->bytes = drive_infos[driveNumber].sector_size;
 }
 
 void handleReadPercomBlock(struct command command, int driveNumber, struct SimpleFile * file, struct sio_action * action)
@@ -778,15 +770,8 @@ void handleWrite(struct command command, int driveNumber, struct SimpleFile * fi
 	u08 pbi = command.deviceId & 0x40;
 	u32 sector = (command.auxab << 16) | command.aux1 | (command.aux2 << 8);
 	int sectorSize = 0;
-	u32 location =0;
+	u32 location = 0;
 
-	if (file->is_readonly)
-	{
-		action->success = 0;
-		return;
-	}
-	//printf("%f:WACK\n",when());
-	//
 	action->respond = 0;
 
 	sectorSize = set_location_offset(driveNumber, sector, &location);
@@ -1008,6 +993,7 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 	u08 min_sector = (command.deviceId & 0x3F) == 0x20 ? 0 : 1;
 	int driveNumber = min_sector ? (command.deviceId & 0xf) - 1 : MAX_DRIVES;
 	u08 pbi = command.deviceId & 0x40;
+	u08 writable = !(drive_infos[driveNumber].info & INFO_RO);
 
 	switch (command.command)
 	{
@@ -1017,7 +1003,7 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 		break;
 	case 0x21: // format single
 	case 0x22: // format enhanced
-		if(!pbi)
+		if(writable && !pbi)
 			res = &handleFormat;
 		break;
 	case 0x46:
@@ -1034,7 +1020,7 @@ CommandHandler getCommandHandler(struct command command, u08 dstats)
 		break;
 	case 0x50: // write
 	case 0x57: // write with verify
-		if ((!pbi || dstats == 0x80) && sector >= min_sector && sector - min_sector < drive_infos[driveNumber].sector_count)
+		if (writable && (!pbi || dstats == 0x80) && sector >= min_sector && sector - min_sector < drive_infos[driveNumber].sector_count)
 			res = &handleWrite;
 		break;
 	case 0x52: // read

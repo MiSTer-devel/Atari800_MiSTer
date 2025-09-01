@@ -220,7 +220,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -251,6 +251,8 @@ localparam CONF_STR = {
 	"P1o6,ATX drive timing,1050,810;",
 	"P1-;",
 	"P1o0,XEX loader,Standard,Stack;",
+	"P1-;",
+	"P1oP,Mount read-only,Disabled,Enabled;",
 	"P2,Hardware & OS;",
 	"P2-;",
 	"P2O79,CPU speed,1x,2x,4x,8x,16x;",
@@ -275,7 +277,9 @@ localparam CONF_STR = {
 	"P3-;",
 	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P3OHJ,Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-	"P3OV,NTSC/PAL artifacting,No,Yes;",
+	"d3P3OV,NTSC artifacting,No,Yes;",
+	"d4P3oN,Artifacting colors,Set 1,Set 2;",
+	"d4P3oQ,Swap artif. colors,No,Yes;",
 	"P3o2,Clip sides,Disabled,Enabled;",
 	"P3OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"d0P3OO,Vertical Crop,Disabled,216p(5x);",
@@ -287,6 +291,8 @@ localparam CONF_STR = {
 	"P5,Input;",
 	"P5-;",
 	"P5OL,Swap Joysticks 1&2,No,Yes;",
+	"P5-;",
+	"P5oO,Mouse X,Normal,Inverted;",
 	"P5O6,Mouse Y,Normal,Inverted;",
 	"-;",
 	"r7,Warm Reset (F9);",
@@ -374,7 +380,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({~status[2] & status[42], status[2],en216p}),
+	.status_menumask({status[31] & status[5], status[5], ~status[2] & status[42], status[2], en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -407,6 +413,7 @@ wire [7:0] R,G,B, Ro,Go,Bo;
 wire HBlank,VBlank,HBlank_o,VBlank_o;
 wire VSync, HSync, VSync_o, HSync_o;
 wire ce_pix;
+wire ce_pix_raw;
 
 assign CLK_VIDEO = clk_vdo;
 
@@ -461,7 +468,7 @@ atari800top atari800top
 	.VGA_B(Bo),
 	.VGA_G(Go),
 	.VGA_R(Ro),
-	.VGA_PIXCE(ce_pix),
+	.VGA_PIXCE(ce_pix_raw),
 	.HBLANK(HBlank_o),
 	.VBLANK(VBlank_o),
 
@@ -550,6 +557,13 @@ assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
 
 wire [2:0] scale = status[19:17];
 
+reg ce_pix_raw_old = 0;
+assign ce_pix = ce_pix_raw & ~ce_pix_raw_old;
+
+always @(posedge CLK_VIDEO) begin
+	ce_pix_raw_old <= ce_pix_raw;
+end
+
 reg hsync_o, vsync_o;
 always @(posedge CLK_VIDEO) begin
 	if(ce_pix) begin
@@ -563,7 +577,9 @@ articolor articolor
 	.clk(CLK_VIDEO),
 	.ce_pix(ce_pix),
 	
-	.enable(status[31]),
+	.enable(status[5] & status[31]),
+	.colorset(~status[55]),
+	.colorswap(status[58]),
 
 	.r_in(Ro),
 	.g_in(Go),
@@ -800,7 +816,7 @@ always @(posedge clk_sys) begin
 		if(img_mounted == 128) zpu_fileno <= 7;
 
 		zpu_filetype <= ioctl_index[7:6];
-		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5];
+		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5] | status[57];
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end
@@ -818,7 +834,7 @@ wire [13:0] j0 = {joy_0[13:9], emu ? ps2_mouse[1:0] : joy_0[8:7], joy_0[6:0]};
 reg  signed [8:0] mx = 0;
 wire signed [8:0] mdx = {ps2_mouse[4],ps2_mouse[4],ps2_mouse[15:9]};
 wire signed [8:0] mdx2 = (mdx > 10) ? 9'd10 : (mdx < -10) ? -8'd10 : mdx;
-wire signed [8:0] nmx = mx + mdx2;
+wire signed [8:0] nmx = status[56] ? (mx - mdx2) : (mx + mdx2);
 
 reg  signed [8:0] my = 0;
 wire signed [8:0] mdy = {ps2_mouse[5],ps2_mouse[5],ps2_mouse[23:17]};
