@@ -220,7 +220,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -274,6 +274,7 @@ localparam CONF_STR = {
 	"P3-;",
 	"P3O5,Video mode,PAL,NTSC;",
 	"P3o1,Hi-Res ANTIC,Disabled,Enabled;",
+	"P3oRS,VBXE,Disabled,0xD640,0xD740;",
 	"P3-;",
 	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P3OHJ,Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -380,7 +381,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({status[31] & status[5], status[5], ~status[2] & status[42], status[2], en216p}),
+	.status_menumask({status[31] & status[5], status[5] & ~status[59] & ~status[60], ~status[2] & status[42], status[2], en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -486,6 +487,7 @@ atari800top atari800top
 	.WARM_RESET_MENU(status[39]),
 	.COLD_RESET_MENU(status[40] | load_reset),
 	.RTC(rtc),
+	.VBXE_MODE(status[60:59]),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
@@ -577,7 +579,7 @@ articolor articolor
 	.clk(CLK_VIDEO),
 	.ce_pix(ce_pix),
 	
-	.enable(status[5] & status[31]),
+	.enable(status[5] & status[31] & ~status[59] & ~status[60]),
 	.colorset(~status[55]),
 	.colorswap(status[58]),
 

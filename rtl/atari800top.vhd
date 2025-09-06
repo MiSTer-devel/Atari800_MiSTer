@@ -64,6 +64,7 @@ PORT
 	WARM_RESET_MENU : IN STD_LOGIC;
 	COLD_RESET_MENU : IN STD_LOGIC;
 	RTC        : IN STD_LOGIC_VECTOR(64 downto 0);
+	VBXE_MODE  : IN STD_LOGIC_VECTOR(1 downto 0) := "00";
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -307,7 +308,9 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	internal_ram => 327680
+	internal_ram => 131072
+	-- internal_ram => 327680
+	-- internal_ram => 393216 -- Max doable at the moment, 128K short for 512K
 	--internal_ram => 0
 )
 PORT MAP
@@ -391,6 +394,8 @@ PORT MAP
 	ATARI800MODE => OS_MODE_800,
 	PBI_ROM_MODE => PBI_MODE,
 	RTC => RTC,
+	VBXE_SWITCH => VBXE_MODE(0) or VBXE_MODE(1),
+	VBXE_REG_BASE => VBXE_MODE(1),
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
 	emulated_cartridge_select => emulated_cartridge_select,
