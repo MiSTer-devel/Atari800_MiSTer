@@ -248,9 +248,14 @@ SIGNAL	GTIA_WRITE_ENABLE :  STD_LOGIC;
 signal COLOUR : std_logic_vector(7 downto 0);
 
 -- GTIA PALETTE
-signal VIDEO_R_WIDE : std_logic_vector(7 downto 0);
-signal VIDEO_G_WIDE : std_logic_vector(7 downto 0);
-signal VIDEO_B_WIDE : std_logic_vector(7 downto 0);
+signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
+signal VIDEO_G_GTIA : std_logic_vector(7 downto 0);
+signal VIDEO_B_GTIA : std_logic_vector(7 downto 0);
+
+-- VBXE PALETTE
+signal VIDEO_R_VBXE : std_logic_vector(7 downto 0);
+signal VIDEO_G_VBXE : std_logic_vector(7 downto 0);
+signal VIDEO_B_VBXE : std_logic_vector(7 downto 0);
 
 -- CPU
 SIGNAL	CPU_6502_RESET :  STD_LOGIC;
@@ -497,7 +502,12 @@ PORT MAP(
 	SDRAM_WR_EN => VBXE_MEMORY_WRITE_ENABLE,
 	SDRAM_REQUEST => VBXE_FETCH,
 	SDRAM_REQUEST_COMPLETE => MEMORY_READY_VBXE,
-	SDRAM_ADDR => VBXE_MEMORY_ADDR
+	SDRAM_ADDR => VBXE_MEMORY_ADDR,
+	PALETTE_GET_COLOR => COLOUR,
+	PALETTE_GET_INDEX => "00",
+	R_OUT => VIDEO_R_VBXE,
+	G_OUT => VIDEO_G_VBXE,
+	B_OUT => VIDEO_B_VBXE
 );
 
 mmu1 : entity work.address_decoder
@@ -676,19 +686,19 @@ GTIA_SOUND <= not(CONSOL_OUT(3));
 	-- colour palette
 
 gen_palette_none : if palette=0 generate
-	VIDEO_B_WIDE <= COLOUR;
-	VIDEO_R_WIDE <= (others => '0');
-	VIDEO_G_WIDE <= (others => '0');
+	VIDEO_B_GTIA <= COLOUR;
+	VIDEO_R_GTIA <= (others => '0');
+	VIDEO_G_GTIA <= (others => '0');
 end generate;
 
 gen_palette_on : if palette=1 generate
 	palette4 : entity work.gtia_palette
-		port map (PAL=>PAL, ATARI_COLOUR=>COLOUR, R_next=>VIDEO_R_WIDE, G_next=>VIDEO_G_WIDE, B_next=>VIDEO_B_WIDE);		
+		port map (PAL=>PAL, ATARI_COLOUR=>COLOUR, R_next=>VIDEO_R_GTIA, G_next=>VIDEO_G_GTIA, B_next=>VIDEO_B_GTIA);		
 end generate;
 
-VIDEO_R(video_bits-1 downto 0) <= VIDEO_R_WIDE(7 downto 8-video_bits);
-VIDEO_G(video_bits-1 downto 0) <= VIDEO_G_WIDE(7 downto 8-video_bits);
-VIDEO_B(video_bits-1 downto 0) <= VIDEO_B_WIDE(7 downto 8-video_bits);
+VIDEO_R(video_bits-1 downto 0) <= VIDEO_R_VBXE(7 downto 8-video_bits) when VBXE_SWITCH = '1' else VIDEO_R_GTIA(7 downto 8-video_bits);
+VIDEO_G(video_bits-1 downto 0) <= VIDEO_G_VBXE(7 downto 8-video_bits) when VBXE_SWITCH = '1' else VIDEO_G_GTIA(7 downto 8-video_bits);
+VIDEO_B(video_bits-1 downto 0) <= VIDEO_B_VBXE(7 downto 8-video_bits) when VBXE_SWITCH = '1' else VIDEO_B_GTIA(7 downto 8-video_bits);
 
 irq_glue1 : entity work.irq_glue
 PORT MAP(pokey_irq => POKEY_IRQ,

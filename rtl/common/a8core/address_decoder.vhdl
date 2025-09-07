@@ -653,7 +653,9 @@ BEGIN
 						notify_DMA <= '1';
 					else
 						state_next <= state_waiting_DMA;
-					end if;					
+					end if;
+					antic_fetch_real_next <= '0';
+					cpu_fetch_real_next <= atari_dma_access;
 				elsif cpu_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
