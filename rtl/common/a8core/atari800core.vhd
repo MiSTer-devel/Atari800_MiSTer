@@ -334,6 +334,16 @@ SIGNAL	MEMORY_READY_VBXE : STD_LOGIC;
 SIGNAL	VBXE_MEMORY_WRITE_ENABLE : STD_LOGIC;
 SIGNAL	VBXE_WRITE_DATA : STD_LOGIC_VECTOR(7 downto 0);
 
+signal memac_address : std_logic_vector(15 downto 0);
+signal memac_write_enable : std_logic;
+signal memac_cpu_access : std_logic;
+signal memac_antic_access : std_logic;
+signal memac_check : std_logic;
+signal memac_data_write : std_logic_vector(7 downto 0);
+signal memac_data_read : std_logic_vector(7 downto 0);
+signal memac_request : std_logic;
+signal memac_request_complete : std_logic;
+
 -- PBI
 SIGNAL PBI_ADDR_INT : std_logic_vector(15 downto 0);
 
@@ -485,7 +495,7 @@ PORT MAP(
 );
 
 vbxe_board : entity work.VBXE
-GENERIC MAP ( mem_config => 1 )
+GENERIC MAP ( cycle_length => cycle_length, mem_config => 1 )
 PORT MAP(
 	CLK => CLK,
 	ENABLE => VBXE_SWITCH,
@@ -507,7 +517,16 @@ PORT MAP(
 	PALETTE_GET_INDEX => "00",
 	R_OUT => VIDEO_R_VBXE,
 	G_OUT => VIDEO_G_VBXE,
-	B_OUT => VIDEO_B_VBXE
+	B_OUT => VIDEO_B_VBXE,
+	memac_address => memac_address,
+	memac_write_enable => memac_write_enable,
+	memac_cpu_access => memac_cpu_access,
+	memac_antic_access => memac_antic_access,
+	memac_check => memac_check,
+	memac_data_in => memac_data_write,
+	memac_data_out => memac_data_read,
+	memac_request => memac_request,
+	memac_request_complete => memac_request_complete
 );
 
 mmu1 : entity work.address_decoder
@@ -560,6 +579,15 @@ PORT MAP(CLK => CLK,
 		 MEMORY_READY_VBXE => MEMORY_READY_VBXE,
 		 VBXE_MEMORY_WRITE_ENABLE => VBXE_MEMORY_WRITE_ENABLE,
 		 VBXE_WRITE_DATA => VBXE_WRITE_DATA,
+		 memac_address => memac_address,
+		 memac_write_enable => memac_write_enable,
+		 memac_cpu_access => memac_cpu_access,
+		 memac_antic_access => memac_antic_access,
+		 memac_check => memac_check,
+		 memac_data_write => memac_data_write,
+		 memac_data_read => memac_data_read,
+		 memac_request => memac_request,
+		 memac_request_complete => memac_request_complete,
 
 		 ram_select => RAM_SELECT(2 downto 0),
 		 ATARI800MODE => ATARI800MODE,

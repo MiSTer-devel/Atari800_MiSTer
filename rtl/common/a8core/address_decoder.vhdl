@@ -52,6 +52,15 @@ PORT
 	MEMORY_READY_VBXE : out std_logic;
 	VBXE_MEMORY_WRITE_ENABLE : in std_logic := '0';
 	VBXE_WRITE_DATA : in std_logic_vector(7 downto 0) := (others => '0');
+	memac_address : out std_logic_vector(15 downto 0);
+	memac_write_enable : out std_logic;
+	memac_cpu_access : out std_logic;
+	memac_antic_access : out std_logic;
+	memac_check : in std_logic;
+	memac_data_write : out std_logic_vector(7 downto 0);
+	memac_data_read : in std_logic_vector(7 downto 0);
+	memac_request : out std_logic;
+	memac_request_complete : in std_logic;
 
 	-- sources of data
 	ROM_DATA : IN STD_LOGIC_VECTOR(7 downto 0);	-- flash rom
@@ -217,6 +226,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 		
 	signal ram_chip_select : std_logic;
 	signal sdram_chip_select : std_logic;
+	signal memac_chip_select : std_logic;
 	
 --	signal sdram_request_next : std_logic;
 --	signal sdram_request_reg : std_logic;
@@ -460,7 +470,8 @@ BEGIN
 		data_out_enable => emu_pbi_data_out_enable
 	);	
 
-	process(clk,emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
+	process( --clk, -- TODO Test the right cart now!
+		emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
 		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
 	begin
 		emu_cart1_int_d_in <= (others => '0');
@@ -585,7 +596,7 @@ BEGIN
 	-- state machine impl
 	pbi_takeover_adj <= (pbi_takeover) when (freezer_enable='0' or not(freezer_disable_atari)) else '0';
 
-	process(antic_fetch, dma_fetch, cpu_fetch, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
+	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
 				vbxe_fetch, vbxe_memory_addr, vbxe_write_data, vbxe_memory_write_enable)
 	begin
 		start_request <= '0';
@@ -873,8 +884,15 @@ gen_low_memory2 : if low_memory=2 generate
 	SDRAM_OS_ROM_ADDR    <= "0000" & "0111100000000000000";
 
 end generate;
-	
-  	process(
+
+	memac_address <= addr_next(15 downto 0);
+	memac_write_enable <= write_enable_next;
+	memac_cpu_access <= cpu_fetch_real_next;
+	memac_antic_access <= antic_fetch_real_next;
+	memac_data_write <= data_write_next(7 downto 0);
+	memac_request <= memac_chip_select;
+
+	process(
 		-- address and writing absolutely points us at a device
 		ADDR_next,WRITE_enable_next, 
 	
@@ -935,7 +953,8 @@ end generate;
 
 		freezer_enable, freezer_disable_atari, freezer_access_type,
 		freezer_dout, freezer_request_complete,
-		SDRAM_FREEZER_RAM_ADDR, SDRAM_FREEZER_ROM_ADDR
+		SDRAM_FREEZER_RAM_ADDR, SDRAM_FREEZER_ROM_ADDR,
+		memac_check, memac_data_read, memac_request_complete 
 	)
 	begin
 		MEMORY_DATA_INT <= (others => '1');
@@ -981,6 +1000,7 @@ end generate;
 		
 		ram_chip_select <= '0';
 		sdram_chip_select <= '0';
+		memac_chip_select <= '0';
 
 		bank0next <= bank0reg;
 		bank1next <= bank1reg;
@@ -997,21 +1017,27 @@ end generate;
 		SDRAM_ADDR(22 downto 14) <= extended_bank;
 		RAM_ADDR(13 downto 0) <= addr_next(13 downto 0);
 		RAM_ADDR(18 downto 14) <= extended_bank(4 downto 0);
-					
-		if (has_ram='1') then
-			if (extended_bank>=std_logic_vector(to_unsigned(sdram_start_bank,9))) then
-				MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
-				sdram_chip_select <= start_request;
-				request_complete <= sdram_request_COMPLETE;
-			else
-				MEMORY_DATA_INT(7 downto 0) <= RAM_DATA(7 downto 0);
-				ram_chip_select <= start_request;
-				request_complete <= ram_request_COMPLETE;
-			end if;
+
+		if (memac_check = '1') then
+			MEMORY_DATA_INT(7 DOWNTO 0) <= memac_data_read;
+			memac_chip_select <= start_request;
+			request_complete <= memac_request_complete;
 		else
-			-- last_bus_reg seems to be the way to go here afterall
-			MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
-			request_complete <= '1';
+			if (has_ram='1') then
+				if (extended_bank>=std_logic_vector(to_unsigned(sdram_start_bank,9))) then
+					MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+					sdram_chip_select <= start_request;
+					request_complete <= sdram_request_COMPLETE;
+				else
+					MEMORY_DATA_INT(7 downto 0) <= RAM_DATA(7 downto 0);
+					ram_chip_select <= start_request;
+					request_complete <= ram_request_COMPLETE;
+				end if;
+			else
+				-- last_bus_reg seems to be the way to go here afterall
+				MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
+				request_complete <= '1';
+			end if;
 		end if;
 		
 		if system=0 then
