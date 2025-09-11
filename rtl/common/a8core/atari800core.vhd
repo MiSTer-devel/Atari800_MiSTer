@@ -343,6 +343,8 @@ signal memac_data_write : std_logic_vector(7 downto 0);
 signal memac_data_read : std_logic_vector(7 downto 0);
 signal memac_request : std_logic;
 signal memac_request_complete : std_logic;
+signal memac_dma_enable : std_logic;
+signal dma_fetch_vbxe_adj : std_logic;
 
 -- PBI
 SIGNAL PBI_ADDR_INT : std_logic_vector(15 downto 0);
@@ -358,6 +360,25 @@ PBI_WIDTH_32bit_ACCESS <= WIDTH_32bit_access;
 PBI_WRITE_DATA <= WRITE_DATA;
 PBI_SNOOP_DATA <= MEMORY_DATA;
 PBI_SNOOP_READY <= MEMORY_READY_CPU or MEMORY_READY_ANTIC;
+
+-- The moment when the dma is allowed to access
+-- the VBXE MEMAC mapped memory needs to be adjusted 
+-- to the proper cycle
+-- TODO This can be still optimized -> also check if it is actually memac access
+-- (vbxe can tell us that)
+-- For the CPU and Atari actually running, the only practical scenario is disk i/o
+-- coming from PBI or the DMA based xex loader, unlikely that there will be a memac
+-- access collision from both CPU and DMA on the same cycle is unlikely
+-- but what about Antic? (Antic memory in the MEMAC range)
+-- But Antic has priority over DMA in the address decoder, does this help? Probably yes!
+-- Should CPU have priority over DMA? 
+
+-- TODO move all this logic to VBXE?
+dma_fetch_vbxe_adj <= 
+	dma_fetch and memac_dma_enable;
+--		(not(VBXE_SWITCH) or
+--			or_reduce(DMA_ADDR(23 downto 18))
+--			or memac_dma_enable);
 
 enables : entity work.shared_enable
 GENERIC MAP(cycle_length => cycle_length)
@@ -526,7 +547,9 @@ PORT MAP(
 	memac_data_in => memac_data_write,
 	memac_data_out => memac_data_read,
 	memac_request => memac_request,
-	memac_request_complete => memac_request_complete
+	memac_request_complete => memac_request_complete,
+	memac_dma_enable => memac_dma_enable,
+	memac_dma_address => dma_addr
 );
 
 mmu1 : entity work.address_decoder
@@ -535,7 +558,7 @@ PORT MAP(CLK => CLK,
 		 CPU_FETCH => CPU_FETCH,
 		 CPU_WRITE_N => R_W_N,
 		 ANTIC_FETCH => ANTIC_FETCH,
-		 DMA_FETCH => DMA_FETCH,
+		 DMA_FETCH => dma_fetch_vbxe_adj,
 		 DMA_READ_ENABLE => DMA_READ_ENABLE,
 		 DMA_32BIT_WRITE_ENABLE => DMA_32BIT_WRITE_ENABLE,
 		 DMA_16BIT_WRITE_ENABLE => DMA_16BIT_WRITE_ENABLE,

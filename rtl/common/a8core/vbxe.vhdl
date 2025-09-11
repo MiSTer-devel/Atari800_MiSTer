@@ -46,8 +46,9 @@ port (
 	memac_data_in : in std_logic_vector(7 downto 0);
 	memac_data_out : out std_logic_vector(7 downto 0);
 	memac_request : in std_logic;
-	memac_request_complete : out std_logic
-
+	memac_request_complete : out std_logic;
+	memac_dma_enable : out std_logic;
+	memac_dma_address : in std_logic_vector(23 downto 0)
 );
 end VBXE;
 
@@ -149,6 +150,8 @@ signal memc_window_address_start : std_logic_vector(15 downto 0);
 signal memc_window_address_end : std_logic_vector(15 downto 0);
 signal memac_check_a : std_logic;
 signal memac_check_b : std_logic;
+--signal memac_dma_check_a : std_logic;
+--signal memac_dma_check_b : std_logic;
 signal memac_check_next : std_logic_vector(1 downto 0);
 signal memac_check_reg : std_logic_vector(1 downto 0);
 
@@ -343,6 +346,29 @@ end process;
 
 memac_data_out <= memac_data_next;
 memac_request_complete <= memac_request_complete_next;
+-- TODO which cycle?
+-- TODO add a check for actual memac access, so that we do not need 
+-- to wait for a cycle
+-- TODO several cycles should be OK, from cycle_length-2 to 0 ???
+-- memac_dma_enable <= clock_shift_reg(cycle_length-1);
+
+memac_dma_enable <=
+	not(enable) or
+	or_reduce(memac_dma_address(23 downto 18))
+	or clock_shift_reg(2)
+	or not(mems_reg(7) or memb_reg(7) or memb_reg(6));
+
+-- This does not work, not sure why, but just checking for registers should be fine
+-- (i.e. no slowdown of DMA access for programs not using VBXE)
+--memac_dma_check_a <= '1' when
+--	(unsigned(memac_dma_address(15 downto 0)) >= unsigned(memc_window_address_start)) and
+--	(unsigned(memac_dma_address(15 downto 0)) <= unsigned(memc_window_address_end)) and
+--	((mems_reg(7) and (memc_reg(3) or memc_reg(2))) = '1')
+--	else '0';
+
+--memac_dma_check_b <= 
+--	not(memac_dma_address(15)) and memac_dma_address(14) and (memb_reg(7) or memb_reg(6));
+
 
 colors0_r: entity work.dpram
 generic map(9,7,"rtl/vbxe/colors_r.mif")
@@ -582,6 +608,8 @@ begin
 		--	data_out <= csel_reg;
 		--when "00101" => -- read psel
 		--	data_out <= psel_reg;
+		when "10011" => -- $53 blitter busy
+			data_out <= x"00"; -- for now fake that the blitter finishes on spot
 		-- MEMAC A registers are readable
 		when "11110" => -- $5E memac_control
 			data_out <= memc_reg;
