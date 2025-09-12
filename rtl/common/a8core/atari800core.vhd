@@ -361,24 +361,8 @@ PBI_WRITE_DATA <= WRITE_DATA;
 PBI_SNOOP_DATA <= MEMORY_DATA;
 PBI_SNOOP_READY <= MEMORY_READY_CPU or MEMORY_READY_ANTIC;
 
--- The moment when the dma is allowed to access
--- the VBXE MEMAC mapped memory needs to be adjusted 
--- to the proper cycle
--- TODO This can be still optimized -> also check if it is actually memac access
--- (vbxe can tell us that)
--- For the CPU and Atari actually running, the only practical scenario is disk i/o
--- coming from PBI or the DMA based xex loader, unlikely that there will be a memac
--- access collision from both CPU and DMA on the same cycle is unlikely
--- but what about Antic? (Antic memory in the MEMAC range)
--- But Antic has priority over DMA in the address decoder, does this help? Probably yes!
--- Should CPU have priority over DMA? 
-
--- TODO move all this logic to VBXE?
 dma_fetch_vbxe_adj <= 
 	dma_fetch and memac_dma_enable;
---		(not(VBXE_SWITCH) or
---			or_reduce(DMA_ADDR(23 downto 18))
---			or memac_dma_enable);
 
 enables : entity work.shared_enable
 GENERIC MAP(cycle_length => cycle_length)

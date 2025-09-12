@@ -461,7 +461,7 @@ atari800top atari800top
 	.ROM_ADDR(rom_addr),
 	.ROM_DO(rom_do),
 
-	.PAL(~status[5]),
+	.PAL(pal_video),
 	.EXT_ANTIC(status[33]),
 	.CLIP_SIDES(status[34]),
 	.VGA_VS(VSync_o),
@@ -688,6 +688,7 @@ reg splashpbi = 0;
 reg [7:0] drivesmodepbi = 0;
 reg [2:0] bootpbi = 0;
 reg [2:0] ram_config = 0;
+reg pal_video = 0;
 
 always @(posedge clk_sys) if(areset) begin
 	rom_sel <= status[2:1];
@@ -697,6 +698,7 @@ always @(posedge clk_sys) if(areset) begin
 	bootpbi <= status[54:52];
 	drivesmodepbi <= status[51:44];
 	ram_config <= (status[2] ? status[37:35] : status[15:13]);
+	pal_video <= ~status[5];
 end
 
 wire [7:0] xl_pad_do = (rom_addr[13:0] >= osrom_off) ? xl_do : 8'hFF;

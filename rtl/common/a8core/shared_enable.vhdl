@@ -237,6 +237,10 @@ begin
 	ANTIC_ENABLE_179 <= enable_179_early;
 	
 	CPU_ENABLE_OUT <= cpu_enable; -- run at 25MHz
+
+	-- This would be only needed for when the VBXE would be able to use SDRAM
+	-- for video RAM, currently not used, can be probably removed at some point
+	-- (with all the attached logic)
 	VBXE_ENABLE_OUT <= vbxe_enable;
 	
 end vhdl;

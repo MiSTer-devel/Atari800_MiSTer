@@ -85,55 +85,34 @@ signal vram_request_reg : std_logic;
 signal vram_request_next : std_logic;
 signal vram_wr_en_temp : std_logic;
 
+signal index_color : std_logic_vector(7 downto 0);
+
 signal data_color0_r : std_logic_vector(6 downto 0);
-signal index_color0_r : std_logic_vector(7 downto 0);
 signal data_color1_r : std_logic_vector(6 downto 0);
-signal index_color1_r : std_logic_vector(7 downto 0);
 signal data_color2_r : std_logic_vector(6 downto 0);
-signal index_color2_r : std_logic_vector(7 downto 0);
 signal data_color3_r : std_logic_vector(6 downto 0);
-signal index_color3_r : std_logic_vector(7 downto 0);
 
 signal data_color0_g : std_logic_vector(6 downto 0);
-signal index_color0_g : std_logic_vector(7 downto 0);
 signal data_color1_g : std_logic_vector(6 downto 0);
-signal index_color1_g : std_logic_vector(7 downto 0);
 signal data_color2_g : std_logic_vector(6 downto 0);
-signal index_color2_g : std_logic_vector(7 downto 0);
 signal data_color3_g : std_logic_vector(6 downto 0);
-signal index_color3_g : std_logic_vector(7 downto 0);
 
 signal data_color0_b : std_logic_vector(6 downto 0);
-signal index_color0_b : std_logic_vector(7 downto 0);
 signal data_color1_b : std_logic_vector(6 downto 0);
-signal index_color1_b : std_logic_vector(7 downto 0);
 signal data_color2_b : std_logic_vector(6 downto 0);
-signal index_color2_b : std_logic_vector(7 downto 0);
 signal data_color3_b : std_logic_vector(6 downto 0);
-signal index_color3_b : std_logic_vector(7 downto 0);
-signal vbxe_pal : std_logic;
 
 signal csel_reg : std_logic_vector(7 downto 0);
 signal csel_next : std_logic_vector(7 downto 0);
 signal psel_reg : std_logic_vector(7 downto 0);
 signal psel_next : std_logic_vector(7 downto 0);
---signal csel_temp : std_logic_vector(7 downto 0);
---signal psel_temp : std_logic_vector(7 downto 0);
---signal cr_data : std_logic_vector(6 downto 0);
---signal cr_request : std_logic := '0';
---signal cg_data : std_logic_vector(6 downto 0);
---signal cg_request : std_logic := '0';
---signal cb_data : std_logic_vector(6 downto 0);
---signal cb_request : std_logic := '0';
 
 signal cr_reg : std_logic_vector(6 downto 0);
 signal cr_next : std_logic_vector(6 downto 0);
-signal cr_request_reg : std_logic;
-signal cr_request_next : std_logic;
+signal cr_request : std_logic;
 signal cg_reg : std_logic_vector(6 downto 0);
 signal cg_next : std_logic_vector(6 downto 0);
-signal cg_request_reg : std_logic;
-signal cg_request_next : std_logic;
+signal cg_request : std_logic;
 signal cb_reg : std_logic_vector(6 downto 0);
 signal cb_next : std_logic_vector(6 downto 0);
 signal cb_request_reg : std_logic;
@@ -171,10 +150,6 @@ signal clock_shift_reg : std_logic_vector(cycle_length-1 downto 0);
 signal clock_shift_next : std_logic_vector(cycle_length-1 downto 0);
 
 begin
-
--- TODO VBXE switch, reg base, and PAL should be globally latched in on system reset
--- Do this in Atari800.sv
-vbxe_pal <= pal;
 
 memc_window_address_start <= memc_reg(7 downto 4) & x"000";
 memc_window_address_end <=
@@ -217,18 +192,7 @@ memc_window_address_end <=
 	x"EFFF" when memc_reg(1 downto 0) = "11" and memc_reg(7 downto 4) = x"7" else
 	x"FFFF";
 
-index_color0_r <= palette_get_color;
-index_color0_g <= palette_get_color;
-index_color0_b <= palette_get_color;
-index_color1_r <= palette_get_color;
-index_color1_g <= palette_get_color;
-index_color1_b <= palette_get_color;
-index_color2_r <= palette_get_color;
-index_color2_g <= palette_get_color;
-index_color2_b <= palette_get_color;
-index_color3_r <= palette_get_color;
-index_color3_g <= palette_get_color;
-index_color3_b <= palette_get_color;
+index_color <= palette_get_color;
 
 r_out <=
 	data_color0_r & '0' when palette_get_index = "00" else
@@ -346,17 +310,26 @@ end process;
 
 memac_data_out <= memac_data_next;
 memac_request_complete <= memac_request_complete_next;
--- TODO which cycle?
--- TODO add a check for actual memac access, so that we do not need 
--- to wait for a cycle
--- TODO several cycles should be OK, from cycle_length-2 to 0 ???
--- memac_dma_enable <= clock_shift_reg(cycle_length-1);
+
+-- A solution to an intricate problem -- a MEMAC access from either the CPU or Antic
+-- needs to be properly timed, MEMAC can serve one request per Atari cycle, the DMA 
+-- state machine resets everything for a new MEMAC round roughly around the ANTIC
+-- enable signal and serves the MEMAC request shortly after. This way, when the "actual"
+-- Atari asks for MEMAC data we will serve it on the same cycle, and at a particular relative
+-- time compare to when the request was made. Now, ZPU/DMA is not Atari clock sychronized/aware,
+-- and can drop a request that is potentially MEMAC on the address decoder at any time, 
+-- not only when the Atari does it. Long story short - DMA request that is potentially 
+-- accessing MEMAC memory needs to come later than any potential CPU or Antic request
+-- (so that those get priority and DMA is pushed to the next Atari cycle) but at the same time 
+-- early enough so that the MEMAC engine can catch it and service it on the same Atari cycle.
+-- (The priorities implemented in the address decoder do not help much because we can only service
+-- one MEMAC request per Atari cycle). Fine if:
 
 memac_dma_enable <=
-	not(enable) or
-	or_reduce(memac_dma_address(23 downto 18))
-	or clock_shift_reg(2)
-	or not(mems_reg(7) or memb_reg(7) or memb_reg(6));
+	not(enable) or -- VBXE is not active 
+	or_reduce(memac_dma_address(23 downto 18)) -- The DMA access is not to the Atari
+	or clock_shift_reg(1) -- we are at the earliest possible cycle not to push out other reqests
+	or not(mems_reg(7) or memb_reg(7) or memb_reg(6)); -- MEMAC is disabled
 
 -- This does not work, not sure why, but just checking for registers should be fine
 -- (i.e. no slowdown of DMA access for programs not using VBXE)
@@ -376,11 +349,11 @@ port map
 (
 	clock => clk,
 	-- To write - palette updating through registers
-	address_a => vbxe_pal & csel_next, -- color index
+	address_a => pal & csel_next, -- color index
 	data_a => cr_next, -- color value
-	wren_a => cr_request_next and not(psel_next(1)) and not(psel_next(0)), 
+	wren_a => cr_request and not(psel_next(1)) and not(psel_next(0)), 
 	-- To read - get color values for display
-	address_b => vbxe_pal & index_color0_r,
+	address_b => pal & index_color,
 	q_b => data_color0_r
 );
 
@@ -392,9 +365,9 @@ port map
 	-- To write - palette updating through registers
 	address_a => csel_next, -- color index
 	data_a => cr_next, -- color value
-	wren_a => cr_request_next and not(psel_next(1)) and psel_next(0), 
+	wren_a => cr_request and not(psel_next(1)) and psel_next(0), 
 	-- To read - get color values for display
-	address_b => index_color1_r,
+	address_b => index_color,
 	q_b => data_color1_r
 );
 
@@ -406,9 +379,9 @@ port map
 	-- To write - palette updating through registers
 	address_a => csel_next, -- color index
 	data_a => cr_next, -- color value
-	wren_a => cr_request_next and psel_next(1) and not(psel_next(0)), 
+	wren_a => cr_request and psel_next(1) and not(psel_next(0)), 
 	-- To read - get color values for display
-	address_b => index_color2_r,
+	address_b => index_color,
 	q_b => data_color2_r
 );
 
@@ -420,9 +393,9 @@ port map
 	-- To write - palette updating through registers
 	address_a => csel_next, -- color index
 	data_a => cr_next, -- color value
-	wren_a => cr_request_next and psel_next(1) and psel_next(0), 
+	wren_a => cr_request and psel_next(1) and psel_next(0), 
 	-- To read - get color values for display
-	address_b => index_color3_r,
+	address_b => index_color,
 	q_b => data_color3_r
 );
 
@@ -432,11 +405,11 @@ port map
 (
 	clock => clk,
 	-- To write - palette updating through registers
-	address_a => vbxe_pal & csel_next, -- color index
+	address_a => pal & csel_next, -- color index
 	data_a => cg_next, -- color value
-	wren_a => cg_request_next and not(psel_next(1)) and not(psel_next(0)), 
+	wren_a => cg_request and not(psel_next(1)) and not(psel_next(0)), 
 	-- To read - get color values for display
-	address_b => vbxe_pal & index_color0_g,
+	address_b => pal & index_color,
 	q_b => data_color0_g
 );
 
@@ -448,9 +421,9 @@ port map
 	-- To write - palette updating through registers
 	address_a => csel_next, -- color index
 	data_a => cg_next, -- color value
-	wren_a => cg_request_next and not(psel_next(1)) and psel_next(0), 
+	wren_a => cg_request and not(psel_next(1)) and psel_next(0), 
 	-- To read - get color values for display
-	address_b => index_color1_g,
+	address_b => index_color,
 	q_b => data_color1_g
 );
 
@@ -462,9 +435,9 @@ port map
 	-- To write - palette updating through registers
 	address_a => csel_next, -- color index
 	data_a => cg_next, -- color value
-	wren_a => cg_request_next and psel_next(1) and not(psel_next(0)), 
+	wren_a => cg_request and psel_next(1) and not(psel_next(0)), 
 	-- To read - get color values for display
-	address_b => index_color2_g,
+	address_b => index_color,
 	q_b => data_color2_g
 );
 
@@ -476,9 +449,9 @@ port map
 	-- To write - palette updating through registers
 	address_a => csel_next, -- color index
 	data_a => cg_next, -- color value
-	wren_a => cg_request_next and psel_next(1) and psel_next(0), 
+	wren_a => cg_request and psel_next(1) and psel_next(0), 
 	-- To read - get color values for display
-	address_b => index_color3_g,
+	address_b => index_color,
 	q_b => data_color3_g
 );
 
@@ -488,11 +461,11 @@ port map
 (
 	clock => clk,
 	-- To write - palette updating through registers
-	address_a => vbxe_pal & csel_next, -- color index
+	address_a => pal & csel_next, -- color index
 	data_a => cb_next, -- color value
 	wren_a => cb_request_next and not(psel_next(1)) and not(psel_next(0)), 
 	-- To read - get color values for display
-	address_b => vbxe_pal & index_color0_b,
+	address_b => pal & index_color,
 	q_b => data_color0_b
 );
 
@@ -506,7 +479,7 @@ port map
 	data_a => cb_next, -- color value
 	wren_a => cb_request_next and not(psel_next(1)) and psel_next(0), 
 	-- To read - get color values for display
-	address_b => index_color1_b,
+	address_b => index_color,
 	q_b => data_color1_b
 );
 
@@ -520,7 +493,7 @@ port map
 	data_a => cb_next, -- color value
 	wren_a => cb_request_next and psel_next(1) and not(psel_next(0)), 
 	-- To read - get color values for display
-	address_b => index_color2_b,
+	address_b => index_color,
 	q_b => data_color2_b
 );
 
@@ -534,19 +507,19 @@ port map
 	data_a => cb_next, -- color value
 	wren_a => cb_request_next and psel_next(1) and psel_next(0), 
 	-- To read - get color values for display
-	address_b => index_color3_b,
+	address_b => index_color,
 	q_b => data_color3_b
 );
 
 -- write registers
-process(addr, wr_en, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cr_request_reg, cg_request_reg, cb_request_reg, memc_reg, mems_reg, memb_reg)
+process(addr, wr_en, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg)
 begin
 		--blit_data_next <= blit_data_reg;
 		--blit_data_dir_next <= blit_data_dir_reg;
 		csel_next <= csel_reg;
 		psel_next <= psel_reg;
-		cr_request_next <= '0';
-		cg_request_next <= '0';
+		cr_request <= '0';
+		cg_request <= '0';
 		cb_request_next <= '0';
 		cr_next <= cr_reg;
 		cg_next <= cg_reg;
@@ -569,10 +542,10 @@ begin
 					psel_next <= data_in;
 				when "00110" => -- $46 cr
 					cr_next <= data_in(7 downto 1);
-					cr_request_next <= '1';
+					cr_request <= '1';
 				when "00111" => -- $47 cg
 					cg_next <= data_in(7 downto 1);
-					cg_request_next <= '1';
+					cg_request <= '1';
 				when "01000" => -- $48 cb
 					cb_next <= data_in(7 downto 1);
 					cb_request_next <= '1';
@@ -587,7 +560,7 @@ begin
 					null;
 			end case;
 		end if;
-		if cb_request_reg = '1' then -- TODO cb_request_next? Propably, but then not csel_reg!
+		if cb_request_reg = '1' then
 			csel_next <= std_logic_vector(unsigned(csel_reg) + 1);
 		end if;
 end process;
@@ -629,8 +602,6 @@ begin
 		cr_reg <= (others => 'U');
 		cg_reg <= (others => 'U');
 		cb_reg <= (others => 'U');
-		cr_request_reg <= '0';
-		cg_request_reg <= '0';
 		cb_request_reg <= '0';
 		memc_reg <= "UUUU00UU";
 		mems_reg <= "0UUUUUUU";
@@ -651,8 +622,6 @@ begin
 		cr_reg <= cr_next;
 		cg_reg <= cg_next;
 		cb_reg <= cb_next;
-		cr_request_reg <= cr_request_next;
-		cg_request_reg <= cg_request_next;
 		cb_request_reg <= cb_request_next;
 		memc_reg <= memc_next;
 		mems_reg <= mems_next;
@@ -670,19 +639,10 @@ begin
 end process;
 
 -- VBXE DMA state machine
-process
---(clk, reset_n)
-(clock_shift_reg,
-dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, 
-memac_data_reg,
-memac_data_in,
-memac_request_next, memac_check_next,
-memc_reg, memc_window_address_start,
-memb_reg,
-vram_data_in,
-vram_request_complete,
-memac_address
-)
+process(clock_shift_reg,
+	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, 
+	memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
+	memc_reg,memb_reg,vram_data_in,vram_request_complete,memac_address)
 begin
 	dma_state_next <= dma_state_reg;
 	memac_request_complete_next <= memac_request_complete_reg;
@@ -698,27 +658,29 @@ begin
 		if (memac_request_next = "01") then
 			vram_op_next <= "01";
 			if memac_check_next(0) = '1' then
-				-- TODO This can be done slightly shorter
+				vram_addr_next <= mems_reg(6 downto 0) & memac_address(11 downto 0);
 				case memc_reg(1 downto 0) is
 				when "00" =>
-					vram_addr_next <= mems_reg(6 downto 0) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(11 downto 0);
+					null;
 				when "01" =>
-					vram_addr_next <= mems_reg(6 downto 1) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(12 downto 0);
+					vram_addr_next(12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(0);
 				when "10" =>
-					vram_addr_next <= mems_reg(6 downto 2) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(13 downto 0);
+					vram_addr_next(13 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(1 downto 0);
 				when "11" =>
-					vram_addr_next <= mems_reg(6 downto 3) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(14 downto 0);
+					vram_addr_next(14 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(2 downto 0);
 				end case;
 			else -- memac_check_b = '1'
 				vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);
 			end if;
-			if vram_request_complete = '1' then -- TODO won't ever happen for reading? Or?
-				memac_data_next <= vram_data_in;
-				memac_request_complete_next <= '1';
-				dma_state_next(3) <= '0';
-			else
+			-- Waste of effort for reading, for writing can also probably just forget it 
+			-- until the next state / cycle.
+			--if vram_request_complete = '1' then
+			--	memac_data_next <= vram_data_in;
+			--	memac_request_complete_next <= '1';
+			--	dma_state_next(3) <= '0';
+			--else
 				dma_state_next(3) <= '1';
-			end if;
+			--end if;
 		else 
 			dma_state_next(3) <= '0';
 		end if;
@@ -738,15 +700,16 @@ begin
 			vram_op_next <= "11";
 			vram_data_next <= memac_data_in;
 			if memac_check_next(0) = '1' then
+				vram_addr_next <= mems_reg(6 downto 0) & memac_address(11 downto 0);
 				case memc_reg(1 downto 0) is
 				when "00" =>
-					vram_addr_next <= mems_reg(6 downto 0) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(11 downto 0);
+					null;
 				when "01" =>
-					vram_addr_next <= mems_reg(6 downto 1) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(12 downto 0);
+					vram_addr_next(12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(0);
 				when "10" =>
-					vram_addr_next <= mems_reg(6 downto 2) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(13 downto 0);
+					vram_addr_next(13 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(1 downto 0);
 				when "11" =>
-					vram_addr_next <= mems_reg(6 downto 3) & std_logic_vector(unsigned(memac_address) - unsigned(memc_window_address_start))(14 downto 0);
+					vram_addr_next(14 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(2 downto 0);
 				end case;
 			else -- memac_check_b = '1'
 				vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);

@@ -470,8 +470,7 @@ BEGIN
 		data_out_enable => emu_pbi_data_out_enable
 	);	
 
-	process( --clk, -- TODO Test the right cart now!
-		emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
+	process(emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
 		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
 	begin
 		emu_cart1_int_d_in <= (others => '0');
@@ -666,6 +665,9 @@ BEGIN
 						state_next <= state_waiting_DMA;
 					end if;
 					antic_fetch_real_next <= '0';
+					-- This is an important change from the previous versions
+					-- we need to be explict that when DMA/ZPU is accessing Atari
+					-- directly, then this is the same as if CPU is accessing it
 					cpu_fetch_real_next <= atari_dma_access;
 				elsif cpu_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
@@ -684,10 +686,11 @@ BEGIN
 					end if;
 					cpu_fetch_real_next <= '1';
 					antic_fetch_real_next <= '0';
+				-- This is a "would be" code for interfacing VBXE to SDRAM
+				-- does not really work and can probably removed with all the attached logic
 				elsif vbxe_fetch = '1' then
 					start_request <= '1';
 					addr_next <= "11110" & vbxe_memory_addr; -- SDRAM slot
-					-- addr_next <= "00100" & vbxe_memory_addr; -- SRAM
 					write_enable_next <= vbxe_memory_write_enable;
 					width_8bit_next <= '1';
 					data_WRITE_next(7 downto 0) <= vbxe_write_data;
