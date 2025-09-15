@@ -54,22 +54,7 @@ end VBXE;
 
 architecture vhdl of VBXE is
 
--- Few things for testing
---signal blit_data_reg : std_logic_vector(7 downto 0);
---signal blit_data_next : std_logic_vector(7 downto 0);
 
---signal blit_counter_reg : std_logic_vector(7 downto 0);
---signal blit_counter_next : std_logic_vector(7 downto 0);
---signal blit_counter : std_logic_vector(7 downto 0);
-
---signal blit_data_read_reg : std_logic_vector(7 downto 0);
---signal blit_data_read_next : std_logic_vector(7 downto 0);
---signal blit_data_read : std_logic_vector(7 downto 0);
-
---signal blit_data_dir_reg : std_logic_vector(7 downto 0);
---signal blit_data_dir_next : std_logic_vector(7 downto 0);
-
--- Actual things needed by VBXE
 signal vram_addr : std_logic_vector(18 downto 0);
 signal vram_addr_reg : std_logic_vector(18 downto 0);
 signal vram_addr_next : std_logic_vector(18 downto 0);
@@ -143,6 +128,17 @@ signal memac_request_next : std_logic_vector(1 downto 0);
 signal memac_data_reg : std_logic_vector(7 downto 0);
 signal memac_data_next : std_logic_vector(7 downto 0);
 
+signal blitter_addr_reg : std_logic_vector(18 downto 0);
+signal blitter_addr_next : std_logic_vector(18 downto 0);
+signal blitter_status : std_logic_vector(1 downto 0);
+signal blitter_collision : std_logic_vector(7 downto 0);
+signal blitter_enable : std_logic;
+signal blitter_request_reg : std_logic_vector(1 downto 0);
+signal blitter_request_next : std_logic_vector(1 downto 0);
+signal blitter_vram_wren : std_logic;
+signal blitter_vram_data : std_logic_vector(7 downto 0);
+signal blitter_vram_address : std_logic_vector(18 downto 0);
+
 signal vram_op_reg : std_logic_vector(1 downto 0);
 signal vram_op_next : std_logic_vector(1 downto 0);
 
@@ -150,6 +146,22 @@ signal clock_shift_reg : std_logic_vector(cycle_length-1 downto 0);
 signal clock_shift_next : std_logic_vector(cycle_length-1 downto 0);
 
 begin
+
+blitter: entity work.VBXE_blitter
+port map (
+	clk => clk,
+	reset_n => reset_n,
+	blitter_enable => blitter_enable,
+	blitter_start_request => blitter_request_next(0),
+	blitter_stop_request => blitter_request_next(1),
+	blitter_address => blitter_addr_reg,
+	blitter_vram_data_in => vram_data_in,
+	blitter_vram_wren => blitter_vram_wren,
+	blitter_vram_data => blitter_vram_data,
+	blitter_vram_address => blitter_vram_address,
+	blitter_status => blitter_status,
+	blitter_collision => blitter_collision
+);
 
 memc_window_address_start <= memc_reg(7 downto 4) & x"000";
 memc_window_address_end <=
@@ -512,7 +524,8 @@ port map
 );
 
 -- write registers
-process(addr, wr_en, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg)
+process(addr, wr_en, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg,
+	blitter_addr_reg,blitter_request_reg,blitter_status)
 begin
 		--blit_data_next <= blit_data_reg;
 		--blit_data_dir_next <= blit_data_dir_reg;
@@ -527,6 +540,8 @@ begin
 		memc_next <= memc_reg;
 		mems_next <= mems_reg;
 		memb_next <= memb_reg;
+		blitter_addr_next <= blitter_addr_reg;
+		blitter_request_next <= "00";
 		if wr_en = '1' then
 			case addr is
 				-- For testing
@@ -549,6 +564,16 @@ begin
 				when "01000" => -- $48 cb
 					cb_next <= data_in(7 downto 1);
 					cb_request_next <= '1';
+				-- Blitter
+				when "10000" => -- $50 bl_adr0
+					blitter_addr_next(7 downto 0) <= data_in;
+				when "10001" => -- $51 bl_adr1
+					blitter_addr_next(15 downto 8) <= data_in;
+				when "10010" => -- $52 bl_adr2
+					blitter_addr_next(18 downto 16) <= data_in(2 downto 0);
+				when "10011" => -- $53 blitter_start
+					blitter_request_next(0) <= not(blitter_status(0) or blitter_status(1)) and data_in(0);
+					blitter_request_next(1) <= not(data_in(1));
 				-- MEMAC registers
 				when "11101" => -- $5D memac_b_control
 					memb_next <= data_in;
@@ -566,23 +591,21 @@ begin
 end process;
 
 -- Read registers
-process(addr, memc_reg, mems_reg)
+process(addr, memc_reg, mems_reg, blitter_status, blitter_collision)
 begin
 	case addr is
 		when "00000" => -- $40 core version -> FX
 			data_out <= X"10";
 		when "00001" => -- $41 minor version
 			data_out <= X"26";
-		--when "00010" => -- 
-		--	data_out <= blit_counter_reg;
-		--when "00011" => -- 
-		--	data_out <= blit_data_read_reg;
 		--when "00100" => -- read csel
 		--	data_out <= csel_reg;
 		--when "00101" => -- read psel
 		--	data_out <= psel_reg;
+		when "10000" => -- $50 collision_code
+			data_out <= blitter_collision;
 		when "10011" => -- $53 blitter busy
-			data_out <= x"00"; -- for now fake that the blitter finishes on spot
+			data_out <= "000000" & blitter_status(1 downto 0);
 		-- MEMAC A registers are readable
 		when "11110" => -- $5E memac_control
 			data_out <= memc_reg;
@@ -615,6 +638,7 @@ begin
 		memac_check_reg <= "00";
 		clock_shift_reg <= (others => '0');
 		memac_data_reg <= (others => '0');
+		blitter_addr_reg <= (others => '0');
 	elsif rising_edge(clk) then
 		vram_request_reg <= vram_request_next;
 		csel_reg <= csel_next;
@@ -635,6 +659,7 @@ begin
 		memac_check_reg <= memac_check_next;
 		clock_shift_reg <= clock_shift_next;
 		memac_data_reg <= memac_data_next;
+		blitter_addr_reg <= blitter_addr_next;
 	end if;
 end process;
 
@@ -642,13 +667,16 @@ end process;
 process(clock_shift_reg,
 	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, 
 	memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
-	memc_reg,memb_reg,vram_data_in,vram_request_complete,memac_address)
+	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,memac_address,
+	blitter_vram_address,blitter_vram_data,blitter_vram_wren)
 begin
+	blitter_enable <= '0';
 	dma_state_next <= dma_state_reg;
 	memac_request_complete_next <= memac_request_complete_reg;
-	vram_op_next <= vram_op_reg;
-	vram_data_next <= vram_data_reg;
-	vram_addr_next <= vram_addr_reg;
+	-- No need to be a register if set in every single process branch, check this!
+	vram_op_next <= vram_op_reg; -- TODO does not need to be register?
+	vram_data_next <= vram_data_reg; -- TODO does not need to be register
+	vram_addr_next <= vram_addr_reg; -- TODO does not need to be register
 	memac_data_next <= memac_data_reg;
 
 	case dma_state_reg(2 downto 0) is 
@@ -683,16 +711,25 @@ begin
 			--end if;
 		else 
 			dma_state_next(3) <= '0';
+			-- TODO make a boolean for this and move it out of the block
+			blitter_enable <= '1';
+			vram_addr_next <= blitter_vram_address;
+			vram_op_next <= blitter_vram_wren & '1';
+			vram_data_next <= blitter_vram_data;
 		end if;
 		dma_state_next(2 downto 0) <= "010";
 	when "010" =>
 		if dma_state_reg(3) = '1' then
-			if (vram_request_complete = '1') then
+			--if (vram_request_complete = '1') then
 				memac_data_next <= vram_data_in;
 				memac_request_complete_next <= '1';
 				dma_state_next <= "0011";
-			end if;
+			--end if;
 		else
+			blitter_enable <= '1';
+			vram_addr_next <= blitter_vram_address;
+			vram_op_next <= blitter_vram_wren & '1';
+			vram_data_next <= blitter_vram_data;
 			dma_state_next <= "0011";
 		end if;
 	when "011" =>
@@ -714,22 +751,22 @@ begin
 			else -- memac_check_b = '1'
 				vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);
 			end if;
-			if vram_request_complete = '1' then
-				memac_request_complete_next <= '1';
-				dma_state_next(3) <= '0';
-			else
+			--if vram_request_complete = '1' then
+			--	memac_request_complete_next <= '1';
+			--	dma_state_next(3) <= '0';
+			--else
 				dma_state_next(3) <= '1';
-			end if;
+			--end if;
 		else 
 			dma_state_next(3) <= '0';
 		end if;
 		dma_state_next(2 downto 0) <= "100";
 	when "100" =>
 		if dma_state_reg(3) = '1' then
-			if (vram_request_complete = '1') then
+			--if (vram_request_complete = '1') then
 				memac_request_complete_next <= '1';
 				dma_state_next <= "1111";
-			end if;
+			--end if;
 		else
 			dma_state_next <= "1111";
 		end if;
