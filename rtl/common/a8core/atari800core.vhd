@@ -326,6 +326,7 @@ SIGNAL	ULTIME_WRITE_ENABLE : STD_LOGIC;
 
 -- VBXE
 SIGNAL	VBXE_CLK_ENABLE : STD_LOGIC;
+SIGNAL	VBXE_SOFT_RESET : STD_LOGIC;
 SIGNAL	VBXE_DO : STD_LOGIC_VECTOR(7 downto 0);
 SIGNAL	VBXE_WRITE_ENABLE : STD_LOGIC;
 SIGNAL	VBXE_MEMORY_ADDR : STD_LOGIC_VECTOR(18 downto 0);
@@ -345,6 +346,8 @@ signal memac_request : std_logic;
 signal memac_request_complete : std_logic;
 signal memac_dma_enable : std_logic;
 signal dma_fetch_vbxe_adj : std_logic;
+
+signal VBXE_IRQ_N : std_logic;
 
 -- PBI
 SIGNAL PBI_ADDR_INT : std_logic_vector(15 downto 0);
@@ -507,6 +510,7 @@ PORT MAP(
 	CLK_ENABLE => VBXE_CLK_ENABLE,
 	ENABLE_179 => ANTIC_ENABLE_179, -- ENABLE_179_MEMWAIT,
 	RESET_N => RESET_N,
+	SOFT_RESET => VBXE_SOFT_RESET,
 	PAL => PAL,
 	ADDR => PBI_ADDR_INT(4 DOWNTO 0),
 	DATA_IN => WRITE_DATA(7 DOWNTO 0),
@@ -533,7 +537,8 @@ PORT MAP(
 	memac_request => memac_request,
 	memac_request_complete => memac_request_complete,
 	memac_dma_enable => memac_dma_enable,
-	memac_dma_address => dma_addr
+	memac_dma_address => dma_addr,
+	irq_n => VBXE_IRQ_N
 );
 
 mmu1 : entity work.address_decoder
@@ -581,6 +586,7 @@ PORT MAP(CLK => CLK,
 		 VBXE_REG_BASE => VBXE_REG_BASE,
 		 VBXE_DATA => VBXE_DO,
 		 VBXE_WRITE_ENABLE => VBXE_WRITE_ENABLE,
+		 VBXE_SOFT_RESET => VBXE_SOFT_RESET,
 		 VBXE_MEMORY_ADDR => VBXE_MEMORY_ADDR,
 		 VBXE_FETCH => VBXE_FETCH,
 		 MEMORY_READY_VBXE => MEMORY_READY_VBXE,
@@ -740,6 +746,7 @@ PORT MAP(pokey_irq => POKEY_IRQ,
 		 pia_irqa => PIA_IRQA,
 		 pia_irqb => PIA_IRQB,
 		 pbi_irq => PBI_IRQ_N,
+		 vbxe_irq => VBXE_IRQ_N,
 		 combined_irq => IRQ_n);
 		 
 -- TODO - generic ram infer?

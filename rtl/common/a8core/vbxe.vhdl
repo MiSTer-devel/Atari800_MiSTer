@@ -4,6 +4,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.STD_LOGIC_MISC.ALL;
 
+-- TODO write down what needs to be soft reset
+
 entity VBXE is
 generic ( 
 	cycle_length : integer := 16;
@@ -12,6 +14,7 @@ generic (
 port (
 	clk : in std_logic;
 	enable : in std_logic;
+	soft_reset : in std_logic;
 	clk_enable : in std_logic; -- VBXE speed -> 8x CPU
 	enable_179 : in std_logic; -- Original Atari speed (based on Antic enable, always active)
 	reset_n : in std_logic;
@@ -48,7 +51,9 @@ port (
 	memac_request : in std_logic;
 	memac_request_complete : out std_logic;
 	memac_dma_enable : out std_logic;
-	memac_dma_address : in std_logic_vector(23 downto 0)
+	memac_dma_address : in std_logic_vector(23 downto 0);
+	-- Blitter irq
+	irq_n : out std_logic
 );
 end VBXE;
 
@@ -138,6 +143,11 @@ signal blitter_request_next : std_logic_vector(1 downto 0);
 signal blitter_vram_wren : std_logic;
 signal blitter_vram_data : std_logic_vector(7 downto 0);
 signal blitter_vram_address : std_logic_vector(18 downto 0);
+signal blitter_irq : std_logic;
+--signal blitter_irqc_reg : std_logic;
+signal blitter_irqc : std_logic;
+signal blitter_irqen_reg : std_logic;
+signal blitter_irqen_next : std_logic;
 
 signal vram_op_reg : std_logic_vector(1 downto 0);
 signal vram_op_next : std_logic_vector(1 downto 0);
@@ -147,10 +157,13 @@ signal clock_shift_next : std_logic_vector(cycle_length-1 downto 0);
 
 begin
 
+irq_n <= not(enable and blitter_irqen_reg and blitter_irq);
+
 blitter: entity work.VBXE_blitter
 port map (
 	clk => clk,
 	reset_n => reset_n,
+	soft_reset => soft_reset,
 	blitter_enable => blitter_enable,
 	blitter_start_request => blitter_request_next(0),
 	blitter_stop_request => blitter_request_next(1),
@@ -160,8 +173,11 @@ port map (
 	blitter_vram_data => blitter_vram_data,
 	blitter_vram_address => blitter_vram_address,
 	blitter_status => blitter_status,
-	blitter_collision => blitter_collision
+	blitter_collision => blitter_collision,
+	blitter_irq => blitter_irq,
+	blitter_irqc => blitter_irqc
 );
+
 
 memc_window_address_start <= memc_reg(7 downto 4) & x"000";
 memc_window_address_end <=
@@ -524,11 +540,9 @@ port map
 );
 
 -- write registers
-process(addr, wr_en, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg,
-	blitter_addr_reg,blitter_request_reg,blitter_status)
+process(addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg,
+	blitter_addr_reg, blitter_status, blitter_irqen_reg)
 begin
-		--blit_data_next <= blit_data_reg;
-		--blit_data_dir_next <= blit_data_dir_reg;
 		csel_next <= csel_reg;
 		psel_next <= psel_reg;
 		cr_request <= '0';
@@ -542,6 +556,8 @@ begin
 		memb_next <= memb_reg;
 		blitter_addr_next <= blitter_addr_reg;
 		blitter_request_next <= "00";
+		blitter_irqen_next <= blitter_irqen_reg;
+		blitter_irqc <= '0';
 		if wr_en = '1' then
 			case addr is
 				-- For testing
@@ -574,6 +590,9 @@ begin
 				when "10011" => -- $53 blitter_start
 					blitter_request_next(0) <= not(blitter_status(0) or blitter_status(1)) and data_in(0);
 					blitter_request_next(1) <= not(data_in(1));
+				when "10100" => -- $54 irq_control
+					blitter_irqen_next <= data_in(0);
+					blitter_irqc <= '1';
 				-- MEMAC registers
 				when "11101" => -- $5D memac_b_control
 					memb_next <= data_in;
@@ -588,10 +607,21 @@ begin
 		if cb_request_reg = '1' then
 			csel_next <= std_logic_vector(unsigned(csel_reg) + 1);
 		end if;
+		-- TODO Soft reset for everything should be done this way
+		-- probably also latched and invoked on a proper cycle not to destroy
+		-- the DMA state machine (but then the soft reset comes from $D080-FF,
+		-- this is nowhere near MEMAC, and that's the only thing that can possibly get messed up)
+		if soft_reset = '1' then
+			memc_next(3 downto 2) <= "00";
+			mems_next(7) <= '0';
+			memb_next(7 downto 6) <= "00";
+			blitter_irqen_next <= '0';
+			blitter_request_next <= "00";
+		end if;
 end process;
 
 -- Read registers
-process(addr, memc_reg, mems_reg, blitter_status, blitter_collision)
+process(addr, memc_reg, mems_reg, blitter_status, blitter_collision, blitter_irq, blitter_irqen_reg)
 begin
 	case addr is
 		when "00000" => -- $40 core version -> FX
@@ -606,6 +636,8 @@ begin
 			data_out <= blitter_collision;
 		when "10011" => -- $53 blitter busy
 			data_out <= "000000" & blitter_status(1 downto 0);
+		when "10100" => -- $54 irq status
+			data_out <= "0000000" & (blitter_irq and blitter_irqen_reg);
 		-- MEMAC A registers are readable
 		when "11110" => -- $5E memac_control
 			data_out <= memc_reg;
@@ -616,9 +648,9 @@ begin
 	end case;
 end process;
 
-process(clk,reset_n)
+process(clk, reset_n)
 begin
-	if reset_n = '0' then
+	if (reset_n = '0') then
 		vram_request_reg <= '0';
 		csel_reg <= (others => 'U');
 		psel_reg <= (others => 'U');
@@ -638,7 +670,9 @@ begin
 		memac_check_reg <= "00";
 		clock_shift_reg <= (others => '0');
 		memac_data_reg <= (others => '0');
-		blitter_addr_reg <= (others => '0');
+		blitter_addr_reg <= (others => 'U');
+		blitter_irqen_reg <= '0';
+		--blitter_irqc_reg <= '0';
 	elsif rising_edge(clk) then
 		vram_request_reg <= vram_request_next;
 		csel_reg <= csel_next;
@@ -660,11 +694,14 @@ begin
 		clock_shift_reg <= clock_shift_next;
 		memac_data_reg <= memac_data_next;
 		blitter_addr_reg <= blitter_addr_next;
+		blitter_irqen_reg <= blitter_irqen_next;
+		--blitter_irqc_reg <= blitter_irqc_next;
 	end if;
 end process;
 
 -- VBXE DMA state machine
-process(clock_shift_reg,
+process(--soft_reset,
+	clock_shift_reg,
 	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, 
 	memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
 	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,memac_address,

@@ -46,6 +46,7 @@ PORT
 	VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
 	-- CACHE_VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
 	VBXE_WRITE_ENABLE : out std_logic;
+	VBXE_SOFT_RESET : out std_logic;
 	-- VBXE VRAM access
 	VBXE_MEMORY_ADDR : in std_logic_vector(18 downto 0) := (others => '0');
 	VBXE_FETCH : in std_logic := '0';
@@ -980,6 +981,7 @@ end generate;
 		D6_WR_ENABLE <= '0';
 		ROM_WR_ENABLE <= '0';
 		VBXE_WRITE_ENABLE <= '0';
+		VBXE_SOFT_RESET <= '0';
 		
 		RAM_WR_ENABLE <= write_enable_next;
 		SDRAM_WRITE_EN <= write_enable_next;		
@@ -1077,6 +1079,7 @@ end generate;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';
+					VBXE_SOFT_RESET <= write_enable_next and addr_next(7);
 
 				when X"D1" =>
 					sdram_chip_select <= '0';
