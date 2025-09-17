@@ -26,8 +26,8 @@ end VBXE_blitter;
 
 architecture vhdl of VBXE_blitter is
 
-signal blitter_src_address_next : std_logic_vector(18 downto 0);
-signal blitter_src_address_reg : std_logic_vector(18 downto 0);
+signal blitter_src_address_next : unsigned(18 downto 0);
+signal blitter_src_address_reg : unsigned(18 downto 0);
 
 signal blitter_src_step_y_reg : unsigned(18 downto 0);
 signal blitter_src_step_y_next : unsigned(18 downto 0);
@@ -35,8 +35,8 @@ signal blitter_src_step_y_next : unsigned(18 downto 0);
 signal blitter_src_step_x_reg : unsigned(18 downto 0);
 signal blitter_src_step_x_next : unsigned(18 downto 0);
 
-signal blitter_dest_address_next : std_logic_vector(18 downto 0);
-signal blitter_dest_address_reg : std_logic_vector(18 downto 0);
+signal blitter_dest_address_next : unsigned(18 downto 0);
+signal blitter_dest_address_reg : unsigned(18 downto 0);
 
 signal blitter_dest_step_y_reg : unsigned(18 downto 0);
 signal blitter_dest_step_y_next : unsigned(18 downto 0);
@@ -44,11 +44,11 @@ signal blitter_dest_step_y_next : unsigned(18 downto 0);
 signal blitter_dest_step_x_reg : unsigned(18 downto 0);
 signal blitter_dest_step_x_next : unsigned(18 downto 0);
 
-signal blitter_width_reg : std_logic_vector(8 downto 0);
-signal blitter_width_next : std_logic_vector(8 downto 0);
+signal blitter_width_reg : unsigned(8 downto 0);
+signal blitter_width_next : unsigned(8 downto 0);
 
-signal blitter_height_reg : std_logic_vector(7 downto 0);
-signal blitter_height_next : std_logic_vector(7 downto 0);
+signal blitter_height_reg : unsigned(7 downto 0);
+signal blitter_height_next : unsigned(7 downto 0);
 
 signal blitter_and_mask_reg : std_logic_vector(7 downto 0);
 signal blitter_and_mask_next : std_logic_vector(7 downto 0);
@@ -59,17 +59,17 @@ signal blitter_xor_mask_next : std_logic_vector(7 downto 0);
 signal blitter_collision_mask_reg : std_logic_vector(7 downto 0);
 signal blitter_collision_mask_next : std_logic_vector(7 downto 0);
 
-signal blitter_zoom_x_reg : std_logic_vector(2 downto 0);
-signal blitter_zoom_x_next : std_logic_vector(2 downto 0);
+signal blitter_zoom_x_reg : unsigned(2 downto 0);
+signal blitter_zoom_x_next : unsigned(2 downto 0);
 
-signal blitter_zoom_y_reg : std_logic_vector(2 downto 0);
-signal blitter_zoom_y_next : std_logic_vector(2 downto 0);
+signal blitter_zoom_y_reg : unsigned(2 downto 0);
+signal blitter_zoom_y_next : unsigned(2 downto 0);
 
 signal blitter_pattern_reg : std_logic;
 signal blitter_pattern_next : std_logic;
 
-signal blitter_pattern_count_reg : std_logic_vector(5 downto 0);
-signal blitter_pattern_count_next : std_logic_vector(5 downto 0);
+signal blitter_pattern_count_reg : unsigned(5 downto 0);
+signal blitter_pattern_count_next : unsigned(5 downto 0);
 
 signal blitter_next_reg : std_logic;
 signal blitter_next_next : std_logic;
@@ -83,14 +83,14 @@ signal blitter_load_address_next : std_logic_vector(18 downto 0);
 signal blitter_state_reg : std_logic_vector(5 downto 0);
 signal blitter_state_next : std_logic_vector(5 downto 0);
 
-signal blitter_src_current_next : std_logic_vector(18 downto 0);
-signal blitter_src_current_reg : std_logic_vector(18 downto 0);
+signal blitter_src_current_next : unsigned(18 downto 0);
+signal blitter_src_current_reg : unsigned(18 downto 0);
 
-signal blitter_dest_current_next : std_logic_vector(18 downto 0);
-signal blitter_dest_current_reg : std_logic_vector(18 downto 0);
+signal blitter_dest_current_next : unsigned(18 downto 0);
+signal blitter_dest_current_reg : unsigned(18 downto 0);
 
---signal blitter_vram_wren_reg : std_logic;
---signal blitter_vram_wren_next : std_logic;
+signal blitter_vram_wren_reg : std_logic;
+signal blitter_vram_wren_next : std_logic;
 
 signal blitter_vram_data_reg : std_logic_vector(7 downto 0);
 signal blitter_vram_data_next : std_logic_vector(7 downto 0);
@@ -104,20 +104,20 @@ signal blitter_collision_next : std_logic_vector(7 downto 0);
 signal blitter_irq_reg : std_logic;
 signal blitter_irq_next : std_logic;
 
-signal blitter_x_reg : std_logic_vector(8 downto 0);
-signal blitter_x_next : std_logic_vector(8 downto 0);
+signal blitter_x_reg : unsigned(8 downto 0);
+signal blitter_x_next : unsigned(8 downto 0);
 
-signal blitter_y_reg : std_logic_vector(7 downto 0);
-signal blitter_y_next : std_logic_vector(7 downto 0);
+signal blitter_y_reg : unsigned(7 downto 0);
+signal blitter_y_next : unsigned(7 downto 0);
 
-signal blitter_rep_x_reg : std_logic_vector(2 downto 0);
-signal blitter_rep_x_next : std_logic_vector(2 downto 0);
+signal blitter_rep_x_reg : unsigned(2 downto 0);
+signal blitter_rep_x_next : unsigned(2 downto 0);
 
-signal blitter_rep_y_reg : std_logic_vector(2 downto 0);
-signal blitter_rep_y_next : std_logic_vector(2 downto 0);
+signal blitter_rep_y_reg : unsigned(2 downto 0);
+signal blitter_rep_y_next : unsigned(2 downto 0);
 
-signal blitter_pattern_current_reg : std_logic_vector(5 downto 0);
-signal blitter_pattern_current_next : std_logic_vector(5 downto 0);
+signal blitter_pattern_current_reg : unsigned(5 downto 0);
+signal blitter_pattern_current_next : unsigned(5 downto 0);
 
 begin
 
@@ -125,9 +125,9 @@ begin
 
 blitter_vram_address <= blitter_vram_address_next;
 blitter_vram_data <= blitter_vram_data_next;
---blitter_vram_wren <= blitter_vram_wren_next;
+blitter_vram_wren <= blitter_vram_wren_next;
 blitter_status <= (not(blitter_state_reg(5)) and or_reduce(blitter_state_reg(4 downto 0))) & blitter_state_reg(5);
-blitter_collision <= blitter_collision_reg; -- TODO or _next?
+blitter_collision <= blitter_collision_reg;
 blitter_irq <= blitter_irq_reg;
 
 process(clk, reset_n)
@@ -154,10 +154,10 @@ begin
 		blitter_load_address_reg <= (others => '0');
 		blitter_state_reg <= (others => '0');
 
-		blitter_src_current_reg <= (others => 'U');
-		blitter_dest_current_reg <= (others => 'U');
+		blitter_src_current_reg <= (others => '0');
+		blitter_dest_current_reg <= (others => '0');
 
-		--blitter_vram_wren_reg <= '0';
+		blitter_vram_wren_reg <= '0';
 		blitter_vram_data_reg <= (others => '0');
 		blitter_vram_address_reg <= (others => '0');
 		blitter_collision_reg  <= (others => 'U');
@@ -192,7 +192,7 @@ begin
 		blitter_src_current_reg <= blitter_src_current_next;
 		blitter_dest_current_reg <= blitter_dest_current_next;
 
-		--blitter_vram_wren_reg <= blitter_vram_wren_next;
+		blitter_vram_wren_reg <= blitter_vram_wren_next;
 		blitter_vram_data_reg <= blitter_vram_data_next;
 		blitter_vram_address_reg <= blitter_vram_address_next;
 		blitter_collision_reg  <= blitter_collision_next;
@@ -214,7 +214,8 @@ process(soft_reset,
 	blitter_pattern_reg,blitter_pattern_count_reg,blitter_next_reg,blitter_mode_reg,
 	blitter_vram_data_reg,blitter_vram_address_reg,blitter_vram_data_in,blitter_start_request,blitter_stop_request,
 	blitter_address,blitter_src_current_reg,blitter_dest_current_reg,blitter_enable,blitter_collision_reg,blitter_irq_reg,blitter_irqc,
-	blitter_x_reg,blitter_y_reg,blitter_rep_x_reg,blitter_rep_y_reg,blitter_pattern_current_reg
+	blitter_x_reg,blitter_y_reg,blitter_rep_x_reg,blitter_rep_y_reg,blitter_pattern_current_reg,
+	blitter_vram_wren_reg
 )
 begin
 
@@ -239,8 +240,8 @@ begin
 	blitter_next_next <= blitter_next_reg;
 	blitter_mode_next <= blitter_mode_reg;
 
-	blitter_vram_wren <= '0';
-	--blitter_vram_wren_next <= blitter_vram_wren_reg; -- TODO does not need to be register? Seems so for now...
+	--blitter_vram_wren <= '0';
+	blitter_vram_wren_next <= blitter_vram_wren_reg;
 	blitter_vram_data_next <= blitter_vram_data_reg;
 	blitter_vram_address_next <= blitter_vram_address_reg;
 
@@ -260,17 +261,24 @@ begin
 		if (blitter_state_reg /= "000000") then
 			if blitter_state_reg(5) = '1' then -- init
 
+				blitter_vram_wren_next <= '0';
 				blitter_vram_address_next <= std_logic_vector(unsigned(blitter_vram_address_reg) + 1);
 
 				case blitter_state_reg(4 downto 0) is
+				when "11111" =>
+					blitter_load_address_next <= std_logic_vector(unsigned(blitter_address) + 21);
+					blitter_vram_address_next <= blitter_address;
+					blitter_collision_next <= X"00";
+					-- blitter_vram_wren_next <= '0';
+					blitter_state_next <= "100000";
 				when "00000" =>
-					blitter_src_address_next(7 downto 0) <= blitter_vram_data_in;
+					blitter_src_address_next(7 downto 0) <= unsigned(blitter_vram_data_in);
 					blitter_state_next <= "100001";
 				when "00001" =>
-					blitter_src_address_next(15 downto 8) <= blitter_vram_data_in;
+					blitter_src_address_next(15 downto 8) <= unsigned(blitter_vram_data_in);
 					blitter_state_next <= "100010";
 				when "00010" =>
-					blitter_src_address_next(18 downto 16) <= blitter_vram_data_in(2 downto 0);
+					blitter_src_address_next(18 downto 16) <= unsigned(blitter_vram_data_in(2 downto 0));
 					blitter_state_next <= "100011";
 				when "00011" =>
 					blitter_src_step_y_next(7 downto 0) <= unsigned(blitter_vram_data_in);
@@ -284,13 +292,13 @@ begin
 					blitter_src_step_x_next(18 downto 8) <= (others => blitter_vram_data_in(7));
 					blitter_state_next <= "100110";
 				when "00110" =>
-					blitter_dest_address_next(7 downto 0) <= blitter_vram_data_in;
+					blitter_dest_address_next(7 downto 0) <= unsigned(blitter_vram_data_in);
 					blitter_state_next <= "100111";
 				when "00111" =>
-					blitter_dest_address_next(15 downto 8) <= blitter_vram_data_in;
+					blitter_dest_address_next(15 downto 8) <= unsigned(blitter_vram_data_in);
 					blitter_state_next <= "101000";
 				when "01000" =>
-					blitter_dest_address_next(18 downto 16) <= blitter_vram_data_in(2 downto 0);
+					blitter_dest_address_next(18 downto 16) <= unsigned(blitter_vram_data_in(2 downto 0));
 					blitter_state_next <= "101001";
 				when "01001" =>
 					blitter_dest_step_y_next(7 downto 0) <= unsigned(blitter_vram_data_in);
@@ -304,13 +312,13 @@ begin
 					blitter_dest_step_x_next(18 downto 8) <= (others => blitter_vram_data_in(7));
 					blitter_state_next <= "101100";
 				when "01100" =>
-					blitter_width_next(7 downto 0) <= blitter_vram_data_in;
+					blitter_width_next(7 downto 0) <= unsigned(blitter_vram_data_in);
 					blitter_state_next <= "101101";
 				when "01101" =>
 					blitter_width_next(8) <= blitter_vram_data_in(0);
 					blitter_state_next <= "101110";
 				when "01110" =>
-					blitter_height_next <= blitter_vram_data_in;
+					blitter_height_next <= unsigned(blitter_vram_data_in);
 					blitter_state_next <= "101111";
 				when "01111" =>
 					blitter_and_mask_next <= blitter_vram_data_in;
@@ -322,17 +330,17 @@ begin
 					blitter_collision_mask_next <= blitter_vram_data_in;
 					blitter_state_next <= "110010";
 				when "10010" =>
-					blitter_zoom_x_next <= blitter_vram_data_in(2 downto 0);
-					blitter_zoom_y_next <= blitter_vram_data_in(6 downto 4);
+					blitter_zoom_x_next <= unsigned(blitter_vram_data_in(2 downto 0));
+					blitter_zoom_y_next <= unsigned(blitter_vram_data_in(6 downto 4));
 					blitter_state_next <= "110011";
 				when "10011" =>
 					blitter_pattern_next <= blitter_vram_data_in(7);
-					blitter_pattern_count_next <= blitter_vram_data_in(5 downto 0);
+					blitter_pattern_count_next <= unsigned(blitter_vram_data_in(5 downto 0));
 					blitter_state_next <= "110100";
 				when "10100" =>
 					blitter_next_next <= blitter_vram_data_in(3);
 					blitter_mode_next <= blitter_vram_data_in(2 downto 0);
-					blitter_state_next <= "000001";
+					blitter_state_next <= "000010";
 					blitter_src_current_next <= blitter_src_address_reg;
 					blitter_dest_current_next <= blitter_dest_address_reg;
 					blitter_x_next <= blitter_width_reg;
@@ -340,22 +348,68 @@ begin
 					blitter_rep_x_next <= blitter_zoom_x_reg;
 					blitter_rep_y_next <= blitter_zoom_y_reg;
 					blitter_pattern_current_next <= blitter_pattern_count_reg;
-					-- blitter_vram_address_next <= ???
+					blitter_vram_address_next <= std_logic_vector(blitter_src_address_reg);
+					-- blitter_vram_wren_next <= '0';
 				when others =>
 				end case;
 			else
 				-- blitter running
 				case blitter_state_reg(4 downto 0) is
 				when "00001" =>
-					-- When the blitter is done
-					if blitter_next_reg = '1' then
-						blitter_load_address_next <= std_logic_vector(unsigned(blitter_load_address_reg) + 21);
-						blitter_vram_address_next <= blitter_load_address_reg;
-						blitter_state_next <= "100000";
-						-- blitter_vram_wren_next <= '0';
+					blitter_vram_wren_next <= '0';
+					blitter_vram_address_next <= std_logic_vector(blitter_src_current_reg);
+					blitter_state_next <= "000010";
+				when "00010" =>
+					-- TODO have a marker to see if we need to do this
+					blitter_vram_data_next <= (blitter_vram_data_in and blitter_and_mask_reg) xor blitter_xor_mask_reg;
+					blitter_vram_address_next <= std_logic_vector(blitter_dest_current_reg);
+					--blitter_vram_wren <= '1';
+					blitter_vram_wren_next <= '1';
+					if (blitter_x_reg = 0) and (blitter_rep_x_reg = 0) then
+						if (blitter_y_reg = 0) and (blitter_rep_y_reg = 0) then
+							if blitter_next_reg = '1' then
+								blitter_load_address_next <= std_logic_vector(unsigned(blitter_load_address_reg) + 21);
+								blitter_vram_address_next <= blitter_load_address_reg;
+								blitter_state_next <= "100000";
+							else
+								blitter_state_next <= "000000";
+								blitter_irq_next <= '1';
+							end if;
+						else
+							blitter_x_next <= blitter_width_reg;
+							if blitter_rep_y_reg = 0 then
+								blitter_src_current_next <= blitter_src_address_reg + blitter_src_step_y_reg;
+								blitter_src_address_next <= blitter_src_address_reg + blitter_src_step_y_reg;
+								blitter_rep_y_next <= blitter_zoom_y_reg;
+								blitter_y_next <= blitter_y_reg - 1;
+							else
+								blitter_src_current_next <= blitter_src_address_reg;
+								blitter_rep_y_next <= blitter_rep_y_reg - 1;
+							end if;
+							blitter_dest_current_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
+							blitter_dest_address_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
+							blitter_state_next <= "000001"; -- ?????; -- new source read
+						end if;
 					else
-						blitter_state_next <= "000000";
-						blitter_irq_next <= '1';
+						if (blitter_pattern_reg = '1') and (blitter_pattern_current_reg = 0) then
+							blitter_src_current_next <= blitter_src_address_reg;
+							blitter_pattern_current_next <= blitter_pattern_count_reg;
+						else
+							blitter_src_current_next <= blitter_src_current_reg + blitter_src_step_x_reg;
+							if (blitter_pattern_reg = '1') then
+								blitter_pattern_current_next <= blitter_pattern_current_reg - 1;
+							end if;
+						end if;
+						blitter_dest_current_next <= blitter_dest_current_reg + blitter_src_step_x_reg;
+						if blitter_rep_x_reg = 0 then
+							blitter_rep_x_next <= blitter_zoom_x_reg;
+							blitter_x_next <= blitter_x_reg - 1;
+							blitter_state_next <= "000001"; -- new source read (or?)
+						else
+							-- No need to latch new input data
+							blitter_rep_x_next <= blitter_rep_x_reg - 1;
+							blitter_state_next <= "000010"; -- after source read (or?)
+						end if;
 					end if;
 				when others =>
 				end case;
@@ -363,19 +417,16 @@ begin
 		end if;
 	end if;
 
-	if (blitter_stop_request = '1') or (soft_reset = '1') then
+	if ((blitter_stop_request or soft_reset) = '1') then
 		blitter_state_next <= "000000";
 	elsif blitter_start_request = '1' then
-		blitter_state_next <= "100000";
-		blitter_load_address_next <= std_logic_vector(unsigned(blitter_address) + 21);
-		blitter_vram_address_next <= blitter_address;
-		blitter_collision_next <= X"00";
-		-- blitter_vram_wren_next <= '0';
+		blitter_state_next <= "111111";
 	end if;
-	if (blitter_irqc = '1') or (soft_reset = '1') then
+	if ((blitter_irqc or soft_reset) = '1') then
 		blitter_irq_next <= '0';
 	end if;
 
 end process;
 
 end vhdl;
+

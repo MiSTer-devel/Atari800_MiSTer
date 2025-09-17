@@ -142,6 +142,8 @@ signal blitter_request_reg : std_logic_vector(1 downto 0);
 signal blitter_request_next : std_logic_vector(1 downto 0);
 signal blitter_vram_wren : std_logic;
 signal blitter_vram_data : std_logic_vector(7 downto 0);
+signal blitter_vram_data_in_reg : std_logic_vector(7 downto 0);
+signal blitter_vram_data_in_next : std_logic_vector(7 downto 0);
 signal blitter_vram_address : std_logic_vector(18 downto 0);
 signal blitter_irq : std_logic;
 --signal blitter_irqc_reg : std_logic;
@@ -168,7 +170,7 @@ port map (
 	blitter_start_request => blitter_request_next(0),
 	blitter_stop_request => blitter_request_next(1),
 	blitter_address => blitter_addr_reg,
-	blitter_vram_data_in => vram_data_in,
+	blitter_vram_data_in => blitter_vram_data_in_next,
 	blitter_vram_wren => blitter_vram_wren,
 	blitter_vram_data => blitter_vram_data,
 	blitter_vram_address => blitter_vram_address,
@@ -589,7 +591,7 @@ begin
 					blitter_addr_next(18 downto 16) <= data_in(2 downto 0);
 				when "10011" => -- $53 blitter_start
 					blitter_request_next(0) <= not(blitter_status(0) or blitter_status(1)) and data_in(0);
-					blitter_request_next(1) <= not(data_in(1));
+					blitter_request_next(1) <= not(data_in(0));
 				when "10100" => -- $54 irq_control
 					blitter_irqen_next <= data_in(0);
 					blitter_irqc <= '1';
@@ -673,6 +675,7 @@ begin
 		blitter_addr_reg <= (others => 'U');
 		blitter_irqen_reg <= '0';
 		--blitter_irqc_reg <= '0';
+		blitter_vram_data_in_reg <= (others => 'U'); 
 	elsif rising_edge(clk) then
 		vram_request_reg <= vram_request_next;
 		csel_reg <= csel_next;
@@ -696,6 +699,7 @@ begin
 		blitter_addr_reg <= blitter_addr_next;
 		blitter_irqen_reg <= blitter_irqen_next;
 		--blitter_irqc_reg <= blitter_irqc_next;
+		blitter_vram_data_in_reg <= blitter_vram_data_in_next;
 	end if;
 end process;
 
@@ -705,16 +709,24 @@ process(--soft_reset,
 	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, 
 	memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
 	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,memac_address,
-	blitter_vram_address,blitter_vram_data,blitter_vram_wren)
+	blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
+	blitter_status)
+
+variable blitter_pending : boolean := false;
+variable blitter_notify : boolean := false;
+
 begin
 	blitter_enable <= '0';
+	blitter_vram_data_in_next <= blitter_vram_data_in_reg;
 	dma_state_next <= dma_state_reg;
 	memac_request_complete_next <= memac_request_complete_reg;
 	-- No need to be a register if set in every single process branch, check this!
-	vram_op_next <= vram_op_reg; -- TODO does not need to be register?
-	vram_data_next <= vram_data_reg; -- TODO does not need to be register
-	vram_addr_next <= vram_addr_reg; -- TODO does not need to be register
+	vram_op_next <= vram_op_reg;
+	vram_data_next <= vram_data_reg;
+	vram_addr_next <= vram_addr_reg;
 	memac_data_next <= memac_data_reg;
+
+	blitter_notify := false;
 
 	case dma_state_reg(2 downto 0) is 
 	when "000" =>
@@ -748,11 +760,7 @@ begin
 			--end if;
 		else 
 			dma_state_next(3) <= '0';
-			-- TODO make a boolean for this and move it out of the block
-			blitter_enable <= '1';
-			vram_addr_next <= blitter_vram_address;
-			vram_op_next <= blitter_vram_wren & '1';
-			vram_data_next <= blitter_vram_data;
+			blitter_notify := true;
 		end if;
 		dma_state_next(2 downto 0) <= "010";
 	when "010" =>
@@ -763,11 +771,8 @@ begin
 				dma_state_next <= "0011";
 			--end if;
 		else
-			blitter_enable <= '1';
-			vram_addr_next <= blitter_vram_address;
-			vram_op_next <= blitter_vram_wren & '1';
-			vram_data_next <= blitter_vram_data;
 			dma_state_next <= "0011";
+			blitter_notify := true;
 		end if;
 	when "011" =>
 		if (memac_request_next = "11") then
@@ -796,6 +801,7 @@ begin
 			--end if;
 		else 
 			dma_state_next(3) <= '0';
+			blitter_notify := true;
 		end if;
 		dma_state_next(2 downto 0) <= "100";
 	when "100" =>
@@ -805,12 +811,24 @@ begin
 				dma_state_next <= "1111";
 			--end if;
 		else
+			-- blitter_notify := true;
 			dma_state_next <= "1111";
 		end if;
 	when others =>
 		vram_op_next <= "00";
 		-- dma_state_next <= "0000";
 	end case;
+	if blitter_pending then
+		blitter_vram_data_in_next <= vram_data_in;
+		blitter_pending := false;
+	end if;
+	if blitter_notify and (or_reduce(blitter_status) = '1') then
+		blitter_enable <= '1';
+		vram_addr_next <= blitter_vram_address;
+		vram_op_next <= blitter_vram_wren & '1';
+		vram_data_next <= blitter_vram_data;
+		blitter_pending := true;
+	end if;
 	if clock_shift_reg(cycle_length-1) = '1' then
 		memac_request_complete_next <= '0';
 		dma_state_next <= "0000";
