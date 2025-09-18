@@ -240,7 +240,6 @@ begin
 	blitter_next_next <= blitter_next_reg;
 	blitter_mode_next <= blitter_mode_reg;
 
-	--blitter_vram_wren <= '0';
 	blitter_vram_wren_next <= blitter_vram_wren_reg;
 	blitter_vram_data_next <= blitter_vram_data_reg;
 	blitter_vram_address_next <= blitter_vram_address_reg;
@@ -269,7 +268,6 @@ begin
 					blitter_load_address_next <= std_logic_vector(unsigned(blitter_address) + 21);
 					blitter_vram_address_next <= blitter_address;
 					blitter_collision_next <= X"00";
-					-- blitter_vram_wren_next <= '0';
 					blitter_state_next <= "100000";
 				when "00000" =>
 					blitter_src_address_next(7 downto 0) <= unsigned(blitter_vram_data_in);
@@ -340,7 +338,6 @@ begin
 				when "10100" =>
 					blitter_next_next <= blitter_vram_data_in(3);
 					blitter_mode_next <= blitter_vram_data_in(2 downto 0);
-					blitter_state_next <= "000010";
 					blitter_src_current_next <= blitter_src_address_reg;
 					blitter_dest_current_next <= blitter_dest_address_reg;
 					blitter_x_next <= blitter_width_reg;
@@ -348,8 +345,11 @@ begin
 					blitter_rep_x_next <= blitter_zoom_x_reg;
 					blitter_rep_y_next <= blitter_zoom_y_reg;
 					blitter_pattern_current_next <= blitter_pattern_count_reg;
+					-- TODO Or waste a cycle and go to "000001" ???
+					-- How does it compare with the original timing in VBXE, can this be tested / measured?
+					-- (with a long chain of blitter blocks?)
 					blitter_vram_address_next <= std_logic_vector(blitter_src_address_reg);
-					-- blitter_vram_wren_next <= '0';
+					blitter_state_next <= "000010";
 				when others =>
 				end case;
 			else
@@ -363,7 +363,6 @@ begin
 					-- TODO have a marker to see if we need to do this
 					blitter_vram_data_next <= (blitter_vram_data_in and blitter_and_mask_reg) xor blitter_xor_mask_reg;
 					blitter_vram_address_next <= std_logic_vector(blitter_dest_current_reg);
-					--blitter_vram_wren <= '1';
 					blitter_vram_wren_next <= '1';
 					if (blitter_x_reg = 0) and (blitter_rep_x_reg = 0) then
 						if (blitter_y_reg = 0) and (blitter_rep_y_reg = 0) then
@@ -420,6 +419,7 @@ begin
 	if ((blitter_stop_request or soft_reset) = '1') then
 		blitter_state_next <= "000000";
 	elsif blitter_start_request = '1' then
+		-- TODO Or prep the first step already here and go to state "100000" ???
 		blitter_state_next <= "111111";
 	end if;
 	if ((blitter_irqc or soft_reset) = '1') then
