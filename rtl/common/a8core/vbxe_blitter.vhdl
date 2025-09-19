@@ -351,6 +351,8 @@ begin
 					blitter_next_next <= blitter_vram_data_in(3);
 					-- TODO what about mode 7???
 					blitter_mode_next <= to_integer(unsigned(blitter_vram_data_in(2 downto 0)));
+					
+					-- Prepare or the state variables to run the blitter
 					blitter_src_current_next <= blitter_src_address_reg;
 					blitter_dest_current_next <= blitter_dest_address_reg;
 					blitter_x_next <= blitter_width_reg;
@@ -461,7 +463,7 @@ begin
 						blitter_vram_wren_next <= '1';
 					end if;
 					
-					-- Are we ready to go to the next data by updating all the indecies
+					-- Are we ready to go to the next data by updating all the indices
 					if blitter_update_state then
 						if (blitter_x_reg = 0) and (blitter_rep_x_reg = 0) then
 							if (blitter_y_reg = 0) and (blitter_rep_y_reg = 0) then

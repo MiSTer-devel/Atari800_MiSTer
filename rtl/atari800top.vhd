@@ -308,7 +308,8 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	internal_ram => 131072
+	internal_ram => 65536
+	-- internal_ram => 131072
 	-- internal_ram => 327680
 	-- internal_ram => 393216 -- Max doable at the moment, 128K short for 512K
 	--internal_ram => 0

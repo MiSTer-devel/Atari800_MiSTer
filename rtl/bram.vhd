@@ -13,6 +13,7 @@ ENTITY spram IS
 		addr_width    : integer := 8;
 		data_width    : integer := 8;
 		mem_init_file : string := " ";
+		mem_type      : string := "AUTO";
 		mem_name      : string := "MEM" -- for InSystem Memory content editor.
 	);
 	PORT
@@ -31,7 +32,7 @@ END spram;
 ARCHITECTURE SYN OF spram IS
 BEGIN
 	spram_sz : work.spram_sz
-	generic map(addr_width, data_width, 2**addr_width, mem_init_file, mem_name)
+	generic map(addr_width, data_width, 2**addr_width, mem_init_file, mem_type, mem_name)
 	port map(clock,address,data,enable,wren,q,cs);
 END SYN;
 
@@ -52,6 +53,7 @@ ENTITY spram_sz IS
 		data_width    : integer := 8;
 		numwords      : integer := 2**8;
 		mem_init_file : string := " ";
+		mem_type      : string := "AUTO";
 		mem_name      : string := "MEM" -- for InSystem Memory content editor.
 	);
 	PORT
@@ -78,6 +80,7 @@ BEGIN
 		intended_device_family => "Cyclone V",
 		lpm_hint => "ENABLE_RUNTIME_MOD=YES,INSTANCE_NAME="&mem_name,
 		lpm_type => "altsyncram",
+		ram_block_type => mem_type,
 		numwords_a => numwords,
 		operation_mode => "SINGLE_PORT",
 		outdata_aclr_a => "NONE",
@@ -112,7 +115,8 @@ entity dpram is
 	generic (
 		addr_width    : integer := 8;
 		data_width    : integer := 8;
-		mem_init_file : string := " "
+		mem_init_file : string := " ";
+		size          : integer := 0
 	);
 	PORT
 	(
@@ -137,7 +141,7 @@ end entity;
 
 ARCHITECTURE SYN OF dpram IS
 BEGIN
-	ram : work.dpram_dif generic map(addr_width,data_width,addr_width,data_width,mem_init_file)
+	ram : work.dpram_dif generic map(addr_width,data_width,addr_width,data_width,mem_init_file,size,size)
 	port map(clock,address_a,data_a,enable_a,wren_a,q_a,cs_a,address_b,data_b,enable_b,wren_b,q_b,cs_b);
 END SYN;
 
@@ -156,7 +160,9 @@ entity dpram_dif is
 		data_width_a  : integer := 8;
 		addr_width_b  : integer := 8;
 		data_width_b  : integer := 8;
-		mem_init_file : string := " "
+		mem_init_file : string := " ";
+		size_a        : integer := 0;
+		size_b        : integer := 0
 	);
 	PORT
 	(
@@ -184,6 +190,15 @@ ARCHITECTURE SYN OF dpram_dif IS
 	signal q0 : std_logic_vector((data_width_a - 1) downto 0);
 	signal q1 : std_logic_vector((data_width_b - 1) downto 0);
 
+function IfElse(C : boolean; A, B : integer) return integer is
+	begin
+		if C then 
+			return A ; 
+		else
+			return B ; 
+		end if ; 
+	end function IfElse ;
+
 BEGIN
 	q_a<= q0 when cs_a = '1' else (others => '1');
 	q_b<= q1 when cs_b = '1' else (others => '1');
@@ -198,8 +213,8 @@ BEGIN
 		indata_reg_b => "CLOCK1",
 		intended_device_family => "Cyclone V",
 		lpm_type => "altsyncram",
-		numwords_a => 2**addr_width_a,
-		numwords_b => 2**addr_width_b,
+		numwords_a => IfElse(size_a = 0, 2**addr_width_a, size_a),
+		numwords_b => IfElse(size_b = 0, 2**addr_width_b, size_b),
 		operation_mode => "BIDIR_DUAL_PORT",
 		outdata_aclr_a => "NONE",
 		outdata_aclr_b => "NONE",

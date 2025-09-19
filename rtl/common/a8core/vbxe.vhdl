@@ -59,7 +59,6 @@ end VBXE;
 
 architecture vhdl of VBXE is
 
-
 signal vram_addr : std_logic_vector(18 downto 0);
 signal vram_addr_reg : std_logic_vector(18 downto 0);
 signal vram_addr_next : std_logic_vector(18 downto 0);
@@ -75,7 +74,8 @@ signal vram_request_reg : std_logic;
 signal vram_request_next : std_logic;
 signal vram_wr_en_temp : std_logic;
 
-signal index_color : std_logic_vector(7 downto 0);
+signal color_index_in : std_logic_vector(10 downto 0);
+signal color_index_out : std_logic_vector(10 downto 0);
 
 signal data_color0_r : std_logic_vector(6 downto 0);
 signal data_color1_r : std_logic_vector(6 downto 0);
@@ -94,8 +94,8 @@ signal data_color3_b : std_logic_vector(6 downto 0);
 
 signal csel_reg : std_logic_vector(7 downto 0);
 signal csel_next : std_logic_vector(7 downto 0);
-signal psel_reg : std_logic_vector(7 downto 0);
-signal psel_next : std_logic_vector(7 downto 0);
+signal psel_reg : std_logic_vector(1 downto 0);
+signal psel_next : std_logic_vector(1 downto 0);
 
 signal cr_reg : std_logic_vector(6 downto 0);
 signal cr_next : std_logic_vector(6 downto 0);
@@ -223,26 +223,24 @@ memc_window_address_end <=
 	x"EFFF" when memc_reg(1 downto 0) = "11" and memc_reg(7 downto 4) = x"7" else
 	x"FFFF";
 
-index_color <= palette_get_color;
-
-r_out <=
-	data_color0_r & '0' when palette_get_index = "00" else
-	data_color1_r & '0' when palette_get_index = "01" else
-	data_color2_r & '0' when palette_get_index = "10" else
-	data_color3_r & '0' when palette_get_index = "11" else
-	x"FF";
-g_out <=
-	data_color0_g & '0' when palette_get_index = "00" else
-	data_color1_g & '0' when palette_get_index = "01" else
-	data_color2_g & '0' when palette_get_index = "10" else
-	data_color3_g & '0' when palette_get_index = "11" else
-	x"FF";
-b_out <=
-	data_color0_b & '0' when palette_get_index = "00" else
-	data_color1_b & '0' when palette_get_index = "01" else
-	data_color2_b & '0' when palette_get_index = "10" else
-	data_color3_b & '0' when palette_get_index = "11" else
-	x"FF";
+r_out <= data_color0_r & '0';
+--	data_color0_r & '0' when palette_get_index = "00" else
+--	data_color1_r & '0' when palette_get_index = "01" else
+--	data_color2_r & '0' when palette_get_index = "10" else
+--	data_color3_r & '0' when palette_get_index = "11" else
+--	x"FF";
+g_out <= data_color0_g & '0';
+--	data_color0_g & '0' when palette_get_index = "00" else
+--	data_color1_g & '0' when palette_get_index = "01" else
+--	data_color2_g & '0' when palette_get_index = "10" else
+--	data_color3_g & '0' when palette_get_index = "11" else
+--	x"FF";
+b_out <= data_color0_b & '0';
+--	data_color0_b & '0' when palette_get_index = "00" else
+--	data_color1_b & '0' when palette_get_index = "01" else
+--	data_color2_b & '0' when palette_get_index = "10" else
+--	data_color3_b & '0' when palette_get_index = "11" else
+--	x"FF";
 
 gen_sdram: if mem_config = 2 generate
 
@@ -347,12 +345,12 @@ memac_request_complete <= memac_request_complete_next;
 -- state machine resets everything for a new MEMAC round roughly around the ANTIC
 -- enable signal and serves the MEMAC request shortly after. This way, when the "actual"
 -- Atari asks for MEMAC data we will serve it on the same cycle, and at a particular relative
--- time compare to when the request was made. Now, ZPU/DMA is not Atari clock sychronized/aware,
+-- time compare to when the request was made. Now, ZPU/DMA is not Atari clock synchronized/aware,
 -- and can drop a request that is potentially MEMAC on the address decoder at any time, 
 -- not only when the Atari does it. Long story short - DMA request that is potentially 
 -- accessing MEMAC memory needs to come later than any potential CPU or Antic request
 -- (so that those get priority and DMA is pushed to the next Atari cycle) but at the same time 
--- early enough so that the MEMAC engine can catch it and service it on the same Atari cycle.
+-- early enough so that the DMA engine can catch it and service it on the same Atari cycle.
 -- (The priorities implemented in the address decoder do not help much because we can only service
 -- one MEMAC request per Atari cycle). Fine if:
 
@@ -373,178 +371,59 @@ memac_dma_enable <=
 --memac_dma_check_b <= 
 --	not(memac_dma_address(15)) and memac_dma_address(14) and (memb_reg(7) or memb_reg(6));
 
+color_index_in <=
+	("00" & pal & csel_next) when (psel_next = "00") else
+	("010" & csel_next) when (psel_next = "01") else
+	("011" & csel_next) when (psel_next = "10") else
+	("100" & csel_next) when (psel_next = "11") else
+	"00000000000";
+
+color_index_out <=
+	("00" & pal & palette_get_color) when (palette_get_index = "00") else
+	("010" & palette_get_color) when (palette_get_index = "01") else
+	("011" & palette_get_color) when (palette_get_index = "10") else
+	("100" & palette_get_color) when (palette_get_index = "11") else
+	"00000000000";
 
 colors0_r: entity work.dpram
-generic map(9,7,"rtl/vbxe/colors_r.mif")
+generic map(11,7,"rtl/vbxe/colors_r.mif",1280)
 port map
 (
 	clock => clk,
-	-- To write - palette updating through registers
-	address_a => pal & csel_next, -- color index
-	data_a => cr_next, -- color value
-	wren_a => cr_request and not(psel_next(1)) and not(psel_next(0)), 
-	-- To read - get color values for display
-	address_b => pal & index_color,
+	address_a => color_index_in,
+	data_a => cr_next,
+	wren_a => cr_request,
+	address_b => color_index_out,
 	q_b => data_color0_r
 );
 
-colors1_r: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cr_next, -- color value
-	wren_a => cr_request and not(psel_next(1)) and psel_next(0), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color1_r
-);
-
-colors2_r: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cr_next, -- color value
-	wren_a => cr_request and psel_next(1) and not(psel_next(0)), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color2_r
-);
-
-colors3_r: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cr_next, -- color value
-	wren_a => cr_request and psel_next(1) and psel_next(0), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color3_r
-);
-
 colors0_g: entity work.dpram
-generic map(9,7,"rtl/vbxe/colors_g.mif")
+generic map(11,7,"rtl/vbxe/colors_g.mif",1280)
 port map
 (
 	clock => clk,
-	-- To write - palette updating through registers
-	address_a => pal & csel_next, -- color index
-	data_a => cg_next, -- color value
-	wren_a => cg_request and not(psel_next(1)) and not(psel_next(0)), 
-	-- To read - get color values for display
-	address_b => pal & index_color,
+	address_a => color_index_in,
+	data_a => cg_next,
+	wren_a => cg_request,
+	address_b => color_index_out,
 	q_b => data_color0_g
 );
 
-colors1_g: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cg_next, -- color value
-	wren_a => cg_request and not(psel_next(1)) and psel_next(0), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color1_g
-);
-
-colors2_g: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cg_next, -- color value
-	wren_a => cg_request and psel_next(1) and not(psel_next(0)), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color2_g
-);
-
-colors3_g: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cg_next, -- color value
-	wren_a => cg_request and psel_next(1) and psel_next(0), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color3_g
-);
-
 colors0_b: entity work.dpram
-generic map(9,7,"rtl/vbxe/colors_b.mif")
+generic map(11,7,"rtl/vbxe/colors_b.mif",1280)
 port map
 (
 	clock => clk,
-	-- To write - palette updating through registers
-	address_a => pal & csel_next, -- color index
-	data_a => cb_next, -- color value
-	wren_a => cb_request_next and not(psel_next(1)) and not(psel_next(0)), 
-	-- To read - get color values for display
-	address_b => pal & index_color,
+	address_a => color_index_in,
+	data_a => cb_next,
+	wren_a => cb_request_next,
+	address_b => color_index_out,
 	q_b => data_color0_b
-);
-
-colors1_b: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cb_next, -- color value
-	wren_a => cb_request_next and not(psel_next(1)) and psel_next(0), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color1_b
-);
-
-colors2_b: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cb_next, -- color value
-	wren_a => cb_request_next and psel_next(1) and not(psel_next(0)), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color2_b
-);
-
-colors3_b: entity work.dpram
-generic map(addr_width => 8, data_width => 7)
-port map
-(
-	clock => clk,
-	-- To write - palette updating through registers
-	address_a => csel_next, -- color index
-	data_a => cb_next, -- color value
-	wren_a => cb_request_next and psel_next(1) and psel_next(0), 
-	-- To read - get color values for display
-	address_b => index_color,
-	q_b => data_color3_b
 );
 
 -- write registers
 process(addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg,
-	blitter_addr_reg, blitter_status, blitter_irqen_reg)
+	blitter_addr_reg, blitter_status, blitter_irqen_reg, pal)
 begin
 		csel_next <= csel_reg;
 		psel_next <= psel_reg;
@@ -567,7 +446,7 @@ begin
 				when "00100" => -- $44 csel
 					csel_next <= data_in;
 				when "00101" => -- $45 psel
-					psel_next <= data_in;
+					psel_next <= data_in(1 downto 0);
 				when "00110" => -- $46 cr
 					cr_next <= data_in(7 downto 1);
 					cr_request <= '1';
@@ -716,7 +595,12 @@ begin
 	memac_data_next <= memac_data_reg;
 	blitter_pending_next <= blitter_pending_reg;
 	
-	blitter_notify := false;
+	if blitter_pending_reg = '1' then
+		blitter_vram_data_in_next <= vram_data_in;
+		blitter_pending_next <= '0';
+	end if;
+
+	blitter_notify := false; -- Becomes true when there is a free slot for the blitter on this cycle
 
 	case dma_state_reg(2 downto 0) is 
 	when "000" =>
@@ -791,15 +675,13 @@ begin
 		vram_op_next <= "00";
 		-- dma_state_next <= "0000";
 	end case;
-	if blitter_pending_reg = '1' then
-		blitter_vram_data_in_next <= vram_data_in;
-		blitter_pending_next <= '0';
-	end if;
 	if blitter_notify and (or_reduce(blitter_status) = '1') then
 		blitter_enable <= '1';
 		vram_addr_next <= blitter_vram_address;
 		vram_op_next <= blitter_vram_wren & '1';
 		vram_data_next <= blitter_vram_data;
+		-- If we are reading, we need to capture the data for the blitter
+		-- on the next cycle
 		blitter_pending_next <= not(blitter_vram_wren);
 	end if;
 	if clock_shift_reg(cycle_length-1) = '1' then
