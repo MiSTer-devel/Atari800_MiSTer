@@ -65,7 +65,8 @@ signal vram_addr_next : std_logic_vector(18 downto 0);
 signal vram_request : std_logic;
 signal vram_request_complete : std_logic;
 signal vram_wr_en : std_logic;
-signal vram_data_in : std_logic_vector(7 downto 0);
+signal vram_data_in_low : std_logic_vector(2 downto 0);
+signal vram_data_in_high : std_logic_vector(4 downto 0);
 signal vram_data : std_logic_vector(7 downto 0);
 signal vram_data_next : std_logic_vector(7 downto 0);
 signal vram_data_reg : std_logic_vector(7 downto 0);
@@ -74,8 +75,8 @@ signal vram_request_reg : std_logic;
 signal vram_request_next : std_logic;
 signal vram_wr_en_temp : std_logic;
 
-signal color_index_in : std_logic_vector(10 downto 0);
-signal color_index_out : std_logic_vector(10 downto 0);
+signal color_index_in : std_logic_vector(9 downto 0);
+signal color_index_out : std_logic_vector(9 downto 0);
 
 signal data_color0_r : std_logic_vector(6 downto 0);
 signal data_color1_r : std_logic_vector(6 downto 0);
@@ -248,7 +249,7 @@ sdram_addr <= vram_addr;
 sdram_request <= vram_request;
 sdram_wr_en <= vram_wr_en;
 vram_request_complete <= sdram_request_complete;
-vram_data_in <= sdram_data_in;
+--vram_data_in <= sdram_data_in;
 sdram_data_out <= vram_data_next;
 
 end generate;
@@ -274,23 +275,34 @@ PORT MAP (
 	RAM_WR_ENABLE => vram_wr_en,
 	RAM_DATA_IN => vram_data,
 	RAM_REQUEST_COMPLETE => vram_request_complete,
-	RAM_REQUEST => vram_request,
-	RAM_DATA => vram_data_in
+	RAM_REQUEST => vram_request --,
+	--RAM_DATA => vram_data_in
 );
 
 end generate;
 
 gen_spram: if mem_config = 1 generate
 
-vbxe_vram: entity work.spram
-generic map(addr_width => 18, data_width => 8)
+vbxe_vram_low_bits: entity work.spram
+generic map(addr_width => 18, data_width => 3, mem_depth => 8192)
 port map
 (
 	clock => clk,
 	address => vram_addr(17 downto 0),
-	data => vram_data,
+	data => vram_data(2 downto 0),
 	wren => vram_wr_en_temp, 
-	q => vram_data_in
+	q => vram_data_in_low
+);
+
+vbxe_vram_high_bits: entity work.spram
+generic map(addr_width => 18, data_width => 5, mem_depth => 2048)
+port map
+(
+	clock => clk,
+	address => vram_addr(17 downto 0),
+	data => vram_data(7 downto 3),
+	wren => vram_wr_en_temp, 
+	q => vram_data_in_high
 );
 
 vram_wr_en_temp <= vram_wr_en and vram_request;
@@ -371,22 +383,33 @@ memac_dma_enable <=
 --memac_dma_check_b <= 
 --	not(memac_dma_address(15)) and memac_dma_address(14) and (memb_reg(7) or memb_reg(6));
 
+-- Temporary fix, add an option to load a different palette from the menu, and leave
+-- just the PAL one as the default.
+
 color_index_in <=
-	("00" & pal & csel_next) when (psel_next = "00") else
-	("010" & csel_next) when (psel_next = "01") else
-	("011" & csel_next) when (psel_next = "10") else
-	("100" & csel_next) when (psel_next = "11") else
-	"00000000000";
+	('0' & (psel_next(0) xor pal) & csel_next) when (psel_next(1) = '0') else 
+	(psel_next & csel_next);
+
+--color_index_in <=
+--	("00" & pal & csel_next) when (psel_next = "00") else
+--	("010" & csel_next) when (psel_next = "01") else
+--	("011" & csel_next) when (psel_next = "10") else
+--	("100" & csel_next) when (psel_next = "11") else
+--	"00000000000";
 
 color_index_out <=
-	("00" & pal & palette_get_color) when (palette_get_index = "00") else
-	("010" & palette_get_color) when (palette_get_index = "01") else
-	("011" & palette_get_color) when (palette_get_index = "10") else
-	("100" & palette_get_color) when (palette_get_index = "11") else
-	"00000000000";
+	('0' & (palette_get_index(0) xor pal) & palette_get_color) when (palette_get_index(1) = '0') else 
+	(palette_get_index & palette_get_color);
+
+--color_index_out <=
+--	("00" & pal & palette_get_color) when (palette_get_index = "00") else
+--	("010" & palette_get_color) when (palette_get_index = "01") else
+--	("011" & palette_get_color) when (palette_get_index = "10") else
+--	("100" & palette_get_color) when (palette_get_index = "11") else
+--	"00000000000";
 
 colors0_r: entity work.dpram
-generic map(11,7,"rtl/vbxe/colors_r.mif",1280)
+generic map(10,7,"rtl/vbxe/colors_r.mif")
 port map
 (
 	clock => clk,
@@ -398,7 +421,7 @@ port map
 );
 
 colors0_g: entity work.dpram
-generic map(11,7,"rtl/vbxe/colors_g.mif",1280)
+generic map(10,7,"rtl/vbxe/colors_g.mif")
 port map
 (
 	clock => clk,
@@ -410,7 +433,7 @@ port map
 );
 
 colors0_b: entity work.dpram
-generic map(11,7,"rtl/vbxe/colors_b.mif",1280)
+generic map(10,7,"rtl/vbxe/colors_b.mif")
 port map
 (
 	clock => clk,
@@ -578,7 +601,7 @@ process(--soft_reset,
 	clock_shift_reg,
 	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, 
 	memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
-	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,memac_address,
+	memc_reg,mems_reg,memb_reg,vram_data_in_low,vram_data_in_high,vram_request_complete,memac_address,
 	blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
 	blitter_status,blitter_pending_reg)
 
@@ -596,7 +619,7 @@ begin
 	blitter_pending_next <= blitter_pending_reg;
 	
 	if blitter_pending_reg = '1' then
-		blitter_vram_data_in_next <= vram_data_in;
+		blitter_vram_data_in_next <= vram_data_in_high & vram_data_in_low;
 		blitter_pending_next <= '0';
 	end if;
 
@@ -631,7 +654,7 @@ begin
 		dma_state_next(2 downto 0) <= "010";
 	when "010" =>
 		if dma_state_reg(3) = '1' then
-			memac_data_next <= vram_data_in;
+			memac_data_next <= vram_data_in_high & vram_data_in_low;
 			memac_request_complete_next <= '1';
 			dma_state_next <= "0011";
 		else
