@@ -8,14 +8,12 @@ use IEEE.STD_LOGIC_MISC.ALL;
 
 entity VBXE is
 generic ( 
-	cycle_length : integer := 16;
-	mem_config : integer := 0  -- 0 bram, 1 spram, 2 sdram
+	cycle_length : integer := 16
 );
 port (
 	clk : in std_logic;
 	enable : in std_logic;
 	soft_reset : in std_logic;
-	clk_enable : in std_logic; -- VBXE speed -> 8x CPU
 	enable_179 : in std_logic; -- Original Atari speed (based on Antic enable, always active)
 	reset_n : in std_logic;
 	pal : in std_logic := '1';
@@ -24,21 +22,17 @@ port (
 	wr_en : in std_logic; -- reading or writing registers?
 	data_out: out std_logic_vector(7 downto 0); -- for register read
 
-	-- Interface to SDRAM interface handled by address_decoder
-	-- Too slow for any practical use!
-	sdram_data_in : in std_logic_vector(7 downto 0); -- read from 512K SDRAM block
-	sdram_data_out : out std_logic_vector(7 downto 0); -- write to 512K SDRAM block
-	sdram_wr_en : out std_logic;
-	sdram_request : out std_logic;
-	sdram_request_complete : in std_logic;
-	sdram_addr : out std_logic_vector(18 downto 0); -- 512K address
-	
 	-- Palette look up interface
 	palette_get_color : in std_logic_vector(7 downto 0);
 	palette_get_index : in std_logic_vector(1 downto 0);
 	r_out : out std_logic_vector(7 downto 0);
 	g_out : out std_logic_vector(7 downto 0);
 	b_out : out std_logic_vector(7 downto 0);
+
+	-- Palette upload
+	VBXE_UPLOAD_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0);
+	VBXE_UPLOAD_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0);
+	VBXE_UPLOAD_PALETTE_COLOR : IN STD_LOGIC_VECTOR(6 downto 0);
 
 	-- MEMAC
 	memac_address : in std_logic_vector(15 downto 0);
@@ -78,20 +72,9 @@ signal vram_wr_en_temp : std_logic;
 signal color_index_in : std_logic_vector(9 downto 0);
 signal color_index_out : std_logic_vector(9 downto 0);
 
-signal data_color0_r : std_logic_vector(6 downto 0);
-signal data_color1_r : std_logic_vector(6 downto 0);
-signal data_color2_r : std_logic_vector(6 downto 0);
-signal data_color3_r : std_logic_vector(6 downto 0);
-
-signal data_color0_g : std_logic_vector(6 downto 0);
-signal data_color1_g : std_logic_vector(6 downto 0);
-signal data_color2_g : std_logic_vector(6 downto 0);
-signal data_color3_g : std_logic_vector(6 downto 0);
-
-signal data_color0_b : std_logic_vector(6 downto 0);
-signal data_color1_b : std_logic_vector(6 downto 0);
-signal data_color2_b : std_logic_vector(6 downto 0);
-signal data_color3_b : std_logic_vector(6 downto 0);
+signal data_color_r : std_logic_vector(6 downto 0);
+signal data_color_g : std_logic_vector(6 downto 0);
+signal data_color_b : std_logic_vector(6 downto 0);
 
 signal csel_reg : std_logic_vector(7 downto 0);
 signal csel_next : std_logic_vector(7 downto 0);
@@ -159,6 +142,14 @@ signal vram_op_next : std_logic_vector(1 downto 0);
 signal clock_shift_reg : std_logic_vector(cycle_length-1 downto 0);
 signal clock_shift_next : std_logic_vector(cycle_length-1 downto 0);
 
+signal cr_wren : std_logic;
+signal cg_wren : std_logic;
+signal cb_wren : std_logic;
+
+signal cr_data_in : std_logic_vector(6 downto 0);
+signal cg_data_in : std_logic_vector(6 downto 0);
+signal cb_data_in : std_logic_vector(6 downto 0);
+
 begin
 
 irq_n <= not(enable and blitter_irqen_reg and blitter_irq);
@@ -224,82 +215,27 @@ memc_window_address_end <=
 	x"EFFF" when memc_reg(1 downto 0) = "11" and memc_reg(7 downto 4) = x"7" else
 	x"FFFF";
 
-r_out <= data_color0_r & '0';
---	data_color0_r & '0' when palette_get_index = "00" else
---	data_color1_r & '0' when palette_get_index = "01" else
---	data_color2_r & '0' when palette_get_index = "10" else
---	data_color3_r & '0' when palette_get_index = "11" else
---	x"FF";
-g_out <= data_color0_g & '0';
---	data_color0_g & '0' when palette_get_index = "00" else
---	data_color1_g & '0' when palette_get_index = "01" else
---	data_color2_g & '0' when palette_get_index = "10" else
---	data_color3_g & '0' when palette_get_index = "11" else
---	x"FF";
-b_out <= data_color0_b & '0';
---	data_color0_b & '0' when palette_get_index = "00" else
---	data_color1_b & '0' when palette_get_index = "01" else
---	data_color2_b & '0' when palette_get_index = "10" else
---	data_color3_b & '0' when palette_get_index = "11" else
---	x"FF";
-
-gen_sdram: if mem_config = 2 generate
-
-sdram_addr <= vram_addr;
-sdram_request <= vram_request;
-sdram_wr_en <= vram_wr_en;
-vram_request_complete <= sdram_request_complete;
---vram_data_in <= sdram_data_in;
-sdram_data_out <= vram_data_next;
-
-end generate;
-
-gen_nosdram: if mem_config < 2 generate
-
-sdram_addr <= (others => '0');
-sdram_data_out <= (others => '0');
-sdram_wr_en <= '0';
-sdram_request <= '0';
-
-end generate;
-
-gen_bram: if mem_config = 0 generate
-
-vbxe_vram : entity work.internalromram
-GENERIC MAP ( internal_ram => 262144 ) -- 524288
-PORT MAP (
-	clock   => clk,
-	reset_n => reset_n,
-
-	RAM_ADDR => '0' & vram_addr(17 downto 0), -- vram_addr(18 downto 0)
-	RAM_WR_ENABLE => vram_wr_en,
-	RAM_DATA_IN => vram_data,
-	RAM_REQUEST_COMPLETE => vram_request_complete,
-	RAM_REQUEST => vram_request --,
-	--RAM_DATA => vram_data_in
-);
-
-end generate;
-
-gen_spram: if mem_config = 1 generate
+r_out <= data_color_r & '0';
+g_out <= data_color_g & '0';
+b_out <= data_color_b & '0';
 
 vbxe_vram_low_bits: entity work.spram
-generic map(addr_width => 18, data_width => 3, mem_depth => 8192)
+generic map(addr_width => 19, data_width => 3, mem_depth => 8192)
 port map
 (
 	clock => clk,
-	address => vram_addr(17 downto 0),
+	address => vram_addr(18 downto 0),
 	data => vram_data(2 downto 0),
 	wren => vram_wr_en_temp, 
 	q => vram_data_in_low
 );
 
 vbxe_vram_high_bits: entity work.spram
-generic map(addr_width => 18, data_width => 5, mem_depth => 2048)
+generic map(addr_width => 19, data_width => 5, mem_depth => 2048)
 port map
 (
 	clock => clk,
-	address => vram_addr(17 downto 0),
+	address => vram_addr(18 downto 0),
 	data => vram_data(7 downto 3),
 	wren => vram_wr_en_temp, 
 	q => vram_data_in_high
@@ -308,8 +244,6 @@ port map
 vram_wr_en_temp <= vram_wr_en and vram_request;
 vram_request_next <= vram_request and not(vram_wr_en);
 vram_request_complete <= vram_wr_en_temp or vram_request_reg;
-
-end generate;
 
 vram_addr <= vram_addr_next;
 vram_request <= vram_op_next(0);
@@ -383,65 +317,55 @@ memac_dma_enable <=
 --memac_dma_check_b <= 
 --	not(memac_dma_address(15)) and memac_dma_address(14) and (memb_reg(7) or memb_reg(6));
 
--- Temporary fix, add an option to load a different palette from the menu, and leave
--- just the PAL one as the default.
-
-color_index_in <=
-	('0' & (psel_next(0) xor pal) & csel_next) when (psel_next(1) = '0') else 
+color_index_in <= 
+	"00" & VBXE_UPLOAD_PALETTE_INDEX 
+	when (VBXE_UPLOAD_PALETTE_RGB(0) or VBXE_UPLOAD_PALETTE_RGB(1) or VBXE_UPLOAD_PALETTE_RGB(2)) = '1' else
 	(psel_next & csel_next);
 
---color_index_in <=
---	("00" & pal & csel_next) when (psel_next = "00") else
---	("010" & csel_next) when (psel_next = "01") else
---	("011" & csel_next) when (psel_next = "10") else
---	("100" & csel_next) when (psel_next = "11") else
---	"00000000000";
+cr_wren <= VBXE_UPLOAD_PALETTE_RGB(0) or cr_request;
+cg_wren <= VBXE_UPLOAD_PALETTE_RGB(1) or cg_request;
+cb_wren <= VBXE_UPLOAD_PALETTE_RGB(2) or cb_request_next;
 
-color_index_out <=
-	('0' & (palette_get_index(0) xor pal) & palette_get_color) when (palette_get_index(1) = '0') else 
-	(palette_get_index & palette_get_color);
+cr_data_in <= VBXE_UPLOAD_PALETTE_COLOR when VBXE_UPLOAD_PALETTE_RGB(0) = '1' else cr_next;
+cg_data_in <= VBXE_UPLOAD_PALETTE_COLOR when VBXE_UPLOAD_PALETTE_RGB(1) = '1' else cg_next;
+cb_data_in <= VBXE_UPLOAD_PALETTE_COLOR when VBXE_UPLOAD_PALETTE_RGB(2) = '1' else cb_next;
 
---color_index_out <=
---	("00" & pal & palette_get_color) when (palette_get_index = "00") else
---	("010" & palette_get_color) when (palette_get_index = "01") else
---	("011" & palette_get_color) when (palette_get_index = "10") else
---	("100" & palette_get_color) when (palette_get_index = "11") else
---	"00000000000";
+color_index_out <= (palette_get_index & palette_get_color);
 
 colors0_r: entity work.dpram
-generic map(10,7,"rtl/vbxe/colors_r.mif")
+generic map(10,7,"rtl/vbxe/pal_r.mif")
 port map
 (
 	clock => clk,
 	address_a => color_index_in,
-	data_a => cr_next,
-	wren_a => cr_request,
+	data_a => cr_data_in,
+	wren_a => cr_wren,
 	address_b => color_index_out,
-	q_b => data_color0_r
+	q_b => data_color_r
 );
 
 colors0_g: entity work.dpram
-generic map(10,7,"rtl/vbxe/colors_g.mif")
+generic map(10,7,"rtl/vbxe/pal_g.mif")
 port map
 (
 	clock => clk,
 	address_a => color_index_in,
-	data_a => cg_next,
-	wren_a => cg_request,
+	data_a => cg_data_in,
+	wren_a => cg_wren,
 	address_b => color_index_out,
-	q_b => data_color0_g
+	q_b => data_color_g
 );
 
 colors0_b: entity work.dpram
-generic map(10,7,"rtl/vbxe/colors_b.mif")
+generic map(10,7,"rtl/vbxe/pal_b.mif")
 port map
 (
 	clock => clk,
 	address_a => color_index_in,
-	data_a => cb_next,
-	wren_a => cb_request_next,
+	data_a => cb_data_in,
+	wren_a => cb_wren,
 	address_b => color_index_out,
-	q_b => data_color0_b
+	q_b => data_color_b
 );
 
 -- write registers

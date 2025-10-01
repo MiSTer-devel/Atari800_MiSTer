@@ -1,4 +1,5 @@
---------------------------------------------------------------------------- -- (c) 2013 mark watson
+---------------------------------------------------------------------------
+-- (c) 2013 mark watson
 -- I am happy for anyone to use this for non-commercial use.
 -- If my vhdl files are used commercially or otherwise sold,
 -- please contact me for explicit permission at scrameta (gmail).
@@ -48,6 +49,14 @@ PORT
 	SDRAM_A    : OUT STD_LOGIC_VECTOR(12 DOWNTO 0);
 	SDRAM_DQ   : INOUT STD_LOGIC_VECTOR(15 DOWNTO 0);
 
+	TURBOFREEZER_ROM_LOADED : in std_logic;
+	UPLOAD_ADDR : in std_logic_vector(22 downto 0);
+	UPLOAD_REQUEST : in std_logic;
+	UPLOAD_DATA : in std_logic_vector(7 downto 0);
+	UPLOAD_READY : out std_logic;
+	INIT_HOLD : in std_logic;
+	SDRAM_READY : out std_logic;
+
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
 	CPU_SPEED  : IN  STD_LOGIC_VECTOR(5 downto 0);
@@ -65,6 +74,9 @@ PORT
 	COLD_RESET_MENU : IN STD_LOGIC;
 	RTC        : IN STD_LOGIC_VECTOR(64 downto 0);
 	VBXE_MODE  : IN STD_LOGIC_VECTOR(1 downto 0) := "00";
+	VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0);
+	VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0);
+	VBXE_PALETTE_COLOR : IN STD_LOGIC_VECTOR(6 downto 0);
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -80,9 +92,6 @@ PORT
 	JOY2       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 	JOY3       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 	JOY4       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
-
-	ROM_ADDR   : OUT STD_LOGIC_VECTOR(14 DOWNTO 0);
-	ROM_DO     : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
 
 	SIO_MODE   : IN  STD_LOGIC := '0';
 	SIO_IN     : IN  STD_LOGIC;
@@ -203,13 +212,11 @@ signal option_tmp : std_logic;
 signal warm_reset_request : std_logic;
 signal cold_reset_request : std_logic;
 
-signal RAM_DATA : std_logic_vector(31 downto 0);
-
-
 BEGIN
 
-areset_n <= RESET_N and SDRAM_RESET_N and not reset_atari;
+areset_n <= (RESET_N and SDRAM_RESET_N and not(reset_atari)) or (INIT_HOLD and SDRAM_RESET_N);
 areset <= not areset_n;
+SDRAM_READY <= SDRAM_RESET_N;
 
 process(clk)
 	variable cnt : integer := 0;
@@ -308,11 +315,11 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	internal_ram => 65536
+	-- internal_ram => 65536
 	-- internal_ram => 131072
 	-- internal_ram => 327680
 	-- internal_ram => 393216 -- Max doable at the moment, 128K short for 512K
-	--internal_ram => 0
+	internal_ram => 0
 )
 PORT MAP
 (
@@ -370,7 +377,7 @@ PORT MAP
 	SDRAM_READ_ENABLE => SDRAM_READ_ENABLE,
 	SDRAM_WRITE_ENABLE => SDRAM_WRITE_ENABLE,
 	SDRAM_ADDR => SDRAM_ADDR,
-	SDRAM_DO => RAM_DATA,
+	SDRAM_DO => SDRAM_DO,
 	SDRAM_DI => SDRAM_DI,
 	SDRAM_32BIT_WRITE_ENABLE => SDRAM_WIDTH_32bit_ACCESS,
 	SDRAM_16BIT_WRITE_ENABLE => SDRAM_WIDTH_16bit_ACCESS,
@@ -387,6 +394,11 @@ PORT MAP
 	MEMORY_READY_DMA => dma_memory_ready,
 	DMA_MEMORY_DATA => dma_memory_data, 
 
+	UPLOAD_ADDR => UPLOAD_ADDR,
+	UPLOAD_REQUEST => UPLOAD_REQUEST,
+	UPLOAD_DATA => UPLOAD_DATA,
+	UPLOAD_READY => UPLOAD_READY,
+
 	RAM_SELECT => RAM_SIZE,
 	PAL => PAL,
 	EXT_ANTIC => EXT_ANTIC,
@@ -397,11 +409,15 @@ PORT MAP
 	RTC => RTC,
 	VBXE_SWITCH => VBXE_MODE(0) or VBXE_MODE(1),
 	VBXE_REG_BASE => VBXE_MODE(1),
+	VBXE_PALETTE_RGB => VBXE_PALETTE_RGB,
+	VBXE_PALETTE_INDEX => VBXE_PALETTE_INDEX,
+	VBXE_PALETTE_COLOR => VBXE_PALETTE_COLOR,
+
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
 	emulated_cartridge_select => emulated_cartridge_select,
 	emulated_cartridge2_select => emulated_cartridge2_select,
-	freezer_enable => freezer_enable,
+	freezer_enable => freezer_enable and TURBOFREEZER_ROM_LOADED,
 	freezer_activate => freezer_activate
 );
 
@@ -455,11 +471,6 @@ PORT MAP
 
 joy <= joy1 or joy2 or joy3 or joy4;
 
-ROM_ADDR <= SDRAM_ADDR(14 downto 0);
-RAM_DATA <= x"FFFFFF"&ROM_DO when SDRAM_ADDR(22 downto 15) = "10000010" else
-            (others=>'1')    when SDRAM_ADDR(22 downto 16) = "1000001" else
-            SDRAM_DO;
-
 zpu: entity work.zpucore
 GENERIC MAP
 (
@@ -469,7 +480,7 @@ PORT MAP
 (
 	-- standard...
 	CLK => CLK,
-	RESET_N => RESET_N and sdram_reset_n,
+	RESET_N => RESET_N and sdram_reset_n and not(INIT_HOLD),
 
 	-- dma bus master (with many waitstates...)
 	ZPU_ADDR_FETCH => dma_addr_fetch,
@@ -521,7 +532,7 @@ PORT MAP
 	ZPU_OUT3 => zpu_out3
 );
 
-pause_atari <= zpu_out1(0);
+pause_atari <= zpu_out1(0) or INIT_HOLD;
 reset_atari <= zpu_out1(1);
 emulated_cartridge2_select <= zpu_out1(16 downto 9);
 emulated_cartridge_select <= zpu_out1(24 downto 17);

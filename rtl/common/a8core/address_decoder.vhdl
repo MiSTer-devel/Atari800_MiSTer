@@ -39,7 +39,12 @@ PORT
 	DMA_16BIT_WRITE_ENABLE : in std_logic; -- for sram
 	DMA_8BIT_WRITE_ENABLE : in std_logic; -- for hardware regs	
 	DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
-	
+
+	UPLOAD_ADDR : in std_logic_vector(22 downto 0) := (others => '0');
+	UPLOAD_REQUEST : in std_logic := '0';
+	UPLOAD_DATA : in std_logic_vector(7 downto 0) := (others => '0');
+	UPLOAD_READY : out std_logic;
+
 	-- VBXE, including the registers (excl. below)
 	VBXE_SWITCH : in std_logic := '0'; -- On / off
 	VBXE_REG_BASE : in std_logic := '0'; -- 0 -> $D640, 1 -> $D740
@@ -47,12 +52,7 @@ PORT
 	-- CACHE_VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
 	VBXE_WRITE_ENABLE : out std_logic;
 	VBXE_SOFT_RESET : out std_logic;
-	-- VBXE VRAM access
-	VBXE_MEMORY_ADDR : in std_logic_vector(18 downto 0) := (others => '0');
-	VBXE_FETCH : in std_logic := '0';
-	MEMORY_READY_VBXE : out std_logic;
-	VBXE_MEMORY_WRITE_ENABLE : in std_logic := '0';
-	VBXE_WRITE_DATA : in std_logic_vector(7 downto 0) := (others => '0');
+	-- VBXE MEMAC
 	memac_address : out std_logic_vector(15 downto 0);
 	memac_write_enable : out std_logic;
 	memac_cpu_access : out std_logic;
@@ -192,7 +192,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal notify_antic : std_logic;
 	signal notify_DMA : std_logic;
 	signal notify_cpu : std_logic;
-	signal notify_VBXE : std_logic;
+	signal notify_UPLOAD : std_logic;
 	signal start_request : std_logic;
 	signal pbi_cycle_next : std_logic;
 	signal pbi_cycle_reg : std_logic;
@@ -223,7 +223,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	constant state_waiting_cpu : std_logic_vector(2 downto 0) := "001";
 	constant state_waiting_DMA : std_logic_vector(2 downto 0) := "010";
 	constant state_waiting_antic : std_logic_vector(2 downto 0) := "011";
-	constant state_waiting_VBXE : std_logic_vector(2 downto 0) := "100";
+	constant state_waiting_UPLOAD : std_logic_vector(2 downto 0) := "100";
 		
 	signal ram_chip_select : std_logic;
 	signal sdram_chip_select : std_logic;
@@ -597,14 +597,14 @@ BEGIN
 	pbi_takeover_adj <= (pbi_takeover) when (freezer_enable='0' or not(freezer_disable_atari)) else '0';
 
 	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
-				vbxe_fetch, vbxe_memory_addr, vbxe_write_data, vbxe_memory_write_enable)
+		upload_request, upload_data, upload_addr)
 	begin
 		start_request <= '0';
 		pbi_request <= '0';
 		notify_antic <= '0';
 		notify_cpu <= '0';
 		notify_DMA <= '0';
-		notify_VBXE <= '0';
+		notify_UPLOAD <= '0';
 		state_next <= state_reg;
 		pbi_cycle_next <= pbi_cycle_reg;
 
@@ -631,7 +631,6 @@ BEGIN
 				data_WRITE_next <= (others => '0');
 				-- This is confusing, does not seem to be needed?
 				-- addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);
-				
 				if antic_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
@@ -687,19 +686,22 @@ BEGIN
 					end if;
 					cpu_fetch_real_next <= '1';
 					antic_fetch_real_next <= '0';
-				-- This is a "would be" code for interfacing VBXE to SDRAM
-				-- does not really work and can probably removed with all the attached logic
-				elsif vbxe_fetch = '1' then
+				elsif upload_request = '1' then
 					start_request <= '1';
-					addr_next <= "11110" & vbxe_memory_addr; -- SDRAM slot
-					write_enable_next <= vbxe_memory_write_enable;
 					width_8bit_next <= '1';
-					data_WRITE_next(7 downto 0) <= vbxe_write_data;
+					addr_next <= '1' & upload_addr;
+					data_write_next(7 downto 0) <= upload_data;
+					write_enable_next <= '1';
 					if (request_complete = '1') then
-						notify_VBXE <= '1';
+						notify_UPLOAD <= '1';
 					else
-						state_next <= state_waiting_VBXE;
+						state_next <= state_waiting_UPLOAD;
 					end if;
+				end if;
+			when state_waiting_UPLOAD =>
+				notify_UPLOAD <= request_complete;
+				if (request_complete = '1') then
+					state_next <= state_idle;
 				end if;
 			when state_waiting_antic =>
 				notify_antic <= request_complete;
@@ -718,11 +720,6 @@ BEGIN
 					state_next <= state_idle;
 					pbi_cycle_next <= '0';
 				end if;
-			when state_waiting_VBXE =>
-				notify_VBXE <= request_complete;
-				if (request_complete = '1') then
-					state_next <= state_idle;
-				end if;
 			when others =>
 				-- NOP
 		end case;
@@ -732,7 +729,7 @@ BEGIN
 	MEMORY_READY_ANTIC <= notify_antic;
 	MEMORY_READY_DMA <= notify_DMA;
 	MEMORY_READY_CPU <= notify_cpu;
-	MEMORY_READY_VBXE <= notify_VBXE;
+	UPLOAD_READY <= notify_UPLOAD;
 	
 	RAM_REQUEST <= ram_chip_select;
 		
@@ -844,11 +841,8 @@ gen_normal_memory : if low_memory=0 generate
 	-- base 64k RAM  - banks 0-3    "000 0000 1111 1111 1111 1111" (TOP)
 	-- to 512k RAM   - banks 4-31   "000 0111 1111 1111 1111 1111" (TOP) 
 	-- to 4MB RAM    - banks 32-255 "011 1111 1111 1111 1111 1111" (TOP)
-	-- +64k          - banks 256-259"100 0000 XX11 1111 1111 1111" (TOP)
-	-- BASIC/OS ROM  -              "100 0001 0XXX XXXX XXXX XXXX" (BOT) (BASIC IN SLOT 0!)
-	SDRAM_BASIC_ROM_ADDR <= "100" & "000100" & "00000000000000";
-	SDRAM_OS_ROM_ADDR    <= "100" & "000101" & "00000000000000";
-	-- SCRATCH       - 4MB+64k+32K+32K-5MB
+	-- +64k          - banks 256-259"100 0000 0000 1111 1111 1111" (TOP)
+	-- SCRATCH       - 4MB+64k-5MB
 	-- 128k freezer ram		"100 100Y YYYY YYYY YYYY YYYY"
 	SDRAM_FREEZER_RAM_ADDR <= "100100" & freezer_access_address;
 	-- 64k freezer rom		"100 1010 YYYY YYYY YYYY YYYY"
@@ -856,8 +850,11 @@ gen_normal_memory : if low_memory=0 generate
 	-- CARTS         -              "101 YYYY YYY0 0000 0000 0000" (BOT) - 2MB! 8kb banks
 	--SDRAM_CART_ADDR      <= "101"&cart_select& "0000000000000";
 	SDRAM_CART_ADDR	<= "1" & emu_cart_address(20) & (not emu_cart_address(20)) & emu_cart_address(19 downto 0);
-	-- VBXE?         -              "111 0VVV 0000 0000 0000 0000" (BOT) - SECOND LAST 512K
-	-- Is this used for anything?:
+	
+	-- BASIC/OS ROM  -              "111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K
+	SDRAM_BASIC_ROM_ADDR <= "111"&"000000" &"00000000000000";
+	SDRAM_OS_ROM_ADDR    <= "111"&"000010" &"00000000000000" when atari800mode = '1' else
+	                        "111"&"000001" &"00000000000000";
 	-- SYSTEM        -              "111 1000 0000 0000 0000 0000" (BOT) - LAST 512K
 
 end generate;

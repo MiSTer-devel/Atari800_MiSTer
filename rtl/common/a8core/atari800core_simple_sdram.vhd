@@ -157,6 +157,12 @@ ENTITY atari800core_simple_sdram is
 		MEMORY_READY_DMA : out std_logic; -- op complete
 		DMA_MEMORY_DATA : out std_logic_vector(31 downto 0);
 
+		-- OS data uploading interface
+		UPLOAD_ADDR : in std_logic_vector(22 downto 0);
+		UPLOAD_REQUEST : in std_logic;
+		UPLOAD_DATA : in std_logic_vector(7 downto 0);
+		UPLOAD_READY : out std_logic;
+
 		-- Special config params
 		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
@@ -168,6 +174,10 @@ ENTITY atari800core_simple_sdram is
 		RTC : in std_logic_vector(64 downto 0);
 		VBXE_SWITCH : IN STD_LOGIC := '1';
 		VBXE_REG_BASE : IN STD_LOGIC := '0';
+		VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0) := "000";
+		VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
+		VBXE_PALETTE_COLOR : IN STD_LOGIC_VECTOR(6 downto 0) := (others => '0');
+
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
 		emulated_cartridge_select: in std_logic_vector(7 downto 0);
@@ -524,6 +534,11 @@ PORT MAP
 	DMA_WRITE_DATA => DMA_WRITE_DATA,
 	MEMORY_READY_DMA => MEMORY_READY_DMA,
 
+	UPLOAD_ADDR => UPLOAD_ADDR,
+	UPLOAD_REQUEST => UPLOAD_REQUEST,
+	UPLOAD_DATA => UPLOAD_DATA,
+	UPLOAD_READY => UPLOAD_READY,
+
 	RAM_SELECT => RAM_SELECT,
 	CART_EMULATION_SELECT => emulated_cartridge_select,
 	CART2_EMULATION_SELECT => emulated_cartridge2_select,
@@ -535,6 +550,9 @@ PORT MAP
 	RTC => RTC,
 	VBXE_SWITCH => VBXE_SWITCH,
 	VBXE_REG_BASE => VBXE_REG_BASE,
+	VBXE_PALETTE_RGB => VBXE_PALETTE_RGB,
+	VBXE_PALETTE_INDEX => VBXE_PALETTE_INDEX,
+	VBXE_PALETTE_COLOR => VBXE_PALETTE_COLOR,
 	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT,
