@@ -321,9 +321,7 @@ pll pll
 	.locked(locked)
 );
 
-//wire reset = ((RESET | status[0]) & ~init_hold) | ~initReset_n | buttons[1];
-wire reset = RESET | ((status[0]) & ~init_hold) | ~initReset_n | buttons[1];
-wire reset_n = ~reset;
+wire reset = RESET | (status[0] & ~init_hold) | ~initReset_n | buttons[1];
 
 reg initReset_n = 0;
 always @(posedge clk_sys) begin
@@ -505,7 +503,7 @@ atari800top atari800top
 (
 	.CLK(clk_sys),
 	.CLK_SDRAM(clk_mem),
-	.RESET_N(reset_n),
+	.RESET_N(~reset),
 	.ARESET(areset),
 
 	.SDRAM_BA(SDRAM_BA),

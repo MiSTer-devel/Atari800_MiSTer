@@ -57,11 +57,11 @@ PORT
 	memac_write_enable : out std_logic;
 	memac_cpu_access : out std_logic;
 	memac_antic_access : out std_logic;
-	memac_check : in std_logic;
+	memac_check : in std_logic := '0';
 	memac_data_write : out std_logic_vector(7 downto 0);
-	memac_data_read : in std_logic_vector(7 downto 0);
+	memac_data_read : in std_logic_vector(7 downto 0) := (others => '0');
 	memac_request : out std_logic;
-	memac_request_complete : in std_logic;
+	memac_request_complete : in std_logic := '0';
 
 	-- sources of data
 	ROM_DATA : IN STD_LOGIC_VECTOR(7 downto 0);	-- flash rom
