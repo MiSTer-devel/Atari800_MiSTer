@@ -277,9 +277,14 @@ begin
 
 				case blitter_state_reg(4 downto 0) is
 				when "11111" =>
-					blitter_load_address_next <= std_logic_vector(unsigned(blitter_address) + 21);
-					blitter_vram_address_next <= blitter_address;
-					blitter_collision_next <= X"00";
+					if (blitter_next_reg = '1') then
+						blitter_load_address_next <= std_logic_vector(unsigned(blitter_load_address_reg) + 21);
+						blitter_vram_address_next <= blitter_load_address_reg;
+					else
+						blitter_load_address_next <= std_logic_vector(unsigned(blitter_address) + 21);
+						blitter_vram_address_next <= blitter_address;
+						blitter_collision_next <= X"00"; -- TODO also when chained???
+					end if;
 					blitter_state_next <= "100000";
 				when "00000" =>
 					blitter_src_address_next(7 downto 0) <= unsigned(blitter_vram_data_in);
@@ -468,9 +473,7 @@ begin
 						if (blitter_x_reg = 0) and (blitter_rep_x_reg = 0) then
 							if (blitter_y_reg = 0) and (blitter_rep_y_reg = 0) then
 								if blitter_next_reg = '1' then
-									blitter_load_address_next <= std_logic_vector(unsigned(blitter_load_address_reg) + 21);
-									blitter_vram_address_next <= blitter_load_address_reg;
-									blitter_state_next <= "100000";
+									blitter_state_next <= "111111";
 								else
 									blitter_state_next <= "000000";
 									blitter_irq_next <= '1';
@@ -532,6 +535,7 @@ begin
 		blitter_state_next <= "000000";
 	elsif blitter_start_request = '1' then
 		-- TODO Or prep the first step already here and go to state "100000" ???
+		-- The condition in state 111111 can be removed (special state for restarting the blitter then?)
 		-- Is the sychronization with the request OK for this?
 		blitter_state_next <= "111111";
 	end if;

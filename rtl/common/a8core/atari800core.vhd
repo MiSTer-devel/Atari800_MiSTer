@@ -242,6 +242,7 @@ SIGNAL	ANTIC_RDY :  STD_LOGIC;
 SIGNAL	ANTIC_WRITE_ENABLE :  STD_LOGIC;
 SIGNAL	BREAK_PRESSED :  STD_LOGIC;
 signal ANTIC_REFRESH_CYCLE : STD_LOGIC;
+SIGNAL	VBXE_COLOUR_CLOCK_OUT :  STD_LOGIC;
 
 -- GTIA
 SIGNAL	GTIA_SOUND :  STD_LOGIC;
@@ -255,6 +256,21 @@ SIGNAL	GTIA_WRITE_ENABLE :  STD_LOGIC;
 
 signal COLOUR : std_logic_vector(7 downto 0);
 
+signal VSYNC : std_logic;
+signal HSYNC : std_logic;
+signal GTIA_VISIBLE : std_logic;
+signal GTIA_HBLANK : std_logic;
+signal GTIA_HSYNC : std_logic;
+signal GTIA_VSYNC : std_logic;
+signal GTIA_HPOS : std_logic_vector(7 downto 0);
+signal GTIA_PF0_IN : std_logic_vector(7 downto 0);
+signal GTIA_PF1_IN : std_logic_vector(7 downto 0);
+signal GTIA_PF2_IN : std_logic_vector(7 downto 0);
+signal GTIA_PF0_OUT : std_logic_vector(7 downto 0);
+signal GTIA_PF1_OUT : std_logic_vector(7 downto 0);
+signal GTIA_PF2_OUT : std_logic_vector(7 downto 0);
+signal GTIA_XCOLOR : std_logic;
+
 -- GTIA PALETTE
 signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
 signal VIDEO_G_GTIA : std_logic_vector(7 downto 0);
@@ -264,6 +280,7 @@ signal VIDEO_B_GTIA : std_logic_vector(7 downto 0);
 signal VIDEO_R_VBXE : std_logic_vector(7 downto 0);
 signal VIDEO_G_VBXE : std_logic_vector(7 downto 0);
 signal VIDEO_B_VBXE : std_logic_vector(7 downto 0);
+signal VBXE_PF_PALETTE : std_logic_vector(1 downto 0);
 
 -- CPU
 SIGNAL	CPU_6502_RESET :  STD_LOGIC;
@@ -418,6 +435,7 @@ PORT MAP(CLK => CLK,
 		 COLOUR_CLOCK_ORIGINAL_OUT => ANTIC_ORIGINAL_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK_OUT => ANTIC_COLOUR_CLOCK_OUT,
 		 HIGHRES_COLOUR_CLOCK_OUT => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
+		 VBXE_COLOUR_CLOCK_OUT => VBXE_COLOUR_CLOCK_OUT,
 		 dma_fetch_out => ANTIC_FETCH,
 		 HBLANK => HBLANK,
 		 VBLANK_OUT => VBLANK,
@@ -516,7 +534,7 @@ PORT MAP(
 	WR_EN => VBXE_WRITE_ENABLE,
 	DATA_OUT => VBXE_DO,
 	PALETTE_GET_COLOR => COLOUR,
-	PALETTE_GET_INDEX => "00",
+	PALETTE_GET_INDEX => VBXE_PF_PALETTE,
 	R_OUT => VIDEO_R_VBXE,
 	G_OUT => VIDEO_G_VBXE,
 	B_OUT => VIDEO_B_VBXE,
@@ -534,7 +552,21 @@ PORT MAP(
 	memac_request_complete => memac_request_complete,
 	memac_dma_enable => memac_dma_enable,
 	memac_dma_address => dma_addr,
-	irq_n => VBXE_IRQ_N
+	irq_n => VBXE_IRQ_N,
+	video_clock_antic_highres => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
+	gtia_live => GTIA_VISIBLE,
+	gtia_pf0 => GTIA_PF0_OUT,
+	gtia_pf1 => GTIA_PF1_OUT,
+	gtia_pf2 => GTIA_PF2_OUT,
+	map_pf0 => GTIA_PF0_IN,
+	map_pf1 => GTIA_PF1_IN,
+	map_pf2 => GTIA_PF2_IN,
+	pf_palette => VBXE_PF_PALETTE,
+	xcolor => GTIA_XCOLOR,
+	VSYNC_START => GTIA_VSYNC,
+	HBLANK_START => GTIA_HBLANK,
+	HSYNC_START => GTIA_HSYNC,
+	GTIA_HPOS => GTIA_HPOS
 );
 
 mmu1 : entity work.address_decoder
@@ -684,6 +716,9 @@ PORT MAP(CLK => CLK,
 		 keyboard_scan => KEYBOARD_SCAN);
 
 CONSOL_IN <= '1'&CONSOL_OPTION&CONSOL_SELECT&CONSOL_START;
+VIDEO_VS <= VSYNC;
+VIDEO_HS <= HSYNC;
+
 		 	 
 gtia1 : entity work.gtia
 PORT MAP(CLK => CLK,
@@ -697,6 +732,22 @@ PORT MAP(CLK => CLK,
 		 COLOUR_CLOCK_ORIGINAL => ANTIC_ORIGINAL_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK => ANTIC_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK_HIGHRES => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
+		 COLOUR_CLOCK_VBXE => VBXE_COLOUR_CLOCK_OUT,
+		 VBXE_SWITCH => VBXE_SWITCH,
+		 GTIA_VISIBLE => GTIA_VISIBLE,
+		 GTIA_PF0_OUT => GTIA_PF0_OUT,
+		 GTIA_PF1_OUT => GTIA_PF1_OUT,
+		 GTIA_PF2_OUT => GTIA_PF2_OUT,
+		 GTIA_PF0_IN => GTIA_PF0_IN,
+		 GTIA_PF1_IN => GTIA_PF1_IN,
+		 GTIA_PF2_IN => GTIA_PF2_IN,
+		 XCOLOR => GTIA_XCOLOR,
+		 HBLANK_START => GTIA_HBLANK,
+		 HSYNC_START_OUT => GTIA_HSYNC,
+		 VSYNC_START => GTIA_VSYNC,
+		 HPOS_OUT => GTIA_HPOS,
+
+
 		 CONSOL_OUT => CONSOL_OUT,
 		 CONSOL_IN => CONSOL_IN,
 		 TRIG => GTIA_TRIG_MERGED,
@@ -704,8 +755,8 @@ PORT MAP(CLK => CLK,
 		 AN => ANTIC_AN,
 		 CPU_DATA_IN => WRITE_DATA(7 DOWNTO 0),
 		 MEMORY_DATA_IN => MEMORY_DATA(7 DOWNTO 0),
-		 VSYNC => VIDEO_VS,
-		 HSYNC => VIDEO_HS,
+		 VSYNC => VSYNC,
+		 HSYNC => HSYNC,
 		 CSYNC => VIDEO_CS,
 		 BLANK => VIDEO_BLANK,
 		 HBLANK => open,
@@ -813,7 +864,7 @@ PBI_ADDR <= PBI_ADDR_INT;
 ENABLE_179_EARLY <= ANTIC_ENABLE_179;
 PORTB_OUT <= PORTB_OUT_INT;
 ANTIC_REFRESH <= ANTIC_REFRESH_CYCLE;
-VIDEO_PIXCE <= ANTIC_HIGHRES_COLOUR_CLOCK_OUT;
+VIDEO_PIXCE <= VBXE_COLOUR_CLOCK_OUT when VBXE_SWITCH = '1' else ANTIC_HIGHRES_COLOUR_CLOCK_OUT;
 
 
 memory_ready_antic_out <= memory_ready_antic;

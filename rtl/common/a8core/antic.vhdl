@@ -47,7 +47,9 @@ PORT
 	COLOUR_CLOCK_ORIGINAL_OUT : out std_logic;
 	COLOUR_CLOCK_OUT : out std_logic;
 	HIGHRES_COLOUR_CLOCK_OUT : out std_logic; -- 2x to allow for half pixel modes
-	
+	-- We could produce the clock locally at VBXE, but it's here anyhow
+	VBXE_COLOUR_CLOCK_OUT : out std_logic; -- 4x for VBXE high res modes
+
 	HBLANK : OUT STD_LOGIC;
 	
 	-- DMA fetch
@@ -1865,6 +1867,7 @@ BEGIN
 	COLOUR_CLOCK_ORIGINAL_OUT <= colour_clock_1x;
 	COLOUR_CLOCK_OUT <= colour_clock_selected;
 	HIGHRES_COLOUR_CLOCK_OUT <= colour_clock_selected_highres;
+	VBXE_COLOUR_CLOCK_OUT <= colour_clock_4x;
 
 	vcount_out <= vcount_reg;
 	hcount_out <= hcount_reg(9 downto 2);
