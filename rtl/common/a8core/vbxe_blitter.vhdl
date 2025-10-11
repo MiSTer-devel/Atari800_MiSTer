@@ -489,6 +489,7 @@ begin
 									blitter_src_current_next <= blitter_src_address_reg;
 									blitter_rep_y_next <= blitter_rep_y_reg - 1;
 								end if;
+								blitter_pattern_current_next <= blitter_pattern_count_reg;
 								blitter_dest_current_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
 								blitter_dest_address_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
 								-- Can skip the read cycle if the and mask is 00
