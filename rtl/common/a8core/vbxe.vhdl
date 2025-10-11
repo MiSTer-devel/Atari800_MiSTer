@@ -49,21 +49,25 @@ port (
 	-- Blitter irq
 	irq_n : out std_logic;
 	
-	-- map_active : out std_logic;
+	gtia_highres : in std_logic := '0';
+	gtia_highres_mod : out std_logic;
+	gtia_active_hr : in std_logic_vector(1 downto 0) := "00";
+	gtia_active_hr_mod : out std_logic_vector(1 downto 0);
+	gtia_prior : in std_logic_vector(7 downto 0) := (others => '0');
 	gtia_pf0 : in std_logic_vector(7 downto 0);
 	gtia_pf1 : in std_logic_vector(7 downto 0);
 	gtia_pf2 : in std_logic_vector(7 downto 0);
+	gtia_pf3 : in std_logic_vector(7 downto 0);
 	map_pf0 : out std_logic_vector(7 downto 0);
 	map_pf1 : out std_logic_vector(7 downto 0);
 	map_pf2 : out std_logic_vector(7 downto 0);
-	map_catt: out std_logic;
-	pf_palette : out std_logic_vector(1 downto 0);
-	ov_palette : out std_logic_vector(1 downto 0);
-	ov_prior : out std_logic_vector(7 downto 0);
+	palette : out std_logic_vector(1 downto 0);
 	xcolor : out std_logic;
+	-- TODO out vbxe highres pixel + activation bit
 
 	gtia_live : in std_logic;
 	video_clock_antic_highres : in std_logic;
+	video_clock_vbxe : in std_logic;
 	gtia_hpos : in std_logic_vector(7 downto 0);
 	
 	hsync_start : in std_logic;
@@ -73,6 +77,34 @@ port (
 end VBXE;
 
 architecture vhdl of VBXE is
+
+component delay_line is
+generic(COUNT : natural := 1);
+PORT
+(
+	CLK : IN STD_LOGIC;
+	SYNC_RESET : IN STD_LOGIC;
+	DATA_IN : IN STD_LOGIC;
+	ENABLE : IN STD_LOGIC;
+	RESET_N : IN STD_LOGIC;
+
+	DATA_OUT : OUT STD_LOGIC
+);
+end component;	
+
+component wide_delay_line is
+generic(COUNT : natural := 1; WIDTH : natural := 1);
+PORT
+(
+	CLK : IN STD_LOGIC;
+	SYNC_RESET : IN STD_LOGIC;
+	DATA_IN : IN STD_LOGIC_VECTOR(WIDTH-1 downto 0);
+	ENABLE : IN STD_LOGIC;
+	RESET_N : IN STD_LOGIC;
+	
+	DATA_OUT : OUT STD_LOGIC_VECTOR(WIDTH-1 downto 0)
+);
+end component;
 
 signal vram_addr : std_logic_vector(18 downto 0);
 signal vram_addr_reg : std_logic_vector(18 downto 0);
@@ -240,11 +272,21 @@ signal xdl_map_buffer_index_next : unsigned(5 downto 0);
 signal xdl_map_sindex_reg : unsigned(4 downto 0);
 signal xdl_map_sindex_next : unsigned(4 downto 0);
 
+signal xdl_field_start : std_logic;
+signal xdl_field_end : std_logic;
+signal xdl_map_live_start : std_logic;
+signal xdl_map_live_end : std_logic;
+
 signal xdl_map_live_reg : std_logic;
 signal xdl_map_live_next : std_logic;
 
 signal xdl_vdelay_reg : unsigned(1 downto 0);
 signal xdl_vdelay_next : unsigned(1 downto 0);
+
+signal pf_palette : std_logic_vector(1 downto 0);
+signal ov_palette : std_logic_vector(1 downto 0);
+signal ov_prior : std_logic_vector(7 downto 0);
+signal map_catt : std_logic;
 
 signal xcolor_reg : std_logic;
 signal xcolor_next : std_logic;
@@ -265,30 +307,86 @@ signal cb_data_in : std_logic_vector(6 downto 0);
 
 begin
 
--- map_active <= xdl_map_active_reg;
+process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_prior,
+	enable,xdl_active_reg,xdl_map_live_reg,xdl_map_wd_reg,xdl_map_sindex_reg,
+	xdl_map_buffer_data_out,xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,
+	p0_reg,p1_reg,p2_reg,p3_reg)
+	variable flip_23 : boolean;
+begin
+	gtia_highres_mod <= gtia_highres;
+	gtia_active_hr_mod <= gtia_active_hr;
+	map_pf0 <= gtia_pf0;
+	map_pf1 <= gtia_pf1;
+	map_pf2 <= gtia_pf2;
+	pf_palette <= "00";
+	ov_palette <= "00";
+	ov_prior <= x"00";
+	map_catt <= '0';
+	flip_23 := false;
+	if (xdl_active_reg = '1') and (enable = '1') then
+		pf_palette <= xdl_pf_pal_reg;
+		ov_palette <= xdl_ov_pal_reg;
+		ov_prior <= xdl_gp_reg;
+		if xdl_map_live_reg = '1' then
+			map_pf0 <= xdl_map_buffer_data_out(31 downto 24);
+			map_pf1 <= xdl_map_buffer_data_out(23 downto 16);
+			if (gtia_highres xor xdl_map_buffer_data_out(2)) = '1' then
+				case xdl_map_wd_reg(4 downto 3) is
+				when "00" =>
+				if xdl_map_buffer_data_out(31-to_integer(xdl_map_sindex_reg(2 downto 0))) = '1' then
+					flip_23 := true;
+				end if;
+				when "01" =>
+				if xdl_map_buffer_data_out(31-to_integer(xdl_map_sindex_reg(3 downto 1))) = '1' then
+					flip_23 := true;
+				end if;
+				when others =>
+				if xdl_map_buffer_data_out(31-to_integer(xdl_map_sindex_reg(4 downto 2))) = '1' then
+					flip_23 := true;
+				end if;
+				end case;
+				if gtia_highres = '0' then
+					gtia_highres_mod <= '1';
+					--gtia_active_hr_mod <= "01";
+					if gtia_prior(4) = '1' then
+						gtia_active_hr_mod <= "01";
+					elsif gtia_prior(5) = '1' then
+						gtia_active_hr_mod <= "10";
+					elsif gtia_prior(6) = '1' then
+						gtia_active_hr_mod <= "11";
+					elsif gtia_prior(7) = '1' then
+						gtia_active_hr_mod <= "00";
+					end if;
+				end if;
+			end if;
+			if flip_23 then
+				map_pf2 <= gtia_pf3;
+			else
+				map_pf2 <= xdl_map_buffer_data_out(15 downto 8);
+				if (gtia_highres and xdl_map_buffer_data_out(2)) = '1' then
+					gtia_active_hr_mod <= "00";
+					case gtia_active_hr is
+					when "00" => map_pf2 <= xdl_map_buffer_data_out(31 downto 24);
+					when "01" => map_pf2 <= xdl_map_buffer_data_out(23 downto 16);
+					when "10" => null;
+					when "11" => map_pf2 <= gtia_pf3;
+					end case;
+				end if;  
+			end if;
+			pf_palette <= xdl_map_buffer_data_out(7 downto 6);
+			ov_palette <= xdl_map_buffer_data_out(5 downto 4);
+			case xdl_map_buffer_data_out(1 downto 0) is
+				when "00" => ov_prior <= p0_reg;
+				when "01" => ov_prior <= p1_reg;
+				when "10" => ov_prior <= p2_reg;
+				when "11" => ov_prior <= p3_reg;
+			end case;
+			map_catt <= xdl_map_buffer_data_out(3);
+		end if;
+	end if;
+end process;
 
-map_pf0 <= gtia_pf0 when (xdl_map_live_reg = '0') or (enable = '0') else xdl_map_buffer_data_out(31 downto 24);
-map_pf1 <= gtia_pf1 when (xdl_map_live_reg = '0') or (enable = '0') else xdl_map_buffer_data_out(23 downto 16);
-map_pf2 <= gtia_pf2 when (xdl_map_live_reg = '0') or (enable = '0') else xdl_map_buffer_data_out(15 downto 8);
-
-pf_palette <= "00" when (xdl_active_reg = '0') or (enable = '0') else
-	xdl_pf_pal_reg when xdl_map_live_reg = '0' else
-	xdl_map_buffer_data_out(7 downto 6);
-
-ov_palette <= "00" when (xdl_active_reg = '0') or (enable = '0') else
-	xdl_ov_pal_reg when xdl_map_live_reg = '0' else
-	xdl_map_buffer_data_out(5 downto 4);
-
-ov_prior <= x"00" when (xdl_active_reg = '0') or (enable = '0') else
-	xdl_gp_reg when xdl_map_live_reg = '0' else
-	p0_reg when xdl_map_buffer_data_out(1 downto 0) = "00" else
-	p1_reg when xdl_map_buffer_data_out(1 downto 0) = "01" else
-	p2_reg when xdl_map_buffer_data_out(1 downto 0) = "10" else
-	p3_reg;
-
-map_catt <= '0' when (xdl_map_live_reg = '0') or (enable = '0') else
-	xdl_map_buffer_data_out(3);
-
+palette <= pf_palette; -- TODO either
 xcolor <= xcolor_reg;
 
 irq_n <= not(enable and blitter_irqen_reg and blitter_irq);
@@ -509,7 +607,7 @@ port map
 
 -- write registers
 process(addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg,
-	blitter_addr_reg, blitter_status, blitter_irqen_reg, xdl_enabled_reg, xcolor_reg, pal, p0_reg, p1_reg, p2_reg, p3_reg)
+	blitter_addr_reg, blitter_status, blitter_irqen_reg, xdl_enabled_reg, xcolor_reg, pal, xdl_addr_reg, p0_reg, p1_reg, p2_reg, p3_reg)
 begin
 		csel_next <= csel_reg;
 		psel_next <= psel_reg;
@@ -789,38 +887,52 @@ begin
 	end if;
 end process;
 
-process(xdl_map_live_reg, gtia_live, xdl_ov_size_reg)
+process(xdl_active_reg, gtia_live, xdl_ov_size_reg, gtia_hpos)
 begin
-	xdl_map_live_next <= xdl_map_live_reg;
-	if (xdl_map_active_reg = '1') and (gtia_live = '1') then
+	xdl_field_start <= '0';
+	xdl_field_end <= '0';
+	if (xdl_active_reg = '1') and (gtia_live = '1') then
+		-- TODO this may have to be adjusted to start earlier (as early as the first signal is needed, e.g. hires_reg)
+		-- and delays accordingly to sync
 		case xdl_ov_size_reg is
 			when "00" => -- Narrow
-				if gtia_hpos = x"40" then
-					xdl_map_live_next <= '1';
-				end if;
-				if gtia_hpos = x"C1" then
-					xdl_map_live_next <= '0';
-				end if;
+				if gtia_hpos = x"40" then xdl_field_start <= '1'; end if;
+				if gtia_hpos = x"C0" then xdl_field_end <= '1'; end if;
 			when "01" => -- Normal
-				if gtia_hpos = x"30" then
-					xdl_map_live_next <= '1';
-				end if;
-				if gtia_hpos = x"D1" then
-					xdl_map_live_next <= '0';
-				end if;
+				if gtia_hpos = x"30" then xdl_field_start <= '1'; end if;
+				if gtia_hpos = x"D0" then xdl_field_end <= '1'; end if;
 			when "10" => -- Wide
-				if gtia_hpos = x"2C" then
-					xdl_map_live_next <= '1';
-				end if;
-				if gtia_hpos = x"D5" then
-					xdl_map_live_next <= '0';
-				end if;
+				if gtia_hpos = x"2C" then xdl_field_start <= '1'; end if;
+				if gtia_hpos = x"D4" then xdl_field_end <= '1'; end if;
 			when others => null;
 		end case;
 	end if;
 end process;
 
-process(xdl_map_buffer_index_reg,xdl_map_sindex_reg,xdl_map_wd_reg,hsync_start)
+map_live_delay1 : delay_line
+	generic map (COUNT=>1) -- was 3
+	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_antic_highres,reset_n=>reset_n,data_out=>xdl_map_live_start);	
+
+map_live_delay2 : delay_line
+	generic map (COUNT=>1) -- was 3
+	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_antic_highres,reset_n=>reset_n,data_out=>xdl_map_live_end);	
+
+process(xdl_map_live_reg, xdl_map_live_start, xdl_map_live_end)
+begin
+	xdl_map_live_next <= xdl_map_live_reg;
+	if (xdl_map_active_reg = '1') then
+		if xdl_map_live_start = '1' then
+			xdl_map_live_next <= '1';
+		end if;
+		if xdl_map_live_end = '1' then
+			xdl_map_live_next <= '0';
+		end if;
+	end if;
+end process;
+
+process(xdl_map_buffer_index_reg,xdl_map_sindex_reg,xdl_map_wd_reg,
+--hsync_start,
+gtia_hpos,xdl_map_active_reg)
 begin
 	xdl_map_buffer_index_next <= xdl_map_buffer_index_reg;
 	xdl_map_sindex_next <= xdl_map_sindex_reg;
@@ -1019,6 +1131,7 @@ begin
 	-- if so, roll over address, reset vcount, set map reading marker to 1
 	-- do the same with OV address
 
+	-- TODO use something else than hblank, end of field?
 	if (hblank_start = '1') and (xdl_active_reg = '1') then
 		if xdl_vdelay_reg = "00" then
 			if xdl_map_vcount_reg = xdl_map_ht_reg then

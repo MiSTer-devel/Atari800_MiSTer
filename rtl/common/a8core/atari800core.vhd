@@ -262,6 +262,11 @@ signal GTIA_VISIBLE : std_logic;
 signal GTIA_HBLANK : std_logic;
 signal GTIA_HSYNC : std_logic;
 signal GTIA_VSYNC : std_logic;
+signal GTIA_HIGHRES_OUT : std_logic;
+signal GTIA_HIGHRES_IN : std_logic;
+signal GTIA_ACTIVE_HR_OUT : std_logic_vector(1 downto 0);
+signal GTIA_ACTIVE_HR_IN : std_logic_vector(1 downto 0);
+signal GTIA_PRIOR : std_logic_vector(7 downto 0);
 signal GTIA_HPOS : std_logic_vector(7 downto 0);
 signal GTIA_PF0_IN : std_logic_vector(7 downto 0);
 signal GTIA_PF1_IN : std_logic_vector(7 downto 0);
@@ -269,7 +274,9 @@ signal GTIA_PF2_IN : std_logic_vector(7 downto 0);
 signal GTIA_PF0_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF1_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF2_OUT : std_logic_vector(7 downto 0);
+signal GTIA_PF3_OUT : std_logic_vector(7 downto 0);
 signal GTIA_XCOLOR : std_logic;
+signal GTIA_PALETTE : std_logic_vector(1 downto 0);
 
 -- GTIA PALETTE
 signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
@@ -280,7 +287,7 @@ signal VIDEO_B_GTIA : std_logic_vector(7 downto 0);
 signal VIDEO_R_VBXE : std_logic_vector(7 downto 0);
 signal VIDEO_G_VBXE : std_logic_vector(7 downto 0);
 signal VIDEO_B_VBXE : std_logic_vector(7 downto 0);
-signal VBXE_PF_PALETTE : std_logic_vector(1 downto 0);
+signal VBXE_PALETTE : std_logic_vector(1 downto 0);
 
 -- CPU
 SIGNAL	CPU_6502_RESET :  STD_LOGIC;
@@ -534,7 +541,7 @@ PORT MAP(
 	WR_EN => VBXE_WRITE_ENABLE,
 	DATA_OUT => VBXE_DO,
 	PALETTE_GET_COLOR => COLOUR,
-	PALETTE_GET_INDEX => VBXE_PF_PALETTE,
+	PALETTE_GET_INDEX => GTIA_PALETTE,
 	R_OUT => VIDEO_R_VBXE,
 	G_OUT => VIDEO_G_VBXE,
 	B_OUT => VIDEO_B_VBXE,
@@ -554,14 +561,21 @@ PORT MAP(
 	memac_dma_address => dma_addr,
 	irq_n => VBXE_IRQ_N,
 	video_clock_antic_highres => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
+	video_clock_vbxe => VBXE_COLOUR_CLOCK_OUT,
 	gtia_live => GTIA_VISIBLE,
+	gtia_highres => GTIA_HIGHRES_OUT,
+	gtia_highres_mod => GTIA_HIGHRES_IN,
+	gtia_active_hr => GTIA_ACTIVE_HR_OUT,
+	gtia_active_hr_mod => GTIA_ACTIVE_HR_IN,
+	gtia_prior => GTIA_PRIOR,
 	gtia_pf0 => GTIA_PF0_OUT,
 	gtia_pf1 => GTIA_PF1_OUT,
 	gtia_pf2 => GTIA_PF2_OUT,
+	gtia_pf3 => GTIA_PF3_OUT,
 	map_pf0 => GTIA_PF0_IN,
 	map_pf1 => GTIA_PF1_IN,
 	map_pf2 => GTIA_PF2_IN,
-	pf_palette => VBXE_PF_PALETTE,
+	palette => VBXE_PALETTE,
 	xcolor => GTIA_XCOLOR,
 	VSYNC_START => GTIA_VSYNC,
 	HBLANK_START => GTIA_HBLANK,
@@ -735,12 +749,20 @@ PORT MAP(CLK => CLK,
 		 COLOUR_CLOCK_VBXE => VBXE_COLOUR_CLOCK_OUT,
 		 VBXE_SWITCH => VBXE_SWITCH,
 		 GTIA_VISIBLE => GTIA_VISIBLE,
+		 GTIA_HIGHRES_OUT => GTIA_HIGHRES_OUT,
+		 GTIA_HIGHRES_IN => GTIA_HIGHRES_IN,
+		 GTIA_ACTIVE_HR_OUT => GTIA_ACTIVE_HR_OUT,
+		 GTIA_ACTIVE_HR_IN => GTIA_ACTIVE_HR_IN,
+		 GTIA_PRIOR => GTIA_PRIOR,
 		 GTIA_PF0_OUT => GTIA_PF0_OUT,
 		 GTIA_PF1_OUT => GTIA_PF1_OUT,
 		 GTIA_PF2_OUT => GTIA_PF2_OUT,
+		 GTIA_PF3_OUT => GTIA_PF3_OUT,
 		 GTIA_PF0_IN => GTIA_PF0_IN,
 		 GTIA_PF1_IN => GTIA_PF1_IN,
 		 GTIA_PF2_IN => GTIA_PF2_IN,
+		 VBXE_PALETTE => VBXE_PALETTE,
+		 PALETTE_out => GTIA_PALETTE,
 		 XCOLOR => GTIA_XCOLOR,
 		 HBLANK_START => GTIA_HBLANK,
 		 HSYNC_START_OUT => GTIA_HSYNC,
