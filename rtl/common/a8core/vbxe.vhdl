@@ -895,7 +895,7 @@ begin
 		-- TODO this may have to be adjusted to start earlier (as early as the first signal is needed, e.g. hires_reg)
 		-- and delays accordingly to sync
 		case xdl_ov_size_reg is
-			when "00" => -- Narrow
+			when "00" | "11" => -- Narrow
 				if gtia_hpos = x"40" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"C0" then xdl_field_end <= '1'; end if;
 			when "01" => -- Normal
@@ -904,17 +904,16 @@ begin
 			when "10" => -- Wide
 				if gtia_hpos = x"2C" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"D4" then xdl_field_end <= '1'; end if;
-			when others => null;
 		end case;
 	end if;
 end process;
 
-map_live_delay1 : delay_line
-	generic map (COUNT=>1) -- was 3
+map_live_delay_start : delay_line
+	generic map (COUNT=>1) -- was 3 at VBXE highres
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_antic_highres,reset_n=>reset_n,data_out=>xdl_map_live_start);	
 
-map_live_delay2 : delay_line
-	generic map (COUNT=>1) -- was 3
+map_live_delay_end : delay_line
+	generic map (COUNT=>1) -- was 3 at VBXE highres
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_antic_highres,reset_n=>reset_n,data_out=>xdl_map_live_end);	
 
 process(xdl_map_live_reg, xdl_map_live_start, xdl_map_live_end)

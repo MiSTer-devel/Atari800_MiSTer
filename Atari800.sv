@@ -732,7 +732,7 @@ always @(posedge clk_sys) begin
 	// already starts, and it needs to be longer than any pause between
 	// downloading two subsequent ROMs when the core is loading for the 
 	// first time. 
-	if(load_reset_timeout < 5000000) begin
+	if(load_reset_timeout < 10000000) begin
 		if(initReset_n) load_reset_timeout <= load_reset_timeout + 1;
 	end
 	else begin
