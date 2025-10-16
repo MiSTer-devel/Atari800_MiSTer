@@ -4,7 +4,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.STD_LOGIC_MISC.ALL;
 
--- TODO write down what needs to be soft reset
+-- TODO Is everything for soft reset now included?
 
 entity VBXE is
 generic ( 
@@ -49,11 +49,11 @@ port (
 	-- Blitter irq
 	irq_n : out std_logic;
 	
-	gtia_highres : in std_logic := '0';
+	gtia_highres : in std_logic;
 	gtia_highres_mod : out std_logic;
-	gtia_active_hr : in std_logic_vector(1 downto 0) := "00";
+	gtia_active_hr : in std_logic_vector(1 downto 0);
 	gtia_active_hr_mod : out std_logic_vector(1 downto 0);
-	gtia_prior : in std_logic_vector(7 downto 0) := (others => '0');
+	gtia_prior : in std_logic_vector(7 downto 0);
 	gtia_pf0 : in std_logic_vector(7 downto 0);
 	gtia_pf1 : in std_logic_vector(7 downto 0);
 	gtia_pf2 : in std_logic_vector(7 downto 0);
@@ -61,9 +61,11 @@ port (
 	map_pf0 : out std_logic_vector(7 downto 0);
 	map_pf1 : out std_logic_vector(7 downto 0);
 	map_pf2 : out std_logic_vector(7 downto 0);
-	palette : out std_logic_vector(1 downto 0);
+	pf_palette : out std_logic_vector(1 downto 0);
+	ov_palette : out std_logic_vector(1 downto 0);
+	ov_pixel : out std_logic_vector(7 downto 0);
+	ov_pixel_active : out std_logic;
 	xcolor : out std_logic;
-	-- TODO out vbxe highres pixel + activation bit
 
 	gtia_live : in std_logic;
 	video_clock_antic_highres : in std_logic;
@@ -114,6 +116,7 @@ signal vram_request_complete : std_logic;
 signal vram_wr_en : std_logic;
 signal vram_data_in_low : std_logic_vector(2 downto 0);
 signal vram_data_in_high : std_logic_vector(4 downto 0);
+signal vram_data_in : std_logic_vector(7 downto 0);
 signal vram_data : std_logic_vector(7 downto 0);
 signal vram_data_next : std_logic_vector(7 downto 0);
 signal vram_data_reg : std_logic_vector(7 downto 0);
@@ -184,7 +187,7 @@ signal blitter_addr_next : std_logic_vector(18 downto 0);
 signal blitter_status : std_logic_vector(1 downto 0);
 signal blitter_collision : std_logic_vector(7 downto 0);
 signal blitter_enable : std_logic;
-signal blitter_request_reg : std_logic_vector(1 downto 0);
+--signal blitter_request_reg : std_logic_vector(1 downto 0);
 signal blitter_request_next : std_logic_vector(1 downto 0);
 signal blitter_vram_wren : std_logic;
 signal blitter_vram_data : std_logic_vector(7 downto 0);
@@ -222,8 +225,8 @@ signal xdl_ovscr_h_reg : unsigned(2 downto 0);
 signal xdl_ovscr_h_next : unsigned(2 downto 0);
 signal xdl_ovscr_v_reg : unsigned(2 downto 0);
 signal xdl_ovscr_v_next : unsigned(2 downto 0);
-signal xdl_chbase_reg : std_logic_vector(18 downto 0);
-signal xdl_chbase_next : std_logic_vector(18 downto 0);
+signal xdl_chbase_reg : std_logic_vector(7 downto 0);
+signal xdl_chbase_next : std_logic_vector(7 downto 0);
 signal xdl_mapaddr_reg : unsigned(18 downto 0);
 signal xdl_mapaddr_next : unsigned(18 downto 0);
 signal xdl_mapaddr_step_reg : unsigned(11 downto 0);
@@ -274,22 +277,69 @@ signal xdl_map_sindex_next : unsigned(4 downto 0);
 
 signal xdl_field_start : std_logic;
 signal xdl_field_end : std_logic;
+
 signal xdl_map_live_start : std_logic;
 signal xdl_map_live_end : std_logic;
 
 signal xdl_map_live_reg : std_logic;
 signal xdl_map_live_next : std_logic;
 
+signal xdl_ov_active_reg : std_logic;
+signal xdl_ov_active_next : std_logic;
+signal xdl_ov_live_start : std_logic;
+signal xdl_ov_live_end : std_logic;
+
+signal xdl_ov_live_reg : std_logic;
+signal xdl_ov_live_next : std_logic;
+
+signal xdl_ov_tlive_start : std_logic;
+signal xdl_ov_tlive_end : std_logic;
+
+signal xdl_ov_tlive_reg : std_logic;
+signal xdl_ov_tlive_next : std_logic;
+
+signal xdl_ov_vcount_reg : unsigned(2 downto 0);
+signal xdl_ov_vcount_next : unsigned(2 downto 0);
+
+signal xdl_ov_fetch_reg : unsigned(18 downto 0);
+signal xdl_ov_fetch_next : unsigned(18 downto 0);
+signal xdl_ov_fetch_init_reg : unsigned(18 downto 0);
+signal xdl_ov_fetch_init_next : unsigned(18 downto 0);
+
 signal xdl_vdelay_reg : unsigned(1 downto 0);
 signal xdl_vdelay_next : unsigned(1 downto 0);
 
-signal pf_palette : std_logic_vector(1 downto 0);
-signal ov_palette : std_logic_vector(1 downto 0);
-signal ov_prior : std_logic_vector(7 downto 0);
-signal map_catt : std_logic;
+signal xdl_pixel_buffer_windex_reg : integer range 0 to 15;
+signal xdl_pixel_buffer_windex_next : integer range 0 to 15;
+signal xdl_pixel_sindex_reg : integer range 0 to 23;
+signal xdl_pixel_sindex_next : integer range 0 to 23;
+
+type xdl_pixel_type is array(0 to 23) of std_logic_vector(7 downto 0);
+type xdl_trans_type is array(0 to 23) of std_logic;
+
+signal xdl_pixels_reg : xdl_pixel_type;
+signal xdl_pixels_next : xdl_pixel_type;
+signal xdl_ptrans_reg : xdl_trans_type;
+signal xdl_ptrans_next : xdl_trans_type;
+
+signal xdl_ov_text_reg : std_logic;
+signal xdl_ov_text_next : std_logic;
+signal xdl_char_code_reg : std_logic_vector(7 downto 0);
+signal xdl_char_code_next : std_logic_vector(7 downto 0);
+signal xdl_char_attr_reg : std_logic_vector(7 downto 0);
+signal xdl_char_attr_next : std_logic_vector(7 downto 0);
+
+signal xdl_pf_palette : std_logic_vector(1 downto 0);
+signal xdl_ov_palette : std_logic_vector(1 downto 0);
+signal xdl_ov_pixel : std_logic_vector(7 downto 0);
+signal xdl_ov_pixel_active : std_logic;
 
 signal xcolor_reg : std_logic;
 signal xcolor_next : std_logic;
+signal no_trans_reg : std_logic;
+signal no_trans_next : std_logic;
+signal trans15_reg : std_logic;
+signal trans15_next : std_logic;
 
 signal vram_op_reg : std_logic_vector(1 downto 0);
 signal vram_op_next : std_logic_vector(1 downto 0);
@@ -305,28 +355,60 @@ signal cr_data_in : std_logic_vector(6 downto 0);
 signal cg_data_in : std_logic_vector(6 downto 0);
 signal cb_data_in : std_logic_vector(6 downto 0);
 
+signal colmask_reg : std_logic_vector(7 downto 0);
+signal colmask_next : std_logic_vector(7 downto 0);
+signal coldetect_reg : std_logic_vector(7 downto 0);
+signal coldetect_next : std_logic_vector(7 downto 0);
+signal colclear : std_logic;
+
 begin
 
 process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_prior,
 	enable,xdl_active_reg,xdl_map_live_reg,xdl_map_wd_reg,xdl_map_sindex_reg,
 	xdl_map_buffer_data_out,xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,
+	xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,
+	xdl_pixel_sindex_reg,
 	p0_reg,p1_reg,p2_reg,p3_reg)
 	variable flip_23 : boolean;
+	variable ov_prior : std_logic_vector(7 downto 0);
+	variable one_pixel : std_logic_vector(7 downto 0);
+	variable one_pixel_active : std_logic;
+	variable map_catt : std_logic;
 begin
+	xdl_map_buffer_index_next <= xdl_map_buffer_index_reg;
+	xdl_map_sindex_next <= xdl_map_sindex_reg;
+	xdl_pixel_sindex_next <= xdl_pixel_sindex_reg;
+	coldetect_next <= coldetect_reg;
 	gtia_highres_mod <= gtia_highres;
 	gtia_active_hr_mod <= gtia_active_hr;
 	map_pf0 <= gtia_pf0;
 	map_pf1 <= gtia_pf1;
 	map_pf2 <= gtia_pf2;
-	pf_palette <= "00";
-	ov_palette <= "00";
-	ov_prior <= x"00";
-	map_catt <= '0';
+	xdl_pf_palette <= "00";
+	xdl_ov_palette <= "00";
+	xdl_ov_pixel <= (others => '0');
+	xdl_ov_pixel_active <= '0';
+	ov_prior := x"00";
+	map_catt := '0';
 	flip_23 := false;
 	if (xdl_active_reg = '1') and (enable = '1') then
-		pf_palette <= xdl_pf_pal_reg;
-		ov_palette <= xdl_ov_pal_reg;
-		ov_prior <= xdl_gp_reg;
+		xdl_pf_palette <= xdl_pf_pal_reg;
+		xdl_ov_palette <= xdl_ov_pal_reg;
+		ov_prior := xdl_gp_reg;
+--		if hsync_start = '1' then -- TODO better?
+		if (gtia_hpos = x"10") then -- arbitrary, as long as it's before anything gets displayed
+			if (xdl_map_active_reg = '1') then
+				xdl_map_buffer_index_next <= (others => '0');
+				xdl_map_sindex_next <= xdl_mapscr_h_reg;
+			end if;
+			if (xdl_ov_active_reg = '1') then
+				if xdl_ov_text_reg = '1' then
+					xdl_pixel_sindex_next <= to_integer(xdl_ovscr_h_reg);
+				else
+					xdl_pixel_sindex_next <= 0;
+				end if;
+			end if;
+		end if;
 		if xdl_map_live_reg = '1' then
 			map_pf0 <= xdl_map_buffer_data_out(31 downto 24);
 			map_pf1 <= xdl_map_buffer_data_out(23 downto 16);
@@ -373,21 +455,61 @@ begin
 					end case;
 				end if;  
 			end if;
-			pf_palette <= xdl_map_buffer_data_out(7 downto 6);
-			ov_palette <= xdl_map_buffer_data_out(5 downto 4);
+			xdl_pf_palette <= xdl_map_buffer_data_out(7 downto 6);
+			xdl_ov_palette <= xdl_map_buffer_data_out(5 downto 4);
 			case xdl_map_buffer_data_out(1 downto 0) is
-				when "00" => ov_prior <= p0_reg;
-				when "01" => ov_prior <= p1_reg;
-				when "10" => ov_prior <= p2_reg;
-				when "11" => ov_prior <= p3_reg;
+				when "00" => ov_prior := p0_reg;
+				when "01" => ov_prior := p1_reg;
+				when "10" => ov_prior := p2_reg;
+				when "11" => ov_prior := p3_reg;
 			end case;
-			map_catt <= xdl_map_buffer_data_out(3);
+			map_catt := xdl_map_buffer_data_out(3);
+			if (video_clock_antic_highres = '1') then
+				if xdl_map_sindex_reg = xdl_map_wd_reg then
+					xdl_map_sindex_next <= "00000";
+					xdl_map_buffer_index_next <= xdl_map_buffer_index_reg + 1;
+				else
+					xdl_map_sindex_next <= xdl_map_sindex_reg + 1;
+				end if;
+			end if;
+		end if;
+		
+		-- TODO Does gtia_prior have the current state throughout all 4 vbxe pixels???
+		if (xdl_ov_live_reg = '1') and (or_reduce(gtia_prior and ov_prior) = '1') then
+			-- Buffer the regular pixels the same way as text pixels?
+			if xdl_ov_text_reg = '1' then
+				xdl_ov_pixel <= xdl_pixels_reg(xdl_pixel_sindex_reg);
+				xdl_ov_pixel_active <= not(xdl_ptrans_reg(xdl_pixel_sindex_reg));
+				-- TODO This has to be done after collision detection!!! (These pixels collide!)
+				if (no_trans_reg = '0') and (trans15_reg = '1') and (xdl_pixels_reg(xdl_pixel_sindex_reg)(3 downto 0) = x"F") then
+					xdl_ov_pixel_active <= '0';
+				end if;
+			else
+				-- TODO
+				-- same, but only one index? and check collisions
+				null;
+			end if;
+			-- TODO This has to be done outside of this if-statement!? Only xdl_ov_live_reg. Or??? 
+			-- Inside, because the pixel has to be visible in the first place?
+			-- TODO check collisions based on one_pixel, one_pixel_active, colmask, record in coldetect_next
+			-- collisions only for visible pixels, color filtered by colmask,
+			-- in coldetect record map_catt and map_active? & gtia_prior(6 downto 0)
+		end if;
+		if (xdl_ov_live_reg = '1') and (video_clock_vbxe = '1') then
+			if xdl_pixel_sindex_reg = 15 then
+				xdl_pixel_sindex_next <= 0;
+			else
+				xdl_pixel_sindex_next <= xdl_pixel_sindex_reg + 1;
+			end if;
 		end if;
 	end if;
 end process;
 
-palette <= pf_palette; -- TODO either
 xcolor <= xcolor_reg;
+ov_palette <= xdl_ov_palette;
+pf_palette <= xdl_pf_palette;
+ov_pixel <= xdl_ov_pixel;
+ov_pixel_active <= xdl_ov_pixel_active;
 
 irq_n <= not(enable and blitter_irqen_reg and blitter_irq);
 
@@ -477,6 +599,8 @@ port map
 	wren => vram_wr_en_temp, 
 	q => vram_data_in_high
 );
+
+vram_data_in <= vram_data_in_high & vram_data_in_low;
 
 vram_wr_en_temp <= vram_wr_en and vram_request;
 vram_request_next <= vram_request and not(vram_wr_en);
@@ -607,7 +731,7 @@ port map
 
 -- write registers
 process(addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg,
-	blitter_addr_reg, blitter_status, blitter_irqen_reg, xdl_enabled_reg, xcolor_reg, pal, xdl_addr_reg, p0_reg, p1_reg, p2_reg, p3_reg)
+	blitter_addr_reg, blitter_status, blitter_irqen_reg, xdl_enabled_reg, xcolor_reg, pal, xdl_addr_reg, p0_reg, p1_reg, p2_reg, p3_reg, colmask_reg)
 begin
 		csel_next <= csel_reg;
 		psel_next <= psel_reg;
@@ -626,17 +750,23 @@ begin
 		blitter_irqc <= '0';
 		xdl_enabled_next <= xdl_enabled_reg;
 		xcolor_next <= xcolor_reg;
+		trans15_next <= trans15_reg;
+		no_trans_next <= no_trans_reg;
 		xdl_addr_next <= xdl_addr_reg;
 		p0_next <= p0_reg;
 		p1_next <= p1_reg;
 		p2_next <= p2_reg;
 		p3_next <= p3_reg;
+		colmask_next <= colmask_reg;
+		colclear <= '0';
 		if wr_en = '1' then
 			case addr is
 				-- XDL
 				when "00000" =>
 					xdl_enabled_next <= data_in(0);
 					xcolor_next <= data_in(1);
+					no_trans_next <= data_in(2);
+					trans15_next <= data_in(3);
 				when "00001" =>
 					xdl_addr_next(7 downto 0) <= data_in;
 				when "00010" =>
@@ -657,6 +787,10 @@ begin
 				when "01000" => -- $48 cb
 					cb_next <= data_in(7 downto 1);
 					cb_request_next <= '1';
+				when "01001" => -- $49 collision mask
+					colmask_next <= data_in;
+				when "01010" => -- $4A collision clear
+					colclear <= '1';
 				-- Blitter
 				when "10000" => -- $50 bl_adr0
 					blitter_addr_next(7 downto 0) <= data_in;
@@ -700,22 +834,28 @@ begin
 		if soft_reset = '1' then
 			xdl_enabled_next <= '0';
 			xcolor_next <= '0';
+			no_trans_next <= '0';
+			trans15_next <= '0';
 			memc_next(3 downto 2) <= "00";
 			mems_next(7) <= '0';
 			memb_next(7 downto 6) <= "00";
 			blitter_irqen_next <= '0';
 			blitter_request_next <= "00";
+			colclear <= '1';
+			colmask_next <= (others => '0');
 		end if;
 end process;
 
 -- Read registers
-process(addr, memc_reg, mems_reg, blitter_status, blitter_collision, blitter_irq, blitter_irqen_reg)
+process(addr, memc_reg, mems_reg, blitter_status, blitter_collision, blitter_irq, blitter_irqen_reg, coldetect_reg)
 begin
 	case addr is
 		when "00000" => -- $40 core version -> FX
 			data_out <= X"10";
 		when "00001" => -- $41 minor version
 			data_out <= X"26";
+		when "01010" => -- $4A raster collision detection
+			data_out <= coldetect_reg;
 		when "10000" => -- $50 collision_code
 			data_out <= blitter_collision;
 		when "10011" => -- $53 blitter busy
@@ -800,6 +940,25 @@ begin
 		xdl_map_live_reg <= '0';
 		xdl_vdelay_reg <= "00";
 		xcolor_reg <= '0';
+		no_trans_reg <= '0';
+		trans15_reg <= '0';
+		xdl_ov_active_reg <= '0';
+		xdl_ov_live_reg <= '0';
+		xdl_ov_tlive_reg <= '0';
+		xdl_ov_vcount_reg <= "000";
+		xdl_ov_fetch_reg <= (others => '0');
+		xdl_ov_fetch_init_reg <= (others => '0');
+		xdl_ov_text_reg <= '0';
+
+		xdl_pixel_sindex_reg <= 0;
+		xdl_pixel_buffer_windex_reg <= 0;
+		xdl_pixels_reg <= (others => (others => '0'));
+		xdl_ptrans_reg <= (others => '0');
+		xdl_char_code_reg <= (others => '0');
+		xdl_char_attr_reg <= (others => '0');
+
+		colmask_reg <= (others => '0');
+		coldetect_reg <= (others => '0');
 
 	elsif rising_edge(clk) then
 		vram_request_reg <= vram_request_next;
@@ -869,6 +1028,26 @@ begin
 		xdl_map_live_reg <= xdl_map_live_next;
 		xdl_vdelay_reg <= xdl_vdelay_next;
 		xcolor_reg <= xcolor_next;
+		no_trans_reg <= no_trans_next;
+		trans15_reg <= trans15_next;
+		xdl_ov_active_reg <= xdl_ov_active_next;
+		xdl_ov_live_reg <= xdl_ov_live_next;
+		xdl_ov_tlive_reg <= xdl_ov_tlive_next;
+		xdl_ov_vcount_reg <= xdl_ov_vcount_next;
+		xdl_ov_fetch_reg <= xdl_ov_fetch_next;
+		xdl_ov_fetch_init_reg <= xdl_ov_fetch_init_next;
+		xdl_ov_text_reg <= xdl_ov_text_next;
+
+		xdl_pixel_sindex_reg <= xdl_pixel_sindex_next;
+		xdl_pixel_buffer_windex_reg <= xdl_pixel_buffer_windex_next;
+		xdl_pixels_reg <= xdl_pixels_next;
+		xdl_ptrans_reg <= xdl_ptrans_next;
+
+		xdl_char_code_reg <= xdl_char_code_next;
+		xdl_char_attr_reg <= xdl_char_attr_next;
+
+		colmask_reg <= colmask_next;
+		coldetect_reg <= coldetect_next;
 	end if;
 end process;
 
@@ -891,34 +1070,52 @@ process(xdl_active_reg, gtia_live, xdl_ov_size_reg, gtia_hpos)
 begin
 	xdl_field_start <= '0';
 	xdl_field_end <= '0';
+	-- TODO use colour_clock instead of gtia_live?
 	if (xdl_active_reg = '1') and (gtia_live = '1') then
 		-- TODO this may have to be adjusted to start earlier (as early as the first signal is needed, e.g. hires_reg)
 		-- and delays accordingly to sync
 		case xdl_ov_size_reg is
+			-- All these are 2 less than initially
+			-- 2 = 4 highres pixels = 8 vbxe highres pixel = one character that we need to buffer
 			when "00" | "11" => -- Narrow
-				if gtia_hpos = x"40" then xdl_field_start <= '1'; end if;
-				if gtia_hpos = x"C0" then xdl_field_end <= '1'; end if;
+				if gtia_hpos = x"3E" then xdl_field_start <= '1'; end if;
+				if gtia_hpos = x"BE" then xdl_field_end <= '1'; end if;
 			when "01" => -- Normal
-				if gtia_hpos = x"30" then xdl_field_start <= '1'; end if;
-				if gtia_hpos = x"D0" then xdl_field_end <= '1'; end if;
+				if gtia_hpos = x"2E" then xdl_field_start <= '1'; end if;
+				if gtia_hpos = x"CE" then xdl_field_end <= '1'; end if;
 			when "10" => -- Wide
-				if gtia_hpos = x"2C" then xdl_field_start <= '1'; end if;
-				if gtia_hpos = x"D4" then xdl_field_end <= '1'; end if;
+				if gtia_hpos = x"2A" then xdl_field_start <= '1'; end if;
+				if gtia_hpos = x"D2" then xdl_field_end <= '1'; end if;
 		end case;
 	end if;
 end process;
 
 map_live_delay_start : delay_line
-	generic map (COUNT=>1) -- was 3 at VBXE highres
-	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_antic_highres,reset_n=>reset_n,data_out=>xdl_map_live_start);	
+	generic map (COUNT=>11) -- 3 + 8 + 8
+	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_map_live_start);
 
 map_live_delay_end : delay_line
-	generic map (COUNT=>1) -- was 3 at VBXE highres
-	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_antic_highres,reset_n=>reset_n,data_out=>xdl_map_live_end);	
+	generic map (COUNT=>11) -- 3 + 8 + 8
+	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_map_live_end);
+
+map_tlive_delay_start : delay_line
+	generic map (COUNT=>3)
+	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_tlive_start);
+
+-- TODO Remember about this!!!
+map_tlive_delay_end : delay_line
+	generic map (COUNT=>11) -- previous plus 8 to catch one more character (for scrolling)
+	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_tlive_end);
+
+-- TODO will these need some shift?
+xdl_ov_live_start <= xdl_map_live_start;
+xdl_ov_live_end <= xdl_map_live_end;
 
 process(xdl_map_live_reg, xdl_map_live_start, xdl_map_live_end)
 begin
 	xdl_map_live_next <= xdl_map_live_reg;
+	xdl_ov_live_next <= xdl_ov_live_reg;
+	xdl_ov_tlive_next <= xdl_ov_tlive_reg;
 	if (xdl_map_active_reg = '1') then
 		if xdl_map_live_start = '1' then
 			xdl_map_live_next <= '1';
@@ -927,25 +1124,18 @@ begin
 			xdl_map_live_next <= '0';
 		end if;
 	end if;
-end process;
-
-process(xdl_map_buffer_index_reg,xdl_map_sindex_reg,xdl_map_wd_reg,
---hsync_start,
-gtia_hpos,xdl_map_active_reg)
-begin
-	xdl_map_buffer_index_next <= xdl_map_buffer_index_reg;
-	xdl_map_sindex_next <= xdl_map_sindex_reg;
---	if hsync_start = '1' then -- TODO better?
-	if (xdl_map_active_reg = '1') and (gtia_hpos = x"10") then
-		xdl_map_buffer_index_next <= (others => '0');
-		xdl_map_sindex_next <= xdl_mapscr_h_reg;
-	end if;
-	if (xdl_map_live_reg = '1') and (video_clock_antic_highres = '1') then
-		if xdl_map_sindex_reg = xdl_map_wd_reg then
-			xdl_map_sindex_next <= "00000";
-			xdl_map_buffer_index_next <= xdl_map_buffer_index_reg + 1;
-		else
-			xdl_map_sindex_next <= xdl_map_sindex_reg + 1;
+	if (xdl_ov_active_reg = '1') then
+		if xdl_ov_live_start = '1' then
+			xdl_ov_live_next <= '1';
+		end if;
+		if xdl_ov_live_end = '1' then
+			xdl_ov_live_next <= '0';
+		end if;
+		if xdl_ov_tlive_start = '1' then
+			xdl_ov_tlive_next <= '1';
+		end if;
+		if xdl_ov_tlive_end = '1' then
+			xdl_ov_tlive_next <= '0';
 		end if;
 	end if;
 end process;
@@ -1006,6 +1196,19 @@ begin
 	xdl_map_read_count_next <= xdl_map_read_count_reg;
 	xdl_map_buffer_data_in_next <= xdl_map_buffer_data_in_reg;
 	xdl_vdelay_next <= xdl_vdelay_reg;
+
+	xdl_ov_active_next <= xdl_ov_active_reg;
+	xdl_ov_vcount_next <= xdl_ov_vcount_reg;
+	xdl_ov_fetch_next <= xdl_ov_fetch_reg;
+	xdl_ov_fetch_init_next <= xdl_ov_fetch_init_reg;
+	xdl_ov_text_next <= xdl_ov_text_reg;
+
+	xdl_pixels_next <= xdl_pixels_reg;
+	xdl_ptrans_next <= xdl_ptrans_reg;
+
+	xdl_pixel_buffer_windex_next <= xdl_pixel_buffer_windex_reg;
+	xdl_char_code_next <= xdl_char_code_reg;
+	xdl_char_attr_next <= xdl_char_attr_reg;
 	
 	if blitter_pending_reg = '1' then
 		blitter_vram_data_in_next <= vram_data_in_high & vram_data_in_low;
@@ -1018,8 +1221,21 @@ begin
 	case dma_state_reg(3 downto 0) is
 	when "0000" =>
 		dma_state_next <= "0001";
-		xdl_or_blitter_notify := true;
+		if xdl_ov_tlive_reg = '1' then
+			if xdl_ov_text_reg = '1' then
+				vram_op_next <= "01";
+				vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
+				xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
+			end if;
+		else
+			xdl_or_blitter_notify := true;
+		end if;
 	when "0001" =>
+		if (xdl_ov_tlive_reg = '1') then
+			if xdl_ov_text_reg = '1' then
+				xdl_char_code_next <= vram_data_in_high & vram_data_in_low;
+			end if;
+		end if;
 		if (memac_request_next = "01") then
 			vram_op_next <= "01";
 			if memac_check_next(0) = '1' then
@@ -1049,8 +1265,21 @@ begin
 			memac_request_complete_next <= '1';
 		end if;
 		dma_state_next <= "0011";
-		xdl_or_blitter_notify := true;
+		if (xdl_ov_tlive_reg = '1') then
+			if xdl_ov_text_reg = '1' then
+				vram_op_next <= "01";
+				vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
+				xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
+			end if;
+		else
+			xdl_or_blitter_notify := true;
+		end if;
 	when "0011" =>
+		if (xdl_ov_tlive_reg = '1') then
+			if xdl_ov_text_reg = '1' then
+				xdl_char_attr_next <= vram_data_in_high & vram_data_in_low;
+			end if;
+		end if;
 		if (memac_request_next = "11") then
 			vram_op_next <= "11";
 			vram_data_next <= memac_data_in;
@@ -1079,9 +1308,37 @@ begin
 		if dma_state_reg(3) = '1' then
 			memac_request_complete_next <= '1';
 		end if;
-		xdl_or_blitter_notify := true;
 		dma_state_next <= "0101";
+		if (xdl_ov_tlive_reg = '1') then
+			if xdl_ov_text_reg = '1' then
+				vram_op_next <= "01";
+				vram_addr_next(18 downto 11) <= xdl_chbase_reg;
+				vram_addr_next(10 downto 3) <= xdl_char_code_reg;
+				vram_addr_next(2 downto 0) <= std_logic_vector(xdl_ov_vcount_reg);
+			end if;
+		else
+			xdl_or_blitter_notify := true;
+		end if;
 	when "0101" =>
+		if (xdl_ov_tlive_reg = '1') then
+			if (xdl_ov_text_reg = '1') then
+				for pi in 0 to 7 loop
+					xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(7) <= not(vram_data_in(7-pi));
+					if (xdl_char_attr_reg(7) = '0') and (vram_data_in(7-pi) = '0') then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(6 downto 0) <= (others => '0');
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+pi) <= not(no_trans_reg);
+					else
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(6 downto 0) <= xdl_char_attr_reg(6 downto 0);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+pi) <= '0';
+					end if;
+				end loop;
+				if xdl_pixel_buffer_windex_reg = 8 then
+					xdl_pixel_buffer_windex_next <= 0;
+				else
+					xdl_pixel_buffer_windex_next <= 8;
+				end if;
+			end if;
+		end if;
 		xdl_or_blitter_notify := true;
 		dma_state_next <= "0110";
 	when "0110" =>
@@ -1117,6 +1374,8 @@ begin
 		xdl_gp_next <= (others => '1');
 		xdl_cmd_next <= (others => '0');
 		xdl_map_active_next <= '0';
+		xdl_ov_active_next <= '0';
+		-- xdl_pixel_buffer_windex_next <= 0;
 		-- graphics modes, attribute modes
 		if (xdl_enabled_reg = '1') then
 			xdl_active_next <= '1';
@@ -1133,21 +1392,38 @@ begin
 	-- TODO use something else than hblank, end of field?
 	if (hblank_start = '1') and (xdl_active_reg = '1') then
 		if xdl_vdelay_reg = "00" then
-			if xdl_map_vcount_reg = xdl_map_ht_reg then
-				xdl_map_vcount_next <= "00000";
-				xdl_map_read_next <= '1';
-				xdl_map_read_count_next <= (others => '0');
-				xdl_map_fetch_next <= xdl_map_fetch_init_reg;
-				xdl_map_fetch_init_next <= xdl_map_fetch_init_reg + xdl_mapaddr_step_reg;
-			else
-				xdl_map_vcount_next <= xdl_map_vcount_reg + 1;
+			if xdl_map_active_reg = '1' then
+				if xdl_map_vcount_reg = xdl_map_ht_reg then
+					xdl_map_vcount_next <= "00000";
+					xdl_map_read_next <= '1';
+					xdl_map_read_count_next <= (others => '0');
+					xdl_map_fetch_next <= xdl_map_fetch_init_reg;
+					xdl_map_fetch_init_next <= xdl_map_fetch_init_reg + xdl_mapaddr_step_reg;
+				else
+					xdl_map_vcount_next <= xdl_map_vcount_reg + 1;
+				end if;
 			end if;
+			if xdl_ov_active_reg = '1' then
+				if xdl_ov_vcount_reg = "111" then
+					if xdl_ov_text_reg = '1' then
+						xdl_ov_vcount_next <= "000";
+					end if;
+					xdl_ov_fetch_next <= xdl_ovaddr_reg;
+					xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
+					xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
+				else
+					xdl_ov_fetch_next <= xdl_ov_fetch_init_reg;
+					xdl_ov_vcount_next <= xdl_ov_vcount_reg + 1;
+				end if;
+			end if;
+			xdl_pixel_buffer_windex_next <= 0;
 			if xdl_rptl_reg = x"00" then
 				if xdl_cmd_reg(15) = '0' then
 					xdl_read_state_next <= 1;
 				else
 					xdl_active_next <= '0'; -- XDL vanishes for the rest of the screen
 					xdl_map_active_next <= '0';
+					xdl_ov_active_next <= '0';
 				end if;
 			else
 				xdl_rptl_next <= xdl_rptl_reg - 1;
@@ -1172,7 +1448,7 @@ begin
 			when 9 => xdl_ovaddr_step_next(11 downto 8) <= unsigned(std_logic_vector'(vram_data_in_high(0) & vram_data_in_low));
 			when 10 => xdl_ovscr_h_next <= unsigned(vram_data_in_low);
 			when 11 => xdl_ovscr_v_next <= unsigned(vram_data_in_low);
-			when 12 => xdl_chbase_next(18 downto 11) <= vram_data_in_high & vram_data_in_low;
+			when 12 => xdl_chbase_next <= vram_data_in_high & vram_data_in_low;
 			when 13 => xdl_mapaddr_next(7 downto 0) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
 			when 14 => xdl_mapaddr_next(15 downto 8) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
 			when 15 => xdl_mapaddr_next(18 downto 16) <= unsigned(vram_data_in_low);
@@ -1210,6 +1486,24 @@ begin
 		if xdl_cmd_reg(4) = '1' then
 			xdl_map_read_next <= '0';
 			xdl_map_active_next <= '0';
+		end if;
+		if (xdl_cmd_reg(0) or xdl_cmd_reg(1) or xdl_cmd_reg(2) or xdl_cmd_reg(12) or xdl_cmd_reg(13)) = '1' then
+			if (xdl_cmd_reg(0) xor xdl_cmd_reg(1)) = '1' then
+				xdl_ov_active_next <= '1';
+				xdl_ov_text_next <= xdl_cmd_reg(0);
+				xdl_ov_fetch_next <= xdl_ovaddr_reg;
+				xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
+				xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
+				if xdl_cmd_reg(0) = '1' then
+					xdl_ov_vcount_next <= xdl_ovscr_v_reg;
+				else
+					xdl_ov_vcount_next <= "111";
+				end if;
+			end if;
+			-- TODO Docs say forbidden for lowres & highres at the same time, but what does it mean? Altirra disables the mode altogether
+			if (xdl_cmd_reg(2) = '1') or ((xdl_cmd_reg(0) and xdl_cmd_reg(1)) = '1') or ((xdl_cmd_reg(12) and xdl_cmd_reg(13)) = '1') then
+				xdl_ov_active_next <= '0';
+			end if;
 		end if;
 	end if;
 

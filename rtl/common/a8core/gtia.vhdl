@@ -55,7 +55,10 @@ PORT
 	GTIA_PF0_IN : in std_logic_vector(7 downto 0);
 	GTIA_PF1_IN : in std_logic_vector(7 downto 0);
 	GTIA_PF2_IN : in std_logic_vector(7 downto 0);
-	VBXE_PALETTE : in std_logic_vector(1 downto 0);
+	VBXE_PF_PALETTE : in std_logic_vector(1 downto 0);
+	VBXE_OV_PALETTE : in std_logic_vector(1 downto 0);
+	VBXE_OV_PIXEL : in std_logic_vector(7 downto 0);
+	VBXE_OV_PIXEL_ACTIVE : in std_logic;
 
 	-- keyboard interface
 	CONSOL_IN : IN STD_LOGIC_VECTOR(3 downto 0);
@@ -411,8 +414,14 @@ ARCHITECTURE vhdl OF gtia IS
 	-- ouput/sync
 	signal COLOUR_NEXT : std_logic_vector(7 downto 0);
 	signal COLOUR_REG : std_logic_vector(7 downto 0);
+	signal COLOUR_SAVED_NEXT : std_logic_vector(7 downto 0);
+	signal COLOUR_SAVED_REG : std_logic_vector(7 downto 0);
 	signal PALETTE_NEXT : std_logic_vector(1 downto 0);
 	signal PALETTE_REG : std_logic_vector(1 downto 0);
+	signal OV_PALETTE_NEXT : std_logic_vector(1 downto 0);
+	signal OV_PALETTE_REG : std_logic_vector(1 downto 0);
+	signal PF_PALETTE_NEXT : std_logic_vector(1 downto 0);
+	signal PF_PALETTE_REG : std_logic_vector(1 downto 0);
 	
 	signal vsync_next : std_logic;
 	signal vsync_reg : std_logic;
@@ -572,7 +581,10 @@ begin
 			consol_output_reg <= (others=>'1');
 			
 			COLOUR_REG <= (OTHERS=>'0');
+			COLOUR_SAVED_REG <= (OTHERS=>'0');
 			PALETTE_REG <= (OTHERS=>'0');
+			OV_PALETTE_REG <= (OTHERS=>'0');
+			PF_PALETTE_REG <= (OTHERS=>'0');
 			
 			csync_reg <= '0';
 			vsync_reg <= '0';
@@ -697,7 +709,10 @@ begin
 			consol_output_reg <= consol_output_next;		
 
 			COLOUR_REG <= colour_next;
+			COLOUR_SAVED_REG <= COLOUR_SAVED_NEXT;
 			PALETTE_REG <= PALETTE_NEXT;
+			OV_PALETTE_REG <= OV_PALETTE_NEXT;
+			PF_PALETTE_REG <= PF_PALETTE_NEXT;
 			
 			csync_reg <= csync_next;
 			vsync_reg <= vsync_next;
@@ -1247,9 +1262,9 @@ begin
 		port map(clk=>clk, colour_enable=>colour_clock, prior=>prior_delayed_reg,p0=>active_pm0_live,p1=>active_pm1_live,p2=>active_pm2_live,p3=>active_pm3_live,pf0=>active_pf0_live,pf1=>active_pf1_live,pf2=>active_pf2_live,pf3=>active_pf3_live,bk=>active_bk_live,p0_out=>set_p0,p1_out=>set_p1,p2_out=>set_p2,p3_out=>set_p3,pf0_out=>set_pf0,pf1_out=>set_pf1,pf2_out=>set_pf2,pf3_out=>set_pf3,bk_out=>set_bk);	
 
 	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg, colour_clock, COLOUR_REG, 
-		gtia_active_hr_in,gtia_highres_in,active_hr_prev,active_bk_valid_prev,active_bk_modify_prev,
+		highres_reg,gtia_active_hr_in,gtia_highres_in,active_hr_prev,active_bk_valid_prev,active_bk_modify_prev,colour_saved_reg,ov_palette_reg,pf_palette_reg,
 		set_bk_prev,set_pf0_prev,set_pf1_prev,set_pf2_prev,set_pf3_prev,set_p0_prev,set_p1_prev,set_p2_prev,set_p3_prev,
-		colour_clock_highres,vbxe_palette,xcolor,gtia_pf0,gtia_pf1,gtia_pf2,
+		colour_clock_highres,colour_clock_vbxe,vbxe_pf_palette,vbxe_ov_palette,vbxe_ov_pixel,vbxe_ov_pixel_active,xcolor,gtia_pf0,gtia_pf1,gtia_pf2,
 		palette_reg, visible_live, invisible_clip, active_bk_modify_next, active_bk_valid_next, gractl_reg)
 	variable ignore_bk_check : boolean := false;
 	begin
@@ -1262,7 +1277,10 @@ begin
 		-- is split over the lowres colour clock, one pixel comes before the clock, and one after.
 
 		colour_next <= colour_reg;
+		colour_saved_next <= colour_saved_reg;
 		palette_next <= palette_reg;
+		ov_palette_next <= ov_palette_reg;
+		pf_palette_next <= pf_palette_reg;
 		active_hr_prev_next <= active_hr_prev;
 		active_bk_modify_prev_next <= active_bk_modify_prev;
 		active_bk_valid_prev_next <= active_bk_valid_prev;
@@ -1277,9 +1295,19 @@ begin
 		set_p3_prev_next <= set_p3_prev;
 
 		if (colour_clock_highres = '1') then 
-			palette_next <= VBXE_PALETTE;
 			if (colour_clock = '1') then 
 				colour_next <= (
+					((colbk_delayed_reg(7 downto 1)&(xcolor and colbk_delayed_reg(0)) or active_bk_modify_next) and active_bk_valid_next and (set_bk &set_bk &set_bk &set_bk &set_bk &set_bk &set_bk& set_bk)) or
+					(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0) ) or
+					(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1) ) or
+					(GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0)) and (set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2) ) or
+					((colpf3_delayed_reg(7 downto 1)&(xcolor and colpf3_delayed_reg(0)) or active_bk_modify_next) and (set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3) ) or
+					(colpm0_delayed_reg(7 downto 1)&(xcolor and colpm0_delayed_reg(0)) and (set_p0 &set_p0 &set_p0 &set_p0 &set_p0 &set_p0 &set_p0& set_p0)) or
+					(colpm1_delayed_reg(7 downto 1)&(xcolor and colpm1_delayed_reg(0)) and (set_p1 &set_p1 &set_p1 &set_p1 &set_p1 &set_p1 &set_p1& set_p1)) or
+					(colpm2_delayed_reg(7 downto 1)&(xcolor and colpm2_delayed_reg(0)) and (set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2& set_p2)) or
+					(colpm3_delayed_reg(7 downto 1)&(xcolor and colpm3_delayed_reg(0)) and (set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3& set_p3))
+					);
+				colour_saved_next <= (
 					((colbk_delayed_reg(7 downto 1)&(xcolor and colbk_delayed_reg(0)) or active_bk_modify_next) and active_bk_valid_next and (set_bk &set_bk &set_bk &set_bk &set_bk &set_bk &set_bk& set_bk)) or
 					(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0) ) or
 					(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1) ) or
@@ -1314,6 +1342,17 @@ begin
 					(colpm2_delayed_reg(7 downto 1)&(xcolor and colpm2_delayed_reg(0)) and (set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev& set_p2_prev)) or
 					(colpm3_delayed_reg(7 downto 1)&(xcolor and colpm3_delayed_reg(0)) and (set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev& set_p3_prev))
 					);
+				colour_saved_next <= (
+					((colbk_delayed_reg(7 downto 1)&(xcolor and colbk_delayed_reg(0)) or active_bk_modify_prev) and active_bk_valid_prev and (set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev& set_bk_prev)) or
+					(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev) ) or
+					(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev) ) or
+					(GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0)) and (set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev) ) or
+					((colpf3_delayed_reg(7 downto 1)&(xcolor and colpf3_delayed_reg(0)) or active_bk_modify_prev) and (set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev) ) or
+					(colpm0_delayed_reg(7 downto 1)&(xcolor and colpm0_delayed_reg(0)) and (set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev& set_p0_prev)) or
+					(colpm1_delayed_reg(7 downto 1)&(xcolor and colpm1_delayed_reg(0)) and (set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev& set_p1_prev)) or
+					(colpm2_delayed_reg(7 downto 1)&(xcolor and colpm2_delayed_reg(0)) and (set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev& set_p2_prev)) or
+					(colpm3_delayed_reg(7 downto 1)&(xcolor and colpm3_delayed_reg(0)) and (set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev& set_p3_prev))
+					);
 			end if;
 
 			-- finally high-res mode overrides the luma
@@ -1321,30 +1360,56 @@ begin
 			if gtia_highres_in = '1' then
 				if highres_reg = '0' then
 					colour_next <= GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0));
+					colour_saved_next <= GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0));
 					ignore_bk_check := true;
 				end if;
 				if colour_clock = '1' then
 					if (gtia_active_hr_in(1) = '1') and (set_bk = '0' or ignore_bk_check) then
 						colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
+						colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
 						if (xcolor or gractl_reg(4)) = '1' then
 							colour_next(7 downto 4) <= GTIA_PF1(7 downto 4);
+							colour_saved_next(7 downto 4) <= GTIA_PF1(7 downto 4);
 						end if;
 					end if;
 				else 
 					if (active_hr_prev(0) = '1') and (set_bk_prev = '0' or ignore_bk_check) then
 						colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
+						colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
 						if (xcolor or gractl_reg(4)) = '1' then
 							colour_next(7 downto 4) <= GTIA_PF1(7 downto 4);
+							colour_saved_next(7 downto 4) <= GTIA_PF1(7 downto 4);
 						end if;
 					end if;
 				end if;
 			end if;				
 			
 			if invisible_clip = '1' then
+				colour_saved_next <= X"00";
 				colour_next <= X"00";
 			end if;			
 		end if;
-		-- TODO here handle (on a VBXE highres clock) possible overlay pixels
+
+		if (colour_clock_vbxe = '1') then
+			palette_next <= VBXE_PF_PALETTE;
+			if colour_clock_highres = '1' then
+				ov_palette_next <= VBXE_OV_PALETTE;
+				pf_palette_next <= VBXE_PF_PALETTE;
+			end if;
+			if VBXE_OV_PIXEL_ACTIVE = '1' then
+				colour_next <= VBXE_OV_PIXEL;
+				if colour_clock_highres = '1' then
+					palette_next <= VBXE_OV_PALETTE;
+				else
+					palette_next <= ov_palette_reg;
+				end if;
+			else
+				if colour_clock_highres = '0' then
+					colour_next <= colour_saved_reg;
+					palette_next <= pf_palette_reg;
+				end if;
+			end if;
+		end if;
 	end process;
 
 	-- collision detection
@@ -1932,7 +1997,9 @@ begin
 	GTIA_VISIBLE <= visible_live;
 	GTIA_HIGHRES_OUT <= highres_reg;
 	GTIA_ACTIVE_HR_OUT <= active_hr_reg;
-	GTIA_PRIOR <= set_bk & (set_pf2 or set_pf3) & set_pf1 & set_pf0 & set_p3 & set_p2 & set_p1 & set_p0;
+	-- TODO ???Should it be with or without prev? Might matter for VBXE collision detection
+	GTIA_PRIOR <= set_bk & (set_pf2 or set_pf3) & set_pf1 & set_pf0 & set_p3 & set_p2 & set_p1 & set_p0 when colour_clock = '1' else
+		set_bk_prev & (set_pf2_prev or set_pf3_prev) & set_pf1_prev & set_pf0_prev & set_p3_prev & set_p2_prev & set_p1_prev & set_p0_prev;
 	GTIA_PF0_OUT <= colpf0_delayed_reg;
 	GTIA_PF1_OUT <= colpf1_delayed_reg;
 	GTIA_PF2_OUT <= colpf2_delayed_reg;

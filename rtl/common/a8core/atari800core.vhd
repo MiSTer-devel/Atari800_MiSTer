@@ -287,7 +287,10 @@ signal VIDEO_B_GTIA : std_logic_vector(7 downto 0);
 signal VIDEO_R_VBXE : std_logic_vector(7 downto 0);
 signal VIDEO_G_VBXE : std_logic_vector(7 downto 0);
 signal VIDEO_B_VBXE : std_logic_vector(7 downto 0);
-signal VBXE_PALETTE : std_logic_vector(1 downto 0);
+signal VBXE_PF_PALETTE : std_logic_vector(1 downto 0);
+signal VBXE_OV_PALETTE : std_logic_vector(1 downto 0);
+signal VBXE_OV_PIXEL : std_logic_vector(7 downto 0);
+signal VBXE_OV_PIXEL_ACTIVE : std_logic;
 
 -- CPU
 SIGNAL	CPU_6502_RESET :  STD_LOGIC;
@@ -575,7 +578,10 @@ PORT MAP(
 	map_pf0 => GTIA_PF0_IN,
 	map_pf1 => GTIA_PF1_IN,
 	map_pf2 => GTIA_PF2_IN,
-	palette => VBXE_PALETTE,
+	pf_palette => VBXE_PF_PALETTE,
+	ov_palette => VBXE_OV_PALETTE,
+	ov_pixel => VBXE_OV_PIXEL,
+	ov_pixel_active => VBXE_OV_PIXEL_ACTIVE,
 	xcolor => GTIA_XCOLOR,
 	VSYNC_START => GTIA_VSYNC,
 	HBLANK_START => GTIA_HBLANK,
@@ -761,14 +767,16 @@ PORT MAP(CLK => CLK,
 		 GTIA_PF0_IN => GTIA_PF0_IN,
 		 GTIA_PF1_IN => GTIA_PF1_IN,
 		 GTIA_PF2_IN => GTIA_PF2_IN,
-		 VBXE_PALETTE => VBXE_PALETTE,
+		 VBXE_PF_PALETTE => VBXE_PF_PALETTE,
+		 VBXE_OV_PALETTE => VBXE_OV_PALETTE,
+		 VBXE_OV_PIXEL => VBXE_OV_PIXEL,
+		 VBXE_OV_PIXEL_ACTIVE => VBXE_OV_PIXEL_ACTIVE,
 		 PALETTE_out => GTIA_PALETTE,
 		 XCOLOR => GTIA_XCOLOR,
 		 HBLANK_START => GTIA_HBLANK,
 		 HSYNC_START_OUT => GTIA_HSYNC,
 		 VSYNC_START => GTIA_VSYNC,
 		 HPOS_OUT => GTIA_HPOS,
-
 
 		 CONSOL_OUT => CONSOL_OUT,
 		 CONSOL_IN => CONSOL_IN,
