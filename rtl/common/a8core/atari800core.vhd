@@ -267,6 +267,7 @@ signal GTIA_HIGHRES_IN : std_logic;
 signal GTIA_ACTIVE_HR_OUT : std_logic_vector(1 downto 0);
 signal GTIA_ACTIVE_HR_IN : std_logic_vector(1 downto 0);
 signal GTIA_PRIOR : std_logic_vector(7 downto 0);
+signal GTIA_PRIOR_RAW : std_logic_vector(7 downto 0);
 signal GTIA_HPOS : std_logic_vector(7 downto 0);
 signal GTIA_PF0_IN : std_logic_vector(7 downto 0);
 signal GTIA_PF1_IN : std_logic_vector(7 downto 0);
@@ -571,6 +572,7 @@ PORT MAP(
 	gtia_active_hr => GTIA_ACTIVE_HR_OUT,
 	gtia_active_hr_mod => GTIA_ACTIVE_HR_IN,
 	gtia_prior => GTIA_PRIOR,
+	gtia_prior_raw => GTIA_PRIOR_RAW,
 	gtia_pf0 => GTIA_PF0_OUT,
 	gtia_pf1 => GTIA_PF1_OUT,
 	gtia_pf2 => GTIA_PF2_OUT,
@@ -760,6 +762,7 @@ PORT MAP(CLK => CLK,
 		 GTIA_ACTIVE_HR_OUT => GTIA_ACTIVE_HR_OUT,
 		 GTIA_ACTIVE_HR_IN => GTIA_ACTIVE_HR_IN,
 		 GTIA_PRIOR => GTIA_PRIOR,
+		 GTIA_PRIOR_RAW => GTIA_PRIOR_RAW,
 		 GTIA_PF0_OUT => GTIA_PF0_OUT,
 		 GTIA_PF1_OUT => GTIA_PF1_OUT,
 		 GTIA_PF2_OUT => GTIA_PF2_OUT,

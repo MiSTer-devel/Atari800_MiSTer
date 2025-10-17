@@ -56,6 +56,7 @@ port (
 	gtia_active_hr : in std_logic_vector(1 downto 0);
 	gtia_active_hr_mod : out std_logic_vector(1 downto 0);
 	gtia_prior : in std_logic_vector(7 downto 0);
+	gtia_prior_raw : in std_logic_vector(7 downto 0);
 	gtia_pf0 : in std_logic_vector(7 downto 0);
 	gtia_pf1 : in std_logic_vector(7 downto 0);
 	gtia_pf2 : in std_logic_vector(7 downto 0);
@@ -320,8 +321,8 @@ signal xdl_pixel_buffer_windex_next : integer range 0 to 15;
 signal xdl_pixel_sindex_reg : integer range 0 to 23;
 signal xdl_pixel_sindex_next : integer range 0 to 23;
 
-type xdl_pixel_type is array(0 to 23) of std_logic_vector(7 downto 0);
-type xdl_trans_type is array(0 to 23) of std_logic;
+type xdl_pixel_type is array(0 to 15) of std_logic_vector(7 downto 0);
+type xdl_trans_type is array(0 to 15) of std_logic;
 
 signal xdl_pixels_reg : xdl_pixel_type;
 signal xdl_pixels_next : xdl_pixel_type;
@@ -376,7 +377,7 @@ signal colclear : std_logic;
 
 begin
 
-process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_prior,
+process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_prior,gtia_prior_raw,
 	enable,xdl_active_reg,xdl_map_live_reg,xdl_map_wd_reg,xdl_map_sindex_reg,
 	xdl_map_buffer_data_out,xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,
 	xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,
@@ -384,9 +385,7 @@ process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_pri
 	p0_reg,p1_reg,p2_reg,p3_reg)
 	variable flip_23 : boolean;
 	variable ov_prior : std_logic_vector(7 downto 0);
-	variable one_pixel : std_logic_vector(7 downto 0);
-	variable one_pixel_active : std_logic;
-	-- variable map_catt : std_logic;
+	variable gtia_prior_adj : std_logic_vector(7 downto 0);
 begin
 	xdl_map_buffer_index_next <= xdl_map_buffer_index_reg;
 	xdl_map_sindex_next <= xdl_map_sindex_reg;
@@ -401,8 +400,8 @@ begin
 	xdl_ov_palette <= "00";
 	xdl_ov_pixel <= (others => '0');
 	xdl_ov_pixel_active <= '0';
+	gtia_prior_adj := gtia_prior;
 	ov_prior := x"00";
-	--map_catt := '0';
 	flip_23 := false;
 	if colclear = '1' then
 		coldetect_next <= (others => '0');
@@ -444,15 +443,16 @@ begin
 					flip_23 := true;
 				end if;
 				end case;
+				-- TODO will this work with the new GTIA prior arrangement?
 				if gtia_highres = '0' then
 					gtia_highres_mod <= '1';
-					if gtia_prior(4) = '1' then
+					if gtia_prior_raw(4) = '1' then
 						gtia_active_hr_mod <= "01";
-					elsif gtia_prior(5) = '1' then
+					elsif gtia_prior_raw(5) = '1' then
 						gtia_active_hr_mod <= "10";
-					elsif gtia_prior(6) = '1' then
+					elsif gtia_prior_raw(6) = '1' then
 						gtia_active_hr_mod <= "11";
-					elsif gtia_prior(7) = '1' then
+					elsif gtia_prior_raw(7) = '1' then
 						gtia_active_hr_mod <= "00";
 					end if;
 				end if;
@@ -464,8 +464,12 @@ begin
 				if (gtia_highres and xdl_map_buffer_data_out(2)) = '1' then
 					gtia_active_hr_mod <= "00";
 					case gtia_active_hr is
-					when "00" => map_pf2 <= xdl_map_buffer_data_out(31 downto 24);
-					when "01" => map_pf2 <= xdl_map_buffer_data_out(23 downto 16);
+					when "00" =>
+						map_pf2 <= xdl_map_buffer_data_out(31 downto 24);
+						gtia_prior_adj(6 downto 4) := "001";
+					when "01" =>
+						map_pf2 <= xdl_map_buffer_data_out(23 downto 16);
+						gtia_prior_adj(6 downto 4) := "010";
 					when "10" => null;
 					when "11" => map_pf2 <= gtia_pf3;
 					end case;
@@ -491,24 +495,12 @@ begin
 		end if;
 		
 		-- TODO Does gtia_prior have the current state throughout all 4 vbxe pixels???
-		if (xdl_ov_live_reg = '1') and (or_reduce(gtia_prior and ov_prior) = '1') then
-			-- Buffer the regular pixels the same way as text pixels?
-			--if xdl_ov_text_reg = '1' then
-				xdl_ov_pixel <= xdl_pixels_reg(xdl_pixel_sindex_reg);
-				xdl_ov_pixel_active <= not(xdl_ptrans_reg(xdl_pixel_sindex_reg));
-			--else
-				-- TODO
-				-- same, but only one index? and check collisions
-			--	null;
-			--end if;
-			-- TODO This has to be done outside of this if-statement!? Only xdl_ov_live_reg. Or??? 
-			-- Inside, because the pixel has to be visible in the first place?
-			-- TODO check collisions based on one_pixel, one_pixel_active, colmask, record in coldetect_next
-			-- collisions only for visible pixels, color filtered by colmask,
-			-- in coldetect record map_catt and map_active? & gtia_prior(6 downto 0)
+		if (xdl_ov_live_reg = '1') and (or_reduce(gtia_prior_adj and ov_prior) = '1') then
+			xdl_ov_pixel <= xdl_pixels_reg(xdl_pixel_sindex_reg);
+			xdl_ov_pixel_active <= not(xdl_ptrans_reg(xdl_pixel_sindex_reg));
 			if xdl_ptrans_reg(xdl_pixel_sindex_reg) = '0' then
 				if colmask_reg(to_integer(unsigned(xdl_pixels_reg(xdl_pixel_sindex_reg)(7 downto 5)))) = '1' then
-					coldetect_next <= coldetect_reg or ((xdl_map_buffer_data_out(3) and xdl_map_active_reg) & gtia_prior(6 downto 0));
+					coldetect_next <= coldetect_reg or ((xdl_map_buffer_data_out(3) and xdl_map_active_reg) & gtia_prior_adj(6 downto 0));
 				end if;
 			end if;
 			if (no_trans_reg = '0') and (trans15_reg = '1') and (xdl_pixels_reg(xdl_pixel_sindex_reg)(3 downto 0) = x"F") then
@@ -1539,30 +1531,19 @@ begin
 		else
 			xdl_vdelay_next <= "10";
 		end if;
-		xdl_active_next <= '0';
+		-- xdl_vdelay_next <= not(pal) & pal;
+		-- TODO this is where we begin the frame?
+		-- TODO All this happening too early?
+		-- TODO Immediate kill of graphics and attribute modes on soft_reset?
+		-- xdl_active_next <= '0';
 		xdl_read_state_next <= 0;
-		xdl_rptl_next <= x"00";
-		xdl_fetch_next <= xdl_addr_reg;
-		xdl_ovscr_h_next <= "000";
-		xdl_ovscr_v_next <= "000";
-		xdl_mapscr_h_next <= "00000";
-		xdl_mapscr_v_next <= "00000";
-		xdl_map_wd_next <= "00111";
-		xdl_map_ht_next <= "00111";
-		xdl_ov_size_next <= "01";
-		xdl_ov_pal_next <= "01";
-		xdl_pf_pal_next <= "00";
-		xdl_gp_next <= (others => '1');
-		xdl_cmd_next <= (others => '0');
-		xdl_map_active_next <= '0';
-		xdl_ov_active_next <= '0';
-		xdl_vcount_next <= 0;
-		-- xdl_pixel_buffer_windex_next <= 0;
-		-- graphics modes, attribute modes
-		if (xdl_enabled_reg = '1') then
-			xdl_active_next <= '1';
-			xdl_read_state_next <= 1;
-		end if;
+		-- graphics modes, attribute modes???
+		-- TODO can this be direct?
+		xdl_active_next <= xdl_enabled_reg;
+		--if (xdl_enabled_reg = '1') then
+		--	xdl_active_next <= '1';
+		--	-- xdl_read_state_next <= 1;
+		--end if;
 	end if;
 
 	-- end of line, state should be 0 from previous calls
@@ -1586,19 +1567,19 @@ begin
 				end if;
 			end if;
 			if xdl_ov_active_reg = '1' then
+				xdl_pixel_buffer_windex_next <= 0;
 				if xdl_ov_vcount_reg = "111" then
 					if xdl_ov_text_reg = '1' then
 						xdl_ov_vcount_next <= "000";
 					end if;
-					xdl_ov_fetch_next <= xdl_ovaddr_reg;
-					xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
+					xdl_ov_fetch_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
+					xdl_ov_fetch_init_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
 					xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
 				else
 					xdl_ov_fetch_next <= xdl_ov_fetch_init_reg;
 					xdl_ov_vcount_next <= xdl_ov_vcount_reg + 1;
 				end if;
 			end if;
-			xdl_pixel_buffer_windex_next <= 0;
 			if xdl_rptl_reg = x"00" then
 				if xdl_cmd_reg(15) = '0' then
 					xdl_read_state_next <= 1;
@@ -1611,17 +1592,33 @@ begin
 				xdl_rptl_next <= xdl_rptl_reg - 1;
 				xdl_read_state_next <= 23; -- say we already read the XDL
 			end if;
---			if xdl_vcount_reg = 239 then
---				xdl_active_next <= '0'; -- XDL vanishes for the rest of the screen
---				xdl_map_active_next <= '0';
---				xdl_ov_active_next <= '0';
---			else
---				xdl_vcount_next <= xdl_vcount_reg + 1;
---			end if;
+			if xdl_vcount_reg = 239 then
+				xdl_active_next <= '0'; -- XDL vanishes for the rest of the screen
+				xdl_map_active_next <= '0';
+				xdl_ov_active_next <= '0';
+			else
+				xdl_vcount_next <= xdl_vcount_reg + 1;
+			end if;
 		else
-			--if xdl_vdelay_reg = "01" then
-			--	xdl_read_state_next <= 1;
-			--end if;
+			if xdl_vdelay_reg = "01" then
+				xdl_rptl_next <= x"00";
+				xdl_fetch_next <= xdl_addr_reg;
+				xdl_ovscr_h_next <= "000";
+				xdl_ovscr_v_next <= "000";
+				xdl_mapscr_h_next <= "00000";
+				xdl_mapscr_v_next <= "00000";
+				xdl_map_wd_next <= "00111";
+				xdl_map_ht_next <= "00111";
+				xdl_ov_size_next <= "01";
+				xdl_ov_pal_next <= "01";
+				xdl_pf_pal_next <= "00";
+				xdl_gp_next <= (others => '1');
+				xdl_cmd_next <= (others => '0');
+				xdl_map_active_next <= '0';
+				xdl_ov_active_next <= '0';
+				xdl_vcount_next <= 0;
+				xdl_read_state_next <= 1;
+			end if;
 			xdl_vdelay_next <= xdl_vdelay_reg - 1;
 		end if;
 	end if;
@@ -1681,6 +1678,11 @@ begin
 			xdl_map_read_next <= '0';
 			xdl_map_active_next <= '0';
 		end if;
+		if xdl_cmd_reg(6) = '1' then
+			xdl_ov_fetch_next <= xdl_ovaddr_reg;
+			xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
+			-- xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
+		end if;
 		-- TODO xdl_ov hi/lo do not need to be registers
 		-- can be linked directly to xdl_cmd_reg
 		if (xdl_cmd_reg(0) xor xdl_cmd_reg(1)) = '1' then
@@ -1688,9 +1690,9 @@ begin
 			xdl_ov_lo_next <= xdl_cmd_reg(13);
 			xdl_ov_active_next <= '1';
 			xdl_ov_text_next <= xdl_cmd_reg(0);
-			xdl_ov_fetch_next <= xdl_ovaddr_reg;
-			xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
-			xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
+			--xdl_ov_fetch_next <= xdl_ovaddr_reg;
+			--xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
+			--xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
 			if xdl_cmd_reg(0) = '1' then
 				xdl_ov_vcount_next <= xdl_ovscr_v_reg;
 			else
