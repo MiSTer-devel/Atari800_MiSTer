@@ -1998,14 +1998,17 @@ begin
 	GTIA_HIGHRES_OUT <= highres_reg;
 	GTIA_ACTIVE_HR_OUT <= active_hr_reg;
 	-- TODO ???Should it be with or without prev? Might matter for VBXE collision detection
-	GTIA_PRIOR <= set_bk & (set_pf2 or set_pf3) & set_pf1 & set_pf0 & set_p3 & set_p2 & set_p1 & set_p0 when colour_clock = '1' else
-		set_bk_prev & (set_pf2_prev or set_pf3_prev) & set_pf1_prev & set_pf0_prev & set_p3_prev & set_p2_prev & set_p1_prev & set_p0_prev;
+	GTIA_PRIOR <= set_bk & (set_pf2 or set_pf3) & set_pf1 & set_pf0 & set_p3 & set_p2 & set_p1 & set_p0
+        when highres_reg = '0' else '0' & set_pf2 & set_pf1 & "00000";
+        -- when colour_clock = '1' else
+	--	set_bk_prev & (set_pf2_prev or set_pf3_prev) & set_pf1_prev & set_pf0_prev & set_p3_prev & set_p2_prev & set_p1_prev & set_p0_prev;
 	GTIA_PF0_OUT <= colpf0_delayed_reg;
 	GTIA_PF1_OUT <= colpf1_delayed_reg;
 	GTIA_PF2_OUT <= colpf2_delayed_reg;
 	GTIA_PF3_OUT <= colpf3_delayed_reg;
 	PALETTE_out <= palette_reg;
 	hblank_start <= hblank_next and not(hblank_reg);
+	--hblank_start <= reset_counter;
 	hsync_start_out <= hsync_start;
 	vsync_start <= vsync_next and not(vsync_reg);
 	hpos_out <= hpos_reg;
