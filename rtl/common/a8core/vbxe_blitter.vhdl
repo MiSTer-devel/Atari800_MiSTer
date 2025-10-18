@@ -480,6 +480,7 @@ begin
 								end if;
 							else
 								blitter_x_next <= blitter_width_reg;
+								blitter_rep_x_next <= blitter_zoom_x_reg;
 								if blitter_rep_y_reg = 0 then
 									blitter_src_current_next <= blitter_src_address_reg + blitter_src_step_y_reg;
 									blitter_src_address_next <= blitter_src_address_reg + blitter_src_step_y_reg;
