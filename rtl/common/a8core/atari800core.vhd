@@ -260,6 +260,7 @@ signal VSYNC : std_logic;
 signal HSYNC : std_logic;
 signal GTIA_VISIBLE : std_logic;
 signal GTIA_HBLANK : std_logic;
+signal GTIA_VSYNC : std_logic;
 signal GTIA_HIGHRES_OUT : std_logic;
 signal GTIA_HIGHRES_IN : std_logic;
 signal GTIA_ACTIVE_HR_OUT : std_logic_vector(1 downto 0);
@@ -585,7 +586,8 @@ PORT MAP(
 	ov_pixel => VBXE_OV_PIXEL,
 	ov_pixel_active => VBXE_OV_PIXEL_ACTIVE,
 	xcolor => GTIA_XCOLOR,
-	VSYNC_START => GTIA_START_OF_FIELD,
+--	VSYNC_START => GTIA_START_OF_FIELD,
+	VSYNC_START => GTIA_VSYNC,
 	HBLANK_START => GTIA_HBLANK,
 	GTIA_HPOS => GTIA_HPOS
 );
@@ -776,6 +778,7 @@ PORT MAP(CLK => CLK,
 		 PALETTE_out => GTIA_PALETTE,
 		 XCOLOR => GTIA_XCOLOR,
 		 HBLANK_START => GTIA_HBLANK,
+		 GTIA_VSYNC => GTIA_VSYNC,
 		 HPOS_OUT => GTIA_HPOS,
 
 		 CONSOL_OUT => CONSOL_OUT,

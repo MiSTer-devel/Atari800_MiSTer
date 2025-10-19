@@ -46,6 +46,7 @@ PORT
 	GTIA_PRIOR : out std_logic_vector(7 downto 0);
 	GTIA_PRIOR_RAW : out std_logic_vector(7 downto 0);
 	hblank_start : out std_logic; -- TODO might not be needed
+	gtia_vsync : out std_logic; -- TODO might not be needed
 	hpos_out : out std_logic_vector(7 downto 0);
 	GTIA_PF0_OUT : out std_logic_vector(7 downto 0);
 	GTIA_PF1_OUT : out std_logic_vector(7 downto 0);
@@ -2015,6 +2016,7 @@ begin
 	GTIA_PF3_OUT <= colpf3_delayed_reg;
 	PALETTE_out <= palette_reg;
 	hblank_start <= hblank_next and not(hblank_reg);
+	gtia_vsync <= vsync_reg and not(vsync_next);
 	hpos_out <= hpos_reg;
 
 	GTIA_PF0 <= GTIA_PF0_IN;

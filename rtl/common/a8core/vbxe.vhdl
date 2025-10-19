@@ -1088,7 +1088,7 @@ begin
 	xdl_field_end2 <= '0';
 	-- TODO use colour_clock instead of gtia_live?
 	if (xdl_active_reg = '1') and (video_clock_antic_lowres = '1') then
-		if gtia_hpos = x"00" then xdl_field_end2 <= '1'; end if;
+		if gtia_hpos = x"D6" then xdl_field_end2 <= '1'; end if;
 		case xdl_ov_size_reg is
 			-- All these are 4 less than the actual places to allow for character buffering
 			-- 4 = 8 highres pixels = 16 vbxe highres pixel
@@ -1531,17 +1531,20 @@ begin
 	if (vsync_start = '1') then
 		-- Account for the PAL/NTSC bug in the original implementation
 		if pal = '1' then
-			xdl_vdelay_next <= 46;
+			xdl_vdelay_next <= 42;
 		else
-			xdl_vdelay_next <= 17;
+			xdl_vdelay_next <= 13;
 		end if;
+		--if pal = '1' then
+		--	xdl_vdelay_next <= 46;
+		--else
+		--	xdl_vdelay_next <= 17;
+		--end if;
 		--xdl_vdelay_next <= not(pal) & pal;
 		xdl_active_next <= xdl_enabled_reg;
 		xdl_read_state_next <= 0;
 	end if;
 
-	-- TODO use something else than hblank, end of field?
-	-- hblank_start
 	if (xdl_field_end2 = '1') and (xdl_vdelay_reg /= 0) and (xdl_active_reg = '1') then
 		-- This worked OK when delay was initially 24
 		if xdl_vdelay_reg = 1 then
