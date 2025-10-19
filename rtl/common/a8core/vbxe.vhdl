@@ -4,7 +4,6 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.STD_LOGIC_MISC.ALL;
 
--- TODO Is everything for soft reset now included?
 -- TODO vram_data_in
 -- TODO clean up GTIA dependencies
 
@@ -72,10 +71,10 @@ port (
 
 	gtia_live : in std_logic;
 	video_clock_antic_highres : in std_logic;
+	video_clock_antic_lowres : in std_logic;
 	video_clock_vbxe : in std_logic;
 	gtia_hpos : in std_logic_vector(7 downto 0);
 	
-	hsync_start : in std_logic;
 	hblank_start : in std_logic;
 	vsync_start : in std_logic
 );
@@ -280,6 +279,7 @@ signal xdl_map_sindex_next : unsigned(4 downto 0);
 
 signal xdl_field_start : std_logic;
 signal xdl_field_end : std_logic;
+signal xdl_field_end2 : std_logic;
 
 signal xdl_map_live_start : std_logic;
 signal xdl_map_live_end : std_logic;
@@ -305,6 +305,8 @@ signal xdl_ov_tlive2_end : std_logic;
 signal xdl_ov_tlive_reg : std_logic;
 signal xdl_ov_tlive_next : std_logic;
 
+signal hblank_start_delayed : std_logic;
+
 signal xdl_ov_vcount_reg : unsigned(2 downto 0);
 signal xdl_ov_vcount_next : unsigned(2 downto 0);
 
@@ -313,8 +315,10 @@ signal xdl_ov_fetch_next : unsigned(18 downto 0);
 signal xdl_ov_fetch_init_reg : unsigned(18 downto 0);
 signal xdl_ov_fetch_init_next : unsigned(18 downto 0);
 
-signal xdl_vdelay_reg : unsigned(1 downto 0);
-signal xdl_vdelay_next : unsigned(1 downto 0);
+--signal xdl_vdelay_reg : unsigned(1 downto 0);
+--signal xdl_vdelay_next : unsigned(1 downto 0);
+signal xdl_vdelay_reg : integer range 0 to 63;
+signal xdl_vdelay_next : integer range 0 to 63;
 
 signal xdl_pixel_buffer_windex_reg : integer range 0 to 15;
 signal xdl_pixel_buffer_windex_next : integer range 0 to 15;
@@ -410,7 +414,6 @@ begin
 		xdl_pf_palette <= xdl_pf_pal_reg;
 		xdl_ov_palette <= xdl_ov_pal_reg;
 		ov_prior := xdl_gp_reg;
---		if hsync_start = '1' then -- TODO better?
 		if (gtia_hpos = x"10") then -- arbitrary, as long as it's before anything gets displayed
 			if (xdl_map_active_reg = '1') then
 				xdl_map_buffer_index_next <= (others => '0');
@@ -443,7 +446,6 @@ begin
 					flip_23 := true;
 				end if;
 				end case;
-				-- TODO will this work with the new GTIA prior arrangement?
 				if gtia_highres = '0' then
 					gtia_highres_mod <= '1';
 					if gtia_prior_raw(4) = '1' then
@@ -494,7 +496,6 @@ begin
 			end if;
 		end if;
 		
-		-- TODO Does gtia_prior have the current state throughout all 4 vbxe pixels???
 		if (xdl_ov_live_reg = '1') and (or_reduce(gtia_prior_adj and ov_prior) = '1') then
 			xdl_ov_pixel <= xdl_pixels_reg(xdl_pixel_sindex_reg);
 			xdl_ov_pixel_active <= not(xdl_ptrans_reg(xdl_pixel_sindex_reg));
@@ -839,10 +840,6 @@ begin
 		if cb_request_reg = '1' then
 			csel_next <= std_logic_vector(unsigned(csel_reg) + 1);
 		end if;
-		-- TODO Soft reset for everything should be done this way
-		-- probably also latched and invoked on a proper cycle not to destroy
-		-- the DMA state machine (but then the soft reset comes from $D080-FF,
-		-- this is nowhere near MEMAC, and that's the only thing that can possibly get messed up)
 		if soft_reset = '1' then
 			xdl_enabled_next <= '0';
 			xcolor_next <= '0';
@@ -950,7 +947,7 @@ begin
 		xdl_map_sindex_reg <= "00000";
 		xdl_map_buffer_data_in_reg <= (others => '0');
 		xdl_map_live_reg <= '0';
-		xdl_vdelay_reg <= "00";
+		xdl_vdelay_reg <= 0;
 		xcolor_reg <= '0';
 		no_trans_reg <= '0';
 		trans15_reg <= '0';
@@ -1088,23 +1085,35 @@ process(xdl_active_reg, gtia_live, xdl_ov_size_reg, gtia_hpos)
 begin
 	xdl_field_start <= '0';
 	xdl_field_end <= '0';
+	xdl_field_end2 <= '0';
 	-- TODO use colour_clock instead of gtia_live?
-	if (xdl_active_reg = '1') and (gtia_live = '1') then
+	if (xdl_active_reg = '1') and (video_clock_antic_lowres = '1') then
+		if gtia_hpos = x"00" then xdl_field_end2 <= '1'; end if;
 		case xdl_ov_size_reg is
 			-- All these are 4 less than the actual places to allow for character buffering
 			-- 4 = 8 highres pixels = 16 vbxe highres pixel
 			when "00" | "11" => -- Narrow
 				if gtia_hpos = x"3C" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"BC" then xdl_field_end <= '1'; end if;
+				--if gtia_hpos = x"C2" then xdl_field_end2 <= '1'; end if;
 			when "01" => -- Normal
 				if gtia_hpos = x"2C" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"CC" then xdl_field_end <= '1'; end if;
+				--if gtia_hpos = x"D2" then xdl_field_end2 <= '1'; end if;
 			when "10" => -- Wide
 				if gtia_hpos = x"28" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"D0" then xdl_field_end <= '1'; end if;
+				--if gtia_hpos = x"D6" then xdl_field_end2 <= '1'; end if;
 		end case;
 	end if;
 end process;
+
+
+-- What would coloour clock be * 8
+-- 256 -- 32
+--hblank_delay : delay_line
+--	generic map (COUNT=>256)
+--	port map(clk=>clk,sync_reset=>'0',data_in=>hblank_start,enable=>'1',reset_n=>reset_n,data_out=>hblank_start_delayed);
 
 map_live_delay_start : delay_line
 	generic map (COUNT=>19) -- 3 + 8 + 8
@@ -1115,11 +1124,11 @@ map_live_delay_end : delay_line
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_map_live_end);
 
 map_glive_delay_start : delay_line
-	generic map (COUNT=>11) -- TODO When exactly should this begin, and on which clock?
+	generic map (COUNT=>11)
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_glive_start);
 
 map_glive_delay_end : delay_line
-	generic map (COUNT=>11) -- TODO Will this read all pixels? Check!!!
+	generic map (COUNT=>11)
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_glive_end);
 
 map_tlive_delay_start : delay_line
@@ -1131,8 +1140,6 @@ map_tlive_delay_end : delay_line
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_tlive_end);
 
 -- For h scroll values of 5,6,7
--- TODO move the character processing couple of DMA cycles later and make this for 4,5,6,7 (requires only one bit checking?)
--- But it may as well easily mess itself up if depending on how tlive_start fits into the DMA cycle pattern, do not touch?
 map_tlive2_delay_start : delay_line
 	generic map (COUNT=>3)
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_tlive2_start);
@@ -1141,7 +1148,6 @@ map_tlive2_delay_end : delay_line
 	generic map (COUNT=>11) -- previous plus 8 to catch one more character (for scrolling)
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_tlive2_end);
 
--- TODO will these need some shift?
 xdl_ov_live_start <= xdl_map_live_start;
 xdl_ov_live_end <= xdl_map_live_end;
 
@@ -1168,7 +1174,6 @@ begin
 			xdl_ov_live_next <= '0';
 		end if;
 		if xdl_ov_text_reg = '0' then
-			-- TODO This may need a whole different cycle marker?
 			if xdl_ov_glive_start = '1' then
 				xdl_ov_tlive_next <= '1';
 			end if;
@@ -1176,7 +1181,6 @@ begin
 				xdl_ov_tlive_next <= '0';
 			end if;
 		else
-			-- TODO Alternative? if xdl_ovscr_h_reg(2) = '0' then
 			case xdl_ovscr_h_reg is
 				when "101" | "110" | "111" =>
 					if xdl_ov_tlive2_start = '1' then
@@ -1527,34 +1531,44 @@ begin
 	if (vsync_start = '1') then
 		-- Account for the PAL/NTSC bug in the original implementation
 		if pal = '1' then
-			xdl_vdelay_next <= "01";
+			xdl_vdelay_next <= 46;
 		else
-			xdl_vdelay_next <= "10";
+			xdl_vdelay_next <= 17;
 		end if;
-		-- xdl_vdelay_next <= not(pal) & pal;
-		-- TODO this is where we begin the frame?
-		-- TODO All this happening too early?
-		-- TODO Immediate kill of graphics and attribute modes on soft_reset?
-		-- xdl_active_next <= '0';
-		xdl_read_state_next <= 0;
-		-- graphics modes, attribute modes???
-		-- TODO can this be direct?
+		--xdl_vdelay_next <= not(pal) & pal;
 		xdl_active_next <= xdl_enabled_reg;
-		--if (xdl_enabled_reg = '1') then
-		--	xdl_active_next <= '1';
-		--	-- xdl_read_state_next <= 1;
-		--end if;
+		xdl_read_state_next <= 0;
 	end if;
 
-	-- end of line, state should be 0 from previous calls
-	-- set map reading marker to 0 (it should be 0 from before)
-	-- check if map address needs to roll (vcount = 0)
-	-- if so, roll over address, reset vcount, set map reading marker to 1
-	-- do the same with OV address
-
 	-- TODO use something else than hblank, end of field?
-	if (hblank_start = '1') and (xdl_active_reg = '1') then
-		if xdl_vdelay_reg = "00" then
+	-- hblank_start
+	if (xdl_field_end2 = '1') and (xdl_vdelay_reg /= 0) and (xdl_active_reg = '1') then
+		-- This worked OK when delay was initially 24
+		if xdl_vdelay_reg = 1 then
+			xdl_active_next <= xdl_enabled_reg;
+			xdl_rptl_next <= x"00";
+			xdl_fetch_next <= xdl_addr_reg;
+			xdl_ovscr_h_next <= "000";
+			xdl_ovscr_v_next <= "000";
+			xdl_mapscr_h_next <= "00000";
+			xdl_mapscr_v_next <= "00000";
+			xdl_map_wd_next <= "00111";
+			xdl_map_ht_next <= "00111";
+			xdl_ov_size_next <= "01";
+			xdl_ov_pal_next <= "01";
+			xdl_pf_pal_next <= "00";
+			xdl_gp_next <= (others => '1');
+			xdl_cmd_next <= (others => '0');
+			xdl_map_active_next <= '0';
+			xdl_ov_active_next <= '0';
+			xdl_vcount_next <= 0;
+			xdl_read_state_next <= 1;
+		end if;
+		xdl_vdelay_next <= xdl_vdelay_reg - 1;
+	end if;
+	if (xdl_field_end2 = '1') and (xdl_vdelay_reg = 0) and (xdl_active_reg = '1') then
+	--if (xdl_field_end2 = '1') and (xdl_active_reg = '1') then
+		--if xdl_vdelay_reg = "00" then
 			if xdl_map_active_reg = '1' then
 				if xdl_map_vcount_reg = xdl_map_ht_reg then
 					xdl_map_vcount_next <= "00000";
@@ -1599,28 +1613,8 @@ begin
 			else
 				xdl_vcount_next <= xdl_vcount_reg + 1;
 			end if;
-		else
-			if xdl_vdelay_reg = "01" then
-				xdl_rptl_next <= x"00";
-				xdl_fetch_next <= xdl_addr_reg;
-				xdl_ovscr_h_next <= "000";
-				xdl_ovscr_v_next <= "000";
-				xdl_mapscr_h_next <= "00000";
-				xdl_mapscr_v_next <= "00000";
-				xdl_map_wd_next <= "00111";
-				xdl_map_ht_next <= "00111";
-				xdl_ov_size_next <= "01";
-				xdl_ov_pal_next <= "01";
-				xdl_pf_pal_next <= "00";
-				xdl_gp_next <= (others => '1');
-				xdl_cmd_next <= (others => '0');
-				xdl_map_active_next <= '0';
-				xdl_ov_active_next <= '0';
-				xdl_vcount_next <= 0;
-				xdl_read_state_next <= 1;
-			end if;
-			xdl_vdelay_next <= xdl_vdelay_reg - 1;
-		end if;
+		--else
+		--end if;
 	end if;
 
 	xdl_map_buffer_wren <= '0';
@@ -1660,12 +1654,7 @@ begin
 		end case;
 	end if;
 
-	-- TODO Is it possible that this happens twice on the top of the screen???
-	-- when is xdl_fetch updated?
 	if xdl_read_state_reg = 22 then
-		-- react to ov mode switches
-		-- i.e. set modes according to correct bits
-		-- reload ov addresses
 		if (xdl_cmd_reg(3) = '1') or (xdl_cmd_reg(9) = '1') then
 			xdl_map_fetch_next <= xdl_mapaddr_reg;
 			xdl_map_fetch_init_next <= xdl_mapaddr_reg + xdl_mapaddr_step_reg;
@@ -1683,8 +1672,6 @@ begin
 			xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
 			-- xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
 		end if;
-		-- TODO xdl_ov hi/lo do not need to be registers
-		-- can be linked directly to xdl_cmd_reg
 		if (xdl_cmd_reg(0) xor xdl_cmd_reg(1)) = '1' then
 			xdl_ov_hi_next <= xdl_cmd_reg(12);
 			xdl_ov_lo_next <= xdl_cmd_reg(13);

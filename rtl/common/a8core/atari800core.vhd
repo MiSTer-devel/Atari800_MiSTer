@@ -260,8 +260,6 @@ signal VSYNC : std_logic;
 signal HSYNC : std_logic;
 signal GTIA_VISIBLE : std_logic;
 signal GTIA_HBLANK : std_logic;
-signal GTIA_HSYNC : std_logic;
-signal GTIA_VSYNC : std_logic;
 signal GTIA_HIGHRES_OUT : std_logic;
 signal GTIA_HIGHRES_IN : std_logic;
 signal GTIA_ACTIVE_HR_OUT : std_logic_vector(1 downto 0);
@@ -278,6 +276,7 @@ signal GTIA_PF2_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF3_OUT : std_logic_vector(7 downto 0);
 signal GTIA_XCOLOR : std_logic;
 signal GTIA_PALETTE : std_logic_vector(1 downto 0);
+signal GTIA_START_OF_FIELD : std_logic;
 
 -- GTIA PALETTE
 signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
@@ -564,6 +563,7 @@ PORT MAP(
 	memac_dma_enable => memac_dma_enable,
 	memac_dma_address => dma_addr,
 	irq_n => VBXE_IRQ_N,
+	video_clock_antic_lowres => ANTIC_COLOUR_CLOCK_OUT,
 	video_clock_antic_highres => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
 	video_clock_vbxe => VBXE_COLOUR_CLOCK_OUT,
 	gtia_live => GTIA_VISIBLE,
@@ -585,9 +585,8 @@ PORT MAP(
 	ov_pixel => VBXE_OV_PIXEL,
 	ov_pixel_active => VBXE_OV_PIXEL_ACTIVE,
 	xcolor => GTIA_XCOLOR,
-	VSYNC_START => GTIA_VSYNC,
+	VSYNC_START => GTIA_START_OF_FIELD,
 	HBLANK_START => GTIA_HBLANK,
-	HSYNC_START => GTIA_HSYNC,
 	GTIA_HPOS => GTIA_HPOS
 );
 
@@ -777,8 +776,6 @@ PORT MAP(CLK => CLK,
 		 PALETTE_out => GTIA_PALETTE,
 		 XCOLOR => GTIA_XCOLOR,
 		 HBLANK_START => GTIA_HBLANK,
-		 HSYNC_START_OUT => GTIA_HSYNC,
-		 VSYNC_START => GTIA_VSYNC,
 		 HPOS_OUT => GTIA_HPOS,
 
 		 CONSOL_OUT => CONSOL_OUT,
@@ -795,13 +792,14 @@ PORT MAP(CLK => CLK,
 		 HBLANK => open,
 		 VBLANK => open,
 		 BURST => VIDEO_BURST,
-		 START_OF_FIELD => VIDEO_START_OF_FIELD,
+		 START_OF_FIELD => GTIA_START_OF_FIELD,
 		 ODD_LINE => VIDEO_ODD_LINE,
 		 COLOUR_out => COLOUR,
 		 DATA_OUT => GTIA_DO);
 
 -- Both negated and non-negated works, but technically it should be negated (or?)
 GTIA_SOUND <= not(CONSOL_OUT(3));
+VIDEO_START_OF_FIELD <= GTIA_START_OF_FIELD;
 
 	-- colour palette
 
