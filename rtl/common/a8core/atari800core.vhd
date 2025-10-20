@@ -258,8 +258,6 @@ signal COLOUR : std_logic_vector(7 downto 0);
 
 signal VSYNC : std_logic;
 signal HSYNC : std_logic;
-signal GTIA_VISIBLE : std_logic;
-signal GTIA_HBLANK : std_logic;
 signal GTIA_VSYNC : std_logic;
 signal GTIA_HIGHRES_OUT : std_logic;
 signal GTIA_HIGHRES_IN : std_logic;
@@ -567,7 +565,6 @@ PORT MAP(
 	video_clock_antic_lowres => ANTIC_COLOUR_CLOCK_OUT,
 	video_clock_antic_highres => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
 	video_clock_vbxe => VBXE_COLOUR_CLOCK_OUT,
-	gtia_live => GTIA_VISIBLE,
 	gtia_highres => GTIA_HIGHRES_OUT,
 	gtia_highres_mod => GTIA_HIGHRES_IN,
 	gtia_active_hr => GTIA_ACTIVE_HR_OUT,
@@ -586,9 +583,7 @@ PORT MAP(
 	ov_pixel => VBXE_OV_PIXEL,
 	ov_pixel_active => VBXE_OV_PIXEL_ACTIVE,
 	xcolor => GTIA_XCOLOR,
---	VSYNC_START => GTIA_START_OF_FIELD,
-	VSYNC_START => GTIA_VSYNC,
-	HBLANK_START => GTIA_HBLANK,
+	VSYNC => GTIA_VSYNC,
 	GTIA_HPOS => GTIA_HPOS
 );
 
@@ -757,7 +752,6 @@ PORT MAP(CLK => CLK,
 		 COLOUR_CLOCK_HIGHRES => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK_VBXE => VBXE_COLOUR_CLOCK_OUT,
 		 VBXE_SWITCH => VBXE_SWITCH,
-		 GTIA_VISIBLE => GTIA_VISIBLE,
 		 GTIA_HIGHRES_OUT => GTIA_HIGHRES_OUT,
 		 GTIA_HIGHRES_IN => GTIA_HIGHRES_IN,
 		 GTIA_ACTIVE_HR_OUT => GTIA_ACTIVE_HR_OUT,
@@ -777,7 +771,6 @@ PORT MAP(CLK => CLK,
 		 VBXE_OV_PIXEL_ACTIVE => VBXE_OV_PIXEL_ACTIVE,
 		 PALETTE_out => GTIA_PALETTE,
 		 XCOLOR => GTIA_XCOLOR,
-		 HBLANK_START => GTIA_HBLANK,
 		 GTIA_VSYNC => GTIA_VSYNC,
 		 HPOS_OUT => GTIA_HPOS,
 

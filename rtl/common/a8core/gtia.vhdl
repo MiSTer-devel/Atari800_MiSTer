@@ -38,14 +38,12 @@ PORT
 	VBXE_SWITCH : in std_logic := '0';
 	XCOLOR : in std_logic := '0';
 	COLOUR_CLOCK_VBXE : in std_logic := '0';
-	GTIA_VISIBLE : out std_logic;
 	GTIA_HIGHRES_OUT : out std_logic;
 	GTIA_HIGHRES_IN : in std_logic;
 	GTIA_ACTIVE_HR_OUT : out std_logic_vector(1 downto 0);
 	GTIA_ACTIVE_HR_IN : in std_logic_vector(1 downto 0);
 	GTIA_PRIOR : out std_logic_vector(7 downto 0);
 	GTIA_PRIOR_RAW : out std_logic_vector(7 downto 0);
-	hblank_start : out std_logic; -- TODO might not be needed
 	gtia_vsync : out std_logic; -- TODO might not be needed
 	hpos_out : out std_logic_vector(7 downto 0);
 	GTIA_PF0_OUT : out std_logic_vector(7 downto 0);
@@ -2004,7 +2002,6 @@ begin
 	
 	consol_out <= consol_output_reg;
 
-	GTIA_VISIBLE <= visible_live;
 	GTIA_HIGHRES_OUT <= highres_reg;
 	GTIA_ACTIVE_HR_OUT <= active_hr_reg;
 	GTIA_PRIOR <= gtia_prior_next;
@@ -2015,7 +2012,6 @@ begin
 	GTIA_PF2_OUT <= colpf2_delayed_reg;
 	GTIA_PF3_OUT <= colpf3_delayed_reg;
 	PALETTE_out <= palette_reg;
-	hblank_start <= hblank_next and not(hblank_reg);
 	gtia_vsync <= vsync_reg and not(vsync_next);
 	hpos_out <= hpos_reg;
 

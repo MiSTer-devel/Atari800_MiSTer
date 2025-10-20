@@ -4,9 +4,6 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.STD_LOGIC_MISC.ALL;
 
--- TODO vram_data_in
--- TODO clean up GTIA dependencies
-
 entity VBXE is
 generic ( 
 	cycle_length : integer := 16
@@ -69,14 +66,11 @@ port (
 	ov_pixel_active : out std_logic;
 	xcolor : out std_logic;
 
-	gtia_live : in std_logic;
 	video_clock_antic_highres : in std_logic;
 	video_clock_antic_lowres : in std_logic;
 	video_clock_vbxe : in std_logic;
-	gtia_hpos : in std_logic_vector(7 downto 0);
-	
-	hblank_start : in std_logic;
-	vsync_start : in std_logic
+	gtia_hpos : in std_logic_vector(7 downto 0);	
+	vsync : in std_logic
 );
 end VBXE;
 
@@ -305,8 +299,6 @@ signal xdl_ov_tlive2_end : std_logic;
 signal xdl_ov_tlive_reg : std_logic;
 signal xdl_ov_tlive_next : std_logic;
 
-signal hblank_start_delayed : std_logic;
-
 signal xdl_ov_vcount_reg : unsigned(2 downto 0);
 signal xdl_ov_vcount_next : unsigned(2 downto 0);
 
@@ -382,11 +374,11 @@ signal colclear : std_logic;
 begin
 
 process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_prior,gtia_prior_raw,
-	enable,xdl_active_reg,xdl_map_live_reg,xdl_map_wd_reg,xdl_map_sindex_reg,
-	xdl_map_buffer_data_out,xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,
-	xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,
-	xdl_pixel_sindex_reg,
-	p0_reg,p1_reg,p2_reg,p3_reg)
+	enable,xdl_active_reg,xdl_map_live_reg,xdl_map_wd_reg,xdl_map_sindex_reg,xdl_map_buffer_data_out,
+	xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,xdl_pixel_sindex_reg,
+	p0_reg,p1_reg,p2_reg,p3_reg,xdl_map_buffer_index_reg,coldetect_reg,colclear,gtia_hpos,xdl_map_active_reg,
+	xdl_mapscr_h_reg,xdl_ov_active_reg,xdl_ovscr_h_reg,video_clock_antic_highres,xdl_ov_live_reg,
+	colmask_reg,no_trans_reg,trans15_reg,video_clock_vbxe)
 	variable flip_23 : boolean;
 	variable ov_prior : std_logic_vector(7 downto 0);
 	variable gtia_prior_adj : std_logic_vector(7 downto 0);
@@ -423,7 +415,6 @@ begin
 				if xdl_ov_text_reg = '1' then
 					xdl_pixel_sindex_next <= to_integer(xdl_ovscr_h_reg);
 				else
-					-- TODO might need fixing, check shifts
 					xdl_pixel_sindex_next <= 0;
 				end if;
 			end if;
@@ -485,7 +476,6 @@ begin
 				when "10" => ov_prior := p2_reg;
 				when "11" => ov_prior := p3_reg;
 			end case;
-			--map_catt := xdl_map_buffer_data_out(3);
 			if (video_clock_antic_highres = '1') then
 				if xdl_map_sindex_reg = xdl_map_wd_reg then
 					xdl_map_sindex_next <= "00000";
@@ -743,7 +733,7 @@ port map
 );
 
 -- write registers
-process(addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg,
+process(addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg, trans15_reg, no_trans_reg,
 	blitter_addr_reg, blitter_status, blitter_irqen_reg, xdl_enabled_reg, xcolor_reg, pal, xdl_addr_reg, p0_reg, p1_reg, p2_reg, p3_reg, colmask_reg)
 begin
 		csel_next <= csel_reg;
@@ -1081,12 +1071,11 @@ begin
 	end if;
 end process;
 
-process(xdl_active_reg, gtia_live, xdl_ov_size_reg, gtia_hpos)
+process(xdl_active_reg, video_clock_antic_lowres, xdl_ov_size_reg, gtia_hpos)
 begin
 	xdl_field_start <= '0';
 	xdl_field_end <= '0';
 	xdl_field_end2 <= '0';
-	-- TODO use colour_clock instead of gtia_live?
 	if (xdl_active_reg = '1') and (video_clock_antic_lowres = '1') then
 		if gtia_hpos = x"D6" then xdl_field_end2 <= '1'; end if;
 		case xdl_ov_size_reg is
@@ -1095,25 +1084,16 @@ begin
 			when "00" | "11" => -- Narrow
 				if gtia_hpos = x"3C" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"BC" then xdl_field_end <= '1'; end if;
-				--if gtia_hpos = x"C2" then xdl_field_end2 <= '1'; end if;
 			when "01" => -- Normal
 				if gtia_hpos = x"2C" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"CC" then xdl_field_end <= '1'; end if;
-				--if gtia_hpos = x"D2" then xdl_field_end2 <= '1'; end if;
 			when "10" => -- Wide
 				if gtia_hpos = x"28" then xdl_field_start <= '1'; end if;
 				if gtia_hpos = x"D0" then xdl_field_end <= '1'; end if;
-				--if gtia_hpos = x"D6" then xdl_field_end2 <= '1'; end if;
 		end case;
 	end if;
 end process;
 
-
--- What would coloour clock be * 8
--- 256 -- 32
---hblank_delay : delay_line
---	generic map (COUNT=>256)
---	port map(clk=>clk,sync_reset=>'0',data_in=>hblank_start,enable=>'1',reset_n=>reset_n,data_out=>hblank_start_delayed);
 
 map_live_delay_start : delay_line
 	generic map (COUNT=>19) -- 3 + 8 + 8
@@ -1151,9 +1131,9 @@ map_tlive2_delay_end : delay_line
 xdl_ov_live_start <= xdl_map_live_start;
 xdl_ov_live_end <= xdl_map_live_end;
 
-process(xdl_map_live_reg, xdl_map_live_start, xdl_map_live_end, xdl_ov_live_reg,
-	xdl_ov_live_start, xdl_ov_live_end, xdl_ov_tlive_reg, xdl_ov_tlive_start, xdl_ov_tlive_end,
-	xdl_ov_tlive2_start, xdl_ov_tlive2_end, xdl_ov_glive_start, xdl_ov_glive_end, xdl_ovscr_h_reg)
+process(xdl_map_live_reg, xdl_map_live_start, xdl_map_live_end, xdl_ov_live_reg, xdl_ov_live_start, xdl_ov_live_end, xdl_ov_tlive_reg,
+	xdl_ov_tlive_start, xdl_ov_tlive_end, xdl_ov_tlive2_start, xdl_ov_tlive2_end, xdl_ov_glive_start, xdl_ov_glive_end, xdl_map_active_reg,
+	xdl_ov_active_reg, xdl_ov_text_reg, xdl_ovscr_h_reg)
 begin
 	xdl_map_live_next <= xdl_map_live_reg;
 	xdl_ov_live_next <= xdl_ov_live_reg;
@@ -1203,13 +1183,17 @@ begin
 end process;
 
 -- VBXE DMA state machine
-process(--soft_reset,
-	clock_shift_reg,
-	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, 
-	memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
-	memc_reg,mems_reg,memb_reg,vram_data_in_low,vram_data_in_high,vram_request_complete,memac_address,
-	blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
-	blitter_status,blitter_pending_reg)
+process(clock_shift_reg,
+	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
+	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,memac_address, blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
+	blitter_status,blitter_pending_reg, xdl_ovscr_h_reg, xdl_ovscr_v_reg,
+	xdl_map_active_reg, xdl_ov_active_reg, xdl_ov_text_reg, xdl_fetch_reg, xdl_pending_reg, xdl_read_state_reg, xdl_cmd_reg, xdl_active_reg,
+	xdl_rptl_reg, xdl_ovaddr_reg, xdl_ovaddr_step_reg, xdl_chbase_reg, xdl_mapaddr_reg, xdl_mapaddr_step_reg,
+	xdl_mapscr_h_reg, xdl_mapscr_v_reg, xdl_map_wd_reg, xdl_map_ht_reg, xdl_ov_size_reg, xdl_ov_pal_reg, xdl_pf_pal_reg, xdl_gp_reg, xdl_map_vcount_reg,
+	xdl_map_read_reg, xdl_map_fetch_reg, xdl_map_fetch_init_reg, xdl_map_read_count_reg, xdl_map_buffer_data_in_reg, xdl_vdelay_reg,
+	xdl_ov_vcount_reg, xdl_ov_fetch_reg, xdl_ov_fetch_init_reg, xdl_ov_hi_reg, xdl_ov_lo_reg, xdl_pixels_reg,
+	xdl_ptrans_reg, xdl_pixel_buffer_windex_reg, xdl_char_attr_reg, xdl_char_code_reg, no_trans_reg, xdl_vcount_reg, xdl_ov_tlive_reg, vsync, pal,
+	xdl_enabled_reg, xdl_field_end2, xdl_addr_reg)
 
 variable blitter_notify : boolean := false;
 variable xdl_or_blitter_notify : boolean := false;
@@ -1276,7 +1260,7 @@ begin
 	xdl_vcount_next <= xdl_vcount_reg;
 	
 	if blitter_pending_reg = '1' then
-		blitter_vram_data_in_next <= vram_data_in_high & vram_data_in_low;
+		blitter_vram_data_in_next <= vram_data_in;
 		blitter_pending_next <= '0';
 	end if;
 
@@ -1287,11 +1271,9 @@ begin
 	when "0000" =>
 		dma_state_next <= "0001";
 		if xdl_ov_tlive_reg = '1' then
-			--if xdl_ov_text_reg = '1' then
-				vram_op_next <= "01";
-				vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
-				xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
-			--end if;
+			vram_op_next <= "01";
+			vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
+			xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
 		else
 			xdl_or_blitter_notify := true;
 		end if;
@@ -1347,16 +1329,14 @@ begin
 		dma_state_next(2 downto 0) <= "010";
 	when "0010" | "1010" =>
 		if dma_state_reg(3) = '1' then
-			memac_data_next <= vram_data_in_high & vram_data_in_low;
+			memac_data_next <= vram_data_in;
 			memac_request_complete_next <= '1';
 		end if;
 		dma_state_next <= "0011";
 		if (xdl_ov_tlive_reg = '1') and (xdl_ov_lo_reg = '0') then
-			--if xdl_ov_text_reg = '1' then
-				vram_op_next <= "01";
-				vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
-				xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
-			--end if;
+			vram_op_next <= "01";
+			vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
+			xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
 		else
 			xdl_or_blitter_notify := true;
 		end if;
@@ -1528,50 +1508,19 @@ begin
 		vram_op_next <= "00";
 	end case;
 
-	if (vsync_start = '1') then
+	if (vsync = '1') then
 		-- Account for the PAL/NTSC bug in the original implementation
 		if pal = '1' then
 			xdl_vdelay_next <= 42;
 		else
 			xdl_vdelay_next <= 13;
 		end if;
-		--if pal = '1' then
-		--	xdl_vdelay_next <= 46;
-		--else
-		--	xdl_vdelay_next <= 17;
-		--end if;
-		--xdl_vdelay_next <= not(pal) & pal;
 		xdl_active_next <= xdl_enabled_reg;
 		xdl_read_state_next <= 0;
 	end if;
 
-	if (xdl_field_end2 = '1') and (xdl_vdelay_reg /= 0) and (xdl_active_reg = '1') then
-		-- This worked OK when delay was initially 24
-		if xdl_vdelay_reg = 1 then
-			xdl_active_next <= xdl_enabled_reg;
-			xdl_rptl_next <= x"00";
-			xdl_fetch_next <= xdl_addr_reg;
-			xdl_ovscr_h_next <= "000";
-			xdl_ovscr_v_next <= "000";
-			xdl_mapscr_h_next <= "00000";
-			xdl_mapscr_v_next <= "00000";
-			xdl_map_wd_next <= "00111";
-			xdl_map_ht_next <= "00111";
-			xdl_ov_size_next <= "01";
-			xdl_ov_pal_next <= "01";
-			xdl_pf_pal_next <= "00";
-			xdl_gp_next <= (others => '1');
-			xdl_cmd_next <= (others => '0');
-			xdl_map_active_next <= '0';
-			xdl_ov_active_next <= '0';
-			xdl_vcount_next <= 0;
-			xdl_read_state_next <= 1;
-		end if;
-		xdl_vdelay_next <= xdl_vdelay_reg - 1;
-	end if;
-	if (xdl_field_end2 = '1') and (xdl_vdelay_reg = 0) and (xdl_active_reg = '1') then
-	--if (xdl_field_end2 = '1') and (xdl_active_reg = '1') then
-		--if xdl_vdelay_reg = "00" then
+	if (xdl_field_end2 = '1') and (xdl_active_reg = '1') then
+		if xdl_vdelay_reg = 0 then
 			if xdl_map_active_reg = '1' then
 				if xdl_map_vcount_reg = xdl_map_ht_reg then
 					xdl_map_vcount_next <= "00000";
@@ -1616,42 +1565,63 @@ begin
 			else
 				xdl_vcount_next <= xdl_vcount_reg + 1;
 			end if;
-		--else
-		--end if;
+		else
+			if xdl_vdelay_reg = 1 then
+				xdl_active_next <= xdl_enabled_reg;
+				xdl_rptl_next <= x"00";
+				xdl_fetch_next <= xdl_addr_reg;
+				xdl_ovscr_h_next <= "000";
+				xdl_ovscr_v_next <= "000";
+				xdl_mapscr_h_next <= "00000";
+				xdl_mapscr_v_next <= "00000";
+				xdl_map_wd_next <= "00111";
+				xdl_map_ht_next <= "00111";
+				xdl_ov_size_next <= "01";
+				xdl_ov_pal_next <= "01";
+				xdl_pf_pal_next <= "00";
+				xdl_gp_next <= (others => '1');
+				xdl_cmd_next <= (others => '0');
+				xdl_map_active_next <= '0';
+				xdl_ov_active_next <= '0';
+				xdl_vcount_next <= 0;
+				xdl_read_state_next <= 1;
+			end if;
+			xdl_vdelay_next <= xdl_vdelay_reg - 1;
+		end if;
 	end if;
 
 	xdl_map_buffer_wren <= '0';
 	if xdl_pending_reg = '1' then
 		xdl_pending_next <= '0';
 		case xdl_read_state_reg is
-			when 2 => xdl_cmd_next(7 downto 0) <= vram_data_in_high & vram_data_in_low;
-			when 3 => xdl_cmd_next(15 downto 8) <= vram_data_in_high & vram_data_in_low;
-			when 4 => xdl_rptl_next <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
-			when 5 => xdl_ovaddr_next(7 downto 0) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
-			when 6 => xdl_ovaddr_next(15 downto 8) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
-			when 7 => xdl_ovaddr_next(18 downto 16) <= unsigned(vram_data_in_low);
-			when 8 => xdl_ovaddr_step_next(7 downto 0) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
-			when 9 => xdl_ovaddr_step_next(11 downto 8) <= unsigned(std_logic_vector'(vram_data_in_high(0) & vram_data_in_low));
-			when 10 => xdl_ovscr_h_next <= unsigned(vram_data_in_low);
-			when 11 => xdl_ovscr_v_next <= unsigned(vram_data_in_low);
-			when 12 => xdl_chbase_next <= vram_data_in_high & vram_data_in_low;
-			when 13 => xdl_mapaddr_next(7 downto 0) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
-			when 14 => xdl_mapaddr_next(15 downto 8) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
-			when 15 => xdl_mapaddr_next(18 downto 16) <= unsigned(vram_data_in_low);
-			when 16 => xdl_mapaddr_step_next(7 downto 0) <= unsigned(std_logic_vector'(vram_data_in_high & vram_data_in_low));
-			when 17 => xdl_mapaddr_step_next(11 downto 8) <= unsigned(std_logic_vector'(vram_data_in_high(0) & vram_data_in_low));
-			when 18 => xdl_mapscr_h_next <= unsigned(std_logic_vector'(vram_data_in_high(1 downto 0) & vram_data_in_low));
-			when 19 => xdl_mapscr_v_next <= unsigned(std_logic_vector'(vram_data_in_high(1 downto 0) & vram_data_in_low));
-			when 20 => xdl_map_wd_next <= unsigned(std_logic_vector'(vram_data_in_high(1 downto 0) & vram_data_in_low)); -- ? What to do if the value is below 7 (=not allowed)?
-			when 21 => xdl_map_ht_next <= unsigned(std_logic_vector'(vram_data_in_high(1 downto 0) & vram_data_in_low));
+			when 2 => xdl_cmd_next(7 downto 0) <= vram_data_in;
+			when 3 => xdl_cmd_next(15 downto 8) <= vram_data_in;
+			when 4 => xdl_rptl_next <= unsigned(vram_data_in);
+			when 5 => xdl_ovaddr_next(7 downto 0) <= unsigned(vram_data_in);
+			when 6 => xdl_ovaddr_next(15 downto 8) <= unsigned(vram_data_in);
+			when 7 => xdl_ovaddr_next(18 downto 16) <= unsigned(vram_data_in(2 downto 0));
+			when 8 => xdl_ovaddr_step_next(7 downto 0) <= unsigned(vram_data_in);
+			when 9 => xdl_ovaddr_step_next(11 downto 8) <= unsigned(vram_data_in(3 downto 0));
+			when 10 => xdl_ovscr_h_next <= unsigned(vram_data_in(2 downto 0));
+			when 11 => xdl_ovscr_v_next <= unsigned(vram_data_in(2 downto 0));
+			when 12 => xdl_chbase_next <= vram_data_in;
+			when 13 => xdl_mapaddr_next(7 downto 0) <= unsigned(vram_data_in);
+			when 14 => xdl_mapaddr_next(15 downto 8) <= unsigned(vram_data_in);
+			when 15 => xdl_mapaddr_next(18 downto 16) <= unsigned(vram_data_in(2 downto 0));
+			when 16 => xdl_mapaddr_step_next(7 downto 0) <= unsigned(vram_data_in);
+			when 17 => xdl_mapaddr_step_next(11 downto 8) <= unsigned(vram_data_in(3 downto 0));
+			when 18 => xdl_mapscr_h_next <= unsigned(vram_data_in(4 downto 0));
+			when 19 => xdl_mapscr_v_next <= unsigned(vram_data_in(4 downto 0));
+			when 20 => xdl_map_wd_next <= unsigned(vram_data_in(4 downto 0)); -- TODO ? What to do if the value is below 7 (=not allowed)?
+			when 21 => xdl_map_ht_next <= unsigned(vram_data_in(4 downto 0));
 			when 22 =>
-				xdl_ov_size_next <= vram_data_in_low(1 downto 0);
-				xdl_ov_pal_next <= vram_data_in_high(2 downto 1);
-				xdl_pf_pal_next <= vram_data_in_high(4 downto 3);
+				xdl_ov_size_next <= vram_data_in(1 downto 0);
+				xdl_ov_pal_next <= vram_data_in(5 downto 4);
+				xdl_pf_pal_next <= vram_data_in(7 downto 6);
 			when 23 =>
-				xdl_gp_next <= vram_data_in_high & vram_data_in_low;
+				xdl_gp_next <= vram_data_in;
 			when 24 =>
-				xdl_map_buffer_data_in_next <= vram_data_in_high & vram_data_in_low;
+				xdl_map_buffer_data_in_next <= vram_data_in;
 				xdl_map_buffer_wren <= '1';
 			when others =>
 		end case;
