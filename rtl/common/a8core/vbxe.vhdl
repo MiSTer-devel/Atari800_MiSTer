@@ -307,8 +307,6 @@ signal xdl_ov_fetch_next : unsigned(18 downto 0);
 signal xdl_ov_fetch_init_reg : unsigned(18 downto 0);
 signal xdl_ov_fetch_init_next : unsigned(18 downto 0);
 
---signal xdl_vdelay_reg : unsigned(1 downto 0);
---signal xdl_vdelay_next : unsigned(1 downto 0);
 signal xdl_vdelay_reg : integer range 0 to 63;
 signal xdl_vdelay_next : integer range 0 to 63;
 
@@ -1643,16 +1641,12 @@ begin
 		if xdl_cmd_reg(6) = '1' then
 			xdl_ov_fetch_next <= xdl_ovaddr_reg;
 			xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
-			-- xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
 		end if;
 		if (xdl_cmd_reg(0) xor xdl_cmd_reg(1)) = '1' then
 			xdl_ov_hi_next <= xdl_cmd_reg(12);
 			xdl_ov_lo_next <= xdl_cmd_reg(13);
 			xdl_ov_active_next <= '1';
 			xdl_ov_text_next <= xdl_cmd_reg(0);
-			--xdl_ov_fetch_next <= xdl_ovaddr_reg;
-			--xdl_ov_fetch_init_next <= xdl_ovaddr_reg;
-			--xdl_ovaddr_next <= xdl_ovaddr_reg + xdl_ovaddr_step_reg;
 			if xdl_cmd_reg(0) = '1' then
 				xdl_ov_vcount_next <= xdl_ovscr_v_reg;
 			else
@@ -1671,8 +1665,7 @@ begin
 			xdl_read_state_next <= xdl_read_state_reg + 1;
 		end if;
 		case xdl_read_state_reg is
-			when 1 => xdl_read_required := true;
-			when 2 => xdl_read_required := true;
+			when 1 | 2 => xdl_read_required := true;
 			when 3 => if xdl_cmd_reg(5) = '1' then xdl_read_required := true; end if;
 			when 4 | 5 | 6 | 7 | 8 => if xdl_cmd_reg(6) = '1' then xdl_read_required := true; end if;
 			when 9 | 10 => if xdl_cmd_reg(7) = '1' then xdl_read_required := true; end if;

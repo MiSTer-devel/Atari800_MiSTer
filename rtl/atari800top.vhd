@@ -30,6 +30,9 @@ PORT
 	VGA_B      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_G      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_R      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
+	interlace_enable : in std_logic;
+	interlace_field : out std_logic;
+	interlace : out std_logic;
 
 	HBLANK     : OUT STD_LOGIC;
 	VBLANK     : OUT STD_LOGIC;
@@ -315,10 +318,6 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	-- internal_ram => 65536
-	-- internal_ram => 131072
-	-- internal_ram => 327680
-	-- internal_ram => 393216 -- Max doable at the moment, 128K short for 512K
 	internal_ram => 0
 )
 PORT MAP
@@ -334,6 +333,9 @@ PORT MAP
 	VIDEO_B => VGA_B,
 	VIDEO_G => VGA_G,
 	VIDEO_R => VGA_R,
+	interlace_enable => interlace_enable,
+	interlace => interlace,
+	interlace_field => interlace_field,
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,

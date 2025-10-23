@@ -44,6 +44,10 @@ ENTITY atari800core IS
 		VIDEO_ODD_LINE : out std_logic;
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
+		interlace_field : out std_logic;
+		interlace : out std_logic;
+		interlace_enable : in std_logic;
+
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
@@ -256,8 +260,6 @@ SIGNAL	GTIA_WRITE_ENABLE :  STD_LOGIC;
 
 signal COLOUR : std_logic_vector(7 downto 0);
 
-signal VSYNC : std_logic;
-signal HSYNC : std_logic;
 signal GTIA_VSYNC : std_logic;
 signal GTIA_HIGHRES_OUT : std_logic;
 signal GTIA_HIGHRES_IN : std_logic;
@@ -275,7 +277,6 @@ signal GTIA_PF2_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF3_OUT : std_logic_vector(7 downto 0);
 signal GTIA_XCOLOR : std_logic;
 signal GTIA_PALETTE : std_logic_vector(1 downto 0);
-signal GTIA_START_OF_FIELD : std_logic;
 
 -- GTIA PALETTE
 signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
@@ -734,8 +735,6 @@ PORT MAP(CLK => CLK,
 		 keyboard_scan => KEYBOARD_SCAN);
 
 CONSOL_IN <= '1'&CONSOL_OPTION&CONSOL_SELECT&CONSOL_START;
-VIDEO_VS <= VSYNC;
-VIDEO_HS <= HSYNC;
 
 		 	 
 gtia1 : entity work.gtia
@@ -781,21 +780,23 @@ PORT MAP(CLK => CLK,
 		 AN => ANTIC_AN,
 		 CPU_DATA_IN => WRITE_DATA(7 DOWNTO 0),
 		 MEMORY_DATA_IN => MEMORY_DATA(7 DOWNTO 0),
-		 VSYNC => VSYNC,
-		 HSYNC => HSYNC,
+		 VSYNC => VIDEO_VS,
+		 HSYNC => VIDEO_HS,
 		 CSYNC => VIDEO_CS,
 		 BLANK => VIDEO_BLANK,
 		 HBLANK => open,
 		 VBLANK => open,
+		 interlace_enable => interlace_enable,
+		 interlace => interlace,
+		 interlace_field => interlace_field,
 		 BURST => VIDEO_BURST,
-		 START_OF_FIELD => GTIA_START_OF_FIELD,
+		 START_OF_FIELD => VIDEO_START_OF_FIELD,
 		 ODD_LINE => VIDEO_ODD_LINE,
 		 COLOUR_out => COLOUR,
 		 DATA_OUT => GTIA_DO);
 
 -- Both negated and non-negated works, but technically it should be negated (or?)
 GTIA_SOUND <= not(CONSOL_OUT(3));
-VIDEO_START_OF_FIELD <= GTIA_START_OF_FIELD;
 
 	-- colour palette
 

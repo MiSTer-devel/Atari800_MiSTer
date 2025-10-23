@@ -39,24 +39,24 @@ PORT
 	XCOLOR : in std_logic := '0';
 	COLOUR_CLOCK_VBXE : in std_logic := '0';
 	GTIA_HIGHRES_OUT : out std_logic;
-	GTIA_HIGHRES_IN : in std_logic;
+	GTIA_HIGHRES_IN : in std_logic := '0';
 	GTIA_ACTIVE_HR_OUT : out std_logic_vector(1 downto 0);
-	GTIA_ACTIVE_HR_IN : in std_logic_vector(1 downto 0);
+	GTIA_ACTIVE_HR_IN : in std_logic_vector(1 downto 0) := "00";
 	GTIA_PRIOR : out std_logic_vector(7 downto 0);
 	GTIA_PRIOR_RAW : out std_logic_vector(7 downto 0);
-	gtia_vsync : out std_logic; -- TODO might not be needed
+	gtia_vsync : out std_logic;
 	hpos_out : out std_logic_vector(7 downto 0);
 	GTIA_PF0_OUT : out std_logic_vector(7 downto 0);
 	GTIA_PF1_OUT : out std_logic_vector(7 downto 0);
 	GTIA_PF2_OUT : out std_logic_vector(7 downto 0);
 	GTIA_PF3_OUT : out std_logic_vector(7 downto 0);
-	GTIA_PF0_IN : in std_logic_vector(7 downto 0);
-	GTIA_PF1_IN : in std_logic_vector(7 downto 0);
-	GTIA_PF2_IN : in std_logic_vector(7 downto 0);
-	VBXE_PF_PALETTE : in std_logic_vector(1 downto 0);
-	VBXE_OV_PALETTE : in std_logic_vector(1 downto 0);
-	VBXE_OV_PIXEL : in std_logic_vector(7 downto 0);
-	VBXE_OV_PIXEL_ACTIVE : in std_logic;
+	GTIA_PF0_IN : in std_logic_vector(7 downto 0) := (others => '0');
+	GTIA_PF1_IN : in std_logic_vector(7 downto 0) := (others => '0');
+	GTIA_PF2_IN : in std_logic_vector(7 downto 0) := (others => '0');
+	VBXE_PF_PALETTE : in std_logic_vector(1 downto 0) := "00";
+	VBXE_OV_PALETTE : in std_logic_vector(1 downto 0) := "00";
+	VBXE_OV_PIXEL : in std_logic_vector(7 downto 0) := (others => '0');
+	VBXE_OV_PIXEL_ACTIVE : in std_logic := '0';
 
 	-- keyboard interface
 	CONSOL_IN : IN STD_LOGIC_VECTOR(3 downto 0);
@@ -79,6 +79,11 @@ PORT
 	BURST : out std_logic;
 	START_OF_FIELD : out std_logic;
 	ODD_LINE : out std_logic;
+
+	-- For the interlace hack
+	interlace_field : out std_logic;
+	interlace : out std_logic;
+	interlace_enable : in std_logic := '0';
 
 	-- special for MISTER!
 	HBLANK : out std_logic;
@@ -425,6 +430,8 @@ ARCHITECTURE vhdl OF gtia IS
 	
 	signal vsync_next : std_logic;
 	signal vsync_reg : std_logic;
+	signal vsync_half_next : std_logic;
+	signal vsync_half_reg : std_logic;
 
 	signal hsync_next : std_logic;
 	signal hsync_reg : std_logic;
@@ -531,6 +538,21 @@ ARCHITECTURE vhdl OF gtia IS
 	signal GTIA_PF0 : std_logic_vector(7 downto 0);
 	signal GTIA_PF1 : std_logic_vector(7 downto 0);
 	signal GTIA_PF2 : std_logic_vector(7 downto 0);
+	signal GTIA_ACTIVE_HR : std_logic_vector(1 downto 0);
+	signal GTIA_HIGHRES : std_logic;
+
+	signal vsync_line_count_reg : integer range 0 to 32;
+	signal vsync_line_count_next : integer range 0 to 32;
+
+	signal vsync_line_count_prev_reg : integer range 0 to 32;
+	signal vsync_line_count_prev_next : integer range 0 to 32;
+
+	signal interlace_reg : std_logic;
+	signal interlace_next : std_logic;
+
+	signal field_reg : std_logic;
+	signal field_next : std_logic;
+
 begin
 	-- register
 	process(clk,reset_n)
@@ -589,6 +611,7 @@ begin
 			
 			csync_reg <= '0';
 			vsync_reg <= '0';
+			vsync_half_reg <= '0';
 			hsync_reg <= '0';
 			burst_reg <= '0';
 			hblank_reg <= '0';
@@ -664,6 +687,12 @@ begin
 			set_p1_prev <= '0';
 			set_p2_prev <= '0';
 			set_p3_prev <= '0';
+
+			field_reg <= '0';
+			interlace_reg <= '0';
+			vsync_line_count_reg <= 0;
+			vsync_line_count_prev_reg <= 0;
+
 		elsif (clk'event and clk='1') then
 			hposp0_raw_reg <= hposp0_raw_next;
 			hposp1_raw_reg <= hposp1_raw_next;
@@ -718,6 +747,7 @@ begin
 			
 			csync_reg <= csync_next;
 			vsync_reg <= vsync_next;
+			vsync_half_reg <= vsync_half_next;
 			hsync_reg <= hsync_next;
 			burst_reg <= burst_next;
 			hblank_reg <= hblank_next;
@@ -793,6 +823,11 @@ begin
 			set_p1_prev <= set_p1_prev_next;
 			set_p2_prev <= set_p2_prev_next;
 			set_p3_prev <= set_p3_prev_next;
+
+			field_reg <= field_next;
+			interlace_reg <= interlace_next;
+			vsync_line_count_reg <= vsync_line_count_next;
+			vsync_line_count_prev_reg <= vsync_line_count_prev_next;
 
 		end if;
 	end process;
@@ -1096,17 +1131,22 @@ begin
 		end if;		
 	end process;
 	
-	-- generate hsync and csync
-	process(hpos_reg, hsync_reg, hsync_end, csync_reg, csync_end, burst_reg, burst_end, vsync_reg, vsync_next)
+	-- generate hsync and csync, and also vsync_half
+	process(hpos_reg, hsync_reg, hsync_end, csync_reg, csync_end, burst_reg, burst_end, vsync_reg, vsync_next, vsync_half_reg)
 	begin
 		hsync_start <= '0';
 		hsync_next <= hsync_reg;
+		vsync_half_next <= vsync_half_reg;
 
 		csync_start <= '0';
 		csync_next <= csync_reg;	
 	
 		burst_start <= '0';
 		burst_next <= burst_reg;
+
+		if (unsigned(hpos_reg) = X"6A") then
+			vsync_half_next <= vsync_reg;
+		end if;
 
 		if (unsigned(hpos_reg) = X"D4") then
 			csync_start <= vsync_reg;
@@ -1264,7 +1304,7 @@ begin
 		port map(clk=>clk, colour_enable=>colour_clock, prior=>prior_delayed_reg,p0=>active_pm0_live,p1=>active_pm1_live,p2=>active_pm2_live,p3=>active_pm3_live,pf0=>active_pf0_live,pf1=>active_pf1_live,pf2=>active_pf2_live,pf3=>active_pf3_live,bk=>active_bk_live,p0_out=>set_p0,p1_out=>set_p1,p2_out=>set_p2,p3_out=>set_p3,pf0_out=>set_pf0,pf1_out=>set_pf1,pf2_out=>set_pf2,pf3_out=>set_pf3,bk_out=>set_bk);	
 
 	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg, colour_clock, COLOUR_REG, 
-		highres_reg,gtia_active_hr_in,gtia_highres_in,active_hr_prev,active_bk_valid_prev,active_bk_modify_prev,colour_saved_reg,ov_palette_reg,pf_palette_reg,
+		highres_reg,gtia_active_hr,gtia_highres,active_hr_prev,active_bk_valid_prev,active_bk_modify_prev,colour_saved_reg,ov_palette_reg,pf_palette_reg,
 		set_bk_prev,set_pf0_prev,set_pf1_prev,set_pf2_prev,set_pf3_prev,set_p0_prev,set_p1_prev,set_p2_prev,set_p3_prev,
 		colour_clock_highres,colour_clock_vbxe,vbxe_pf_palette,vbxe_ov_palette,vbxe_ov_pixel,vbxe_ov_pixel_active,xcolor,gtia_pf0,gtia_pf1,gtia_pf2,
 		palette_reg, visible_live, invisible_clip, active_bk_modify_next, active_bk_valid_next, gractl_reg, gtia_prior_reg)
@@ -1322,7 +1362,7 @@ begin
 					(colpm2_delayed_reg(7 downto 1)&(xcolor and colpm2_delayed_reg(0)) and (set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2& set_p2)) or
 					(colpm3_delayed_reg(7 downto 1)&(xcolor and colpm3_delayed_reg(0)) and (set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3& set_p3))
 					);
-				active_hr_prev_next <= gtia_active_hr_in;
+				active_hr_prev_next <= gtia_active_hr;
 				active_bk_modify_prev_next <= active_bk_modify_next;
 				active_bk_valid_prev_next <= active_bk_valid_next;
 				set_bk_prev_next <= set_bk;
@@ -1362,7 +1402,7 @@ begin
 
 			-- finally high-res mode overrides the luma
 			ignore_bk_check := false;
-			if gtia_highres_in = '1' then
+			if gtia_highres = '1' then
 				if highres_reg = '0' then
 					colour_next <= GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0));
 					colour_saved_next <= GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0));
@@ -1370,7 +1410,7 @@ begin
 					ignore_bk_check := true;
 				end if;
 				if colour_clock = '1' then
-					if (gtia_active_hr_in(1) = '1') and (set_bk = '0' or ignore_bk_check) then
+					if (gtia_active_hr(1) = '1') and (set_bk = '0' or ignore_bk_check) then
 						colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
 						colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
 						if (xcolor or gractl_reg(4)) = '1' then
@@ -1989,11 +2029,42 @@ begin
 		end if;
 		
 	end process;
-	
+
+	process (hpos_reg, colour_clock, vsync_reg, vsync_next, vsync_line_count_prev_reg, vsync_line_count_reg, field_reg, interlace_reg)
+	begin
+		interlace_next <= interlace_reg;
+		field_next <= field_reg;
+		vsync_line_count_prev_next <= vsync_line_count_prev_reg;
+		vsync_line_count_next <= vsync_line_count_reg;
+
+		-- vsync start
+		if (vsync_reg = '0') and (vsync_next = '1') then
+			if vsync_line_count_reg /= vsync_line_count_prev_reg then
+				interlace_next <= '1';
+				-- field_next <= not(field_reg);
+				if vsync_line_count_reg > vsync_line_count_prev_reg then
+					field_next <= '1';
+				else
+					field_next <= '0';
+				end if;
+			else
+				interlace_next <= '0';
+			end if;
+			vsync_line_count_next <= 0;
+			vsync_line_count_prev_next <= vsync_line_count_reg;
+		end if;
+
+		-- line tick on vsync
+		if (vsync_reg = '1') and (hpos_reg = x"00") and (colour_clock = '1') then
+			vsync_line_count_next <= vsync_line_count_reg + 1;
+		end if;
+
+	end process;
+
 	-- output	
 	colour_out <= colour_reg;
 	
-	vsync<=vsync_reg;
+	vsync<=vsync_reg when (interlace_enable = '0') or (interlace_reg = '0') or (field_reg = '1') else vsync_half_reg;
 	hsync<=hsync_reg;
 	csync<=csync_reg xor vsync_reg;
 	blank<=hblank_reg or vsync_reg;
@@ -2014,10 +2085,14 @@ begin
 	PALETTE_out <= palette_reg;
 	gtia_vsync <= vsync_reg and not(vsync_next);
 	hpos_out <= hpos_reg;
+	interlace <= interlace_enable and interlace_reg;
+	interlace_field <= interlace_enable and field_reg;
 
-	GTIA_PF0 <= GTIA_PF0_IN;
-	GTIA_PF1 <= GTIA_PF1_IN;
-	GTIA_PF2 <= GTIA_PF2_IN;
+	GTIA_PF0 <= GTIA_PF0_IN when VBXE_SWITCH='1' else colpf0_delayed_reg;
+	GTIA_PF1 <= GTIA_PF1_IN when VBXE_SWITCH='1' else colpf1_delayed_reg;
+	GTIA_PF2 <= GTIA_PF2_IN when VBXE_SWITCH='1' else colpf2_delayed_reg;
+	GTIA_HIGHRES <= GTIA_HIGHRES_IN when VBXE_SWITCH='1' else highres_reg;
+	GTIA_ACTIVE_HR <= GTIA_ACTIVE_HR_IN when VBXE_SWITCH='1' else active_hr_reg;
 
 	-- special for MISTER
 	hblank<=hblank_reg;

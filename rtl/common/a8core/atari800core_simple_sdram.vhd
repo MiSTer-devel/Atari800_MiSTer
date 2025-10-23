@@ -61,6 +61,9 @@ ENTITY atari800core_simple_sdram is
 		VIDEO_BURST : out std_logic;
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
+		interlace_field : out std_logic;
+		interlace : out std_logic;
+		interlace_enable : in std_logic;
 
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
@@ -442,6 +445,9 @@ PORT MAP
 	VIDEO_BURST => VIDEO_BURST,
 	VIDEO_START_OF_FIELD => VIDEO_START_OF_FIELD,
 	VIDEO_ODD_LINE => VIDEO_ODD_LINE,
+	interlace_enable => interlace_enable,
+	interlace => interlace,
+	interlace_field => interlace_field,
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,

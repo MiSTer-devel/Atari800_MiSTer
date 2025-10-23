@@ -189,7 +189,7 @@ assign VGA_SCALER= 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
-assign HDMI_BOB_DEINT = 0;
+assign HDMI_BOB_DEINT = status[62] & interlace;
 
 wire [1:0] ar       = status[23:22];
 wire       vcrop_en = status[24];
@@ -220,7 +220,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -274,7 +274,9 @@ localparam CONF_STR = {
 	"P3-;",
 	"P3O5,Video mode,PAL,NTSC;",
 	"P3o1,Hi-Res ANTIC,Disabled,Enabled;",
-	"P3oRS,VBXE,Disabled,0xD640,0xD740;",
+	"P3oTU,Interlace hack,Disabled,Enabled,DeBOB;",
+	"P3-;",
+	"P3oRS,VBXE,Disabled,$D640,$D740;",
 	"P3FC2,ACT,VBXE Palette;",
 	"P3-;",
 	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
@@ -533,6 +535,9 @@ atari800top atari800top
 	.VGA_G(Go),
 	.VGA_R(Ro),
 	.VGA_PIXCE(ce_pix_raw),
+	.interlace_enable(status[62] | status[61]),
+	.interlace(interlace),
+	.interlace_field(interlace_field),
 	.HBLANK(HBlank_o),
 	.VBLANK(VBlank_o),
 
@@ -620,8 +625,11 @@ sdramclk_ddr
 	.sset(1'b0)
 ); 
 
-assign VGA_F1 = 0;
-assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
+wire interlace;
+wire interlace_field;
+
+assign VGA_F1 = interlace & interlace_field;
+assign VGA_SL = (scale ? scale[1:0] - 1'd1 : 2'd0)&{~interlace,~interlace};
 
 wire [2:0] scale = status[19:17];
 
@@ -669,7 +677,7 @@ articolor articolor
 video_mixer #(.GAMMA(1)) video_mixer
 (
 	.*,
-	.scandoubler(scale || forced_scandoubler),
+	.scandoubler(~interlace && (scale || forced_scandoubler)),
 	.hq2x(scale==1),
 	.freeze_sync(),
 	.VGA_DE(vga_de)
