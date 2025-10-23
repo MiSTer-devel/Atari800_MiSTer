@@ -85,24 +85,9 @@ PORT
 	DATA_IN : IN STD_LOGIC;
 	ENABLE : IN STD_LOGIC;
 	RESET_N : IN STD_LOGIC;
-
 	DATA_OUT : OUT STD_LOGIC
 );
 end component;	
-
-component wide_delay_line is
-generic(COUNT : natural := 1; WIDTH : natural := 1);
-PORT
-(
-	CLK : IN STD_LOGIC;
-	SYNC_RESET : IN STD_LOGIC;
-	DATA_IN : IN STD_LOGIC_VECTOR(WIDTH-1 downto 0);
-	ENABLE : IN STD_LOGIC;
-	RESET_N : IN STD_LOGIC;
-	
-	DATA_OUT : OUT STD_LOGIC_VECTOR(WIDTH-1 downto 0)
-);
-end component;
 
 signal vram_addr : std_logic_vector(18 downto 0);
 signal vram_addr_reg : std_logic_vector(18 downto 0);
@@ -183,8 +168,7 @@ signal blitter_addr_next : std_logic_vector(18 downto 0);
 signal blitter_status : std_logic_vector(1 downto 0);
 signal blitter_collision : std_logic_vector(7 downto 0);
 signal blitter_enable : std_logic;
---signal blitter_request_reg : std_logic_vector(1 downto 0);
-signal blitter_request_next : std_logic_vector(1 downto 0);
+signal blitter_request : std_logic_vector(1 downto 0);
 signal blitter_vram_wren : std_logic;
 signal blitter_vram_data : std_logic_vector(7 downto 0);
 signal blitter_vram_data_in_reg : std_logic_vector(7 downto 0);
@@ -520,8 +504,8 @@ port map (
 	reset_n => reset_n,
 	soft_reset => soft_reset,
 	blitter_enable => blitter_enable,
-	blitter_start_request => blitter_request_next(0),
-	blitter_stop_request => blitter_request_next(1),
+	blitter_start_request => blitter_request(0),
+	blitter_stop_request => blitter_request(1),
 	blitter_address => blitter_addr_reg,
 	blitter_vram_data_in => blitter_vram_data_in_next,
 	blitter_vram_wren => blitter_vram_wren,
@@ -746,7 +730,7 @@ begin
 		mems_next <= mems_reg;
 		memb_next <= memb_reg;
 		blitter_addr_next <= blitter_addr_reg;
-		blitter_request_next <= "00";
+		blitter_request <= "00";
 		blitter_irqen_next <= blitter_irqen_reg;
 		blitter_irqc <= '0';
 		xdl_enabled_next <= xdl_enabled_reg;
@@ -800,8 +784,8 @@ begin
 				when "10010" => -- $52 bl_adr2
 					blitter_addr_next(18 downto 16) <= data_in(2 downto 0);
 				when "10011" => -- $53 blitter_start
-					blitter_request_next(0) <= not(blitter_status(0) or blitter_status(1)) and data_in(0);
-					blitter_request_next(1) <= not(data_in(0));
+					blitter_request(0) <= not(blitter_status(0) or blitter_status(1)) and data_in(0);
+					blitter_request(1) <= not(data_in(0));
 				when "10100" => -- $54 irq_control
 					blitter_irqen_next <= data_in(0);
 					blitter_irqc <= '1';
@@ -837,7 +821,7 @@ begin
 			mems_next(7) <= '0';
 			memb_next(7 downto 6) <= "00";
 			blitter_irqen_next <= '0';
-			blitter_request_next <= "00";
+			blitter_request <= "00";
 			colclear <= '1';
 			colmask_next <= (others => '0');
 		end if;
