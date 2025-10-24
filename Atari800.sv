@@ -190,6 +190,7 @@ assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
 assign HDMI_BOB_DEINT = status[62] & interlace;
+//assign HDMI_BOB_DEINT = 0;
 
 wire [1:0] ar       = status[23:22];
 wire       vcrop_en = status[24];
@@ -274,7 +275,7 @@ localparam CONF_STR = {
 	"P3-;",
 	"P3O5,Video mode,PAL,NTSC;",
 	"P3o1,Hi-Res ANTIC,Disabled,Enabled;",
-	"P3oTU,Interlace hack,Disabled,Enabled,DeBOB;",
+	"P3oTU,Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
 	"P3oRS,VBXE,Disabled,$D640,$D740;",
 	"P3FC2,ACT,VBXE Palette;",

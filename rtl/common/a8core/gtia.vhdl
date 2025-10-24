@@ -57,6 +57,7 @@ PORT
 	VBXE_OV_PALETTE : in std_logic_vector(1 downto 0) := "00";
 	VBXE_OV_PIXEL : in std_logic_vector(7 downto 0) := (others => '0');
 	VBXE_OV_PIXEL_ACTIVE : in std_logic := '0';
+	ANTIC_DMA_ENABLED : in std_logic := '0';
 
 	-- keyboard interface
 	CONSOL_IN : IN STD_LOGIC_VECTOR(3 downto 0);
@@ -541,14 +542,13 @@ ARCHITECTURE vhdl OF gtia IS
 	signal GTIA_ACTIVE_HR : std_logic_vector(1 downto 0);
 	signal GTIA_HIGHRES : std_logic;
 
-	signal vsync_line_count_reg : integer range 0 to 32;
-	signal vsync_line_count_next : integer range 0 to 32;
-
-	signal vsync_line_count_prev_reg : integer range 0 to 32;
-	signal vsync_line_count_prev_next : integer range 0 to 32;
+	signal interlace_switch_count_reg : integer range 0 to 15;
+	signal interlace_switch_count_next : integer range 0 to 15;
 
 	signal interlace_reg : std_logic;
 	signal interlace_next : std_logic;
+	signal interlace_pending_reg : std_logic;
+	signal interlace_pending_next : std_logic;
 
 	signal field_reg : std_logic;
 	signal field_next : std_logic;
@@ -690,8 +690,8 @@ begin
 
 			field_reg <= '0';
 			interlace_reg <= '0';
-			vsync_line_count_reg <= 0;
-			vsync_line_count_prev_reg <= 0;
+			interlace_pending_reg <= '0';
+			interlace_switch_count_reg <= 0;
 
 		elsif (clk'event and clk='1') then
 			hposp0_raw_reg <= hposp0_raw_next;
@@ -826,8 +826,8 @@ begin
 
 			field_reg <= field_next;
 			interlace_reg <= interlace_next;
-			vsync_line_count_reg <= vsync_line_count_next;
-			vsync_line_count_prev_reg <= vsync_line_count_prev_next;
+			interlace_pending_reg <= interlace_pending_next;
+			interlace_switch_count_reg <= interlace_switch_count_next;
 
 		end if;
 	end process;
@@ -2030,33 +2030,34 @@ begin
 		
 	end process;
 
-	process (hpos_reg, colour_clock, vsync_reg, vsync_next, vsync_line_count_prev_reg, vsync_line_count_reg, field_reg, interlace_reg)
+	process (highres_reg, colour_clock, vsync_reg, vsync_next, interlace_switch_count_reg, field_reg, interlace_reg, interlace_pending_reg, ANTIC_DMA_ENABLED)
 	begin
 		interlace_next <= interlace_reg;
+		interlace_pending_next <= interlace_pending_reg;
 		field_next <= field_reg;
-		vsync_line_count_prev_next <= vsync_line_count_prev_reg;
-		vsync_line_count_next <= vsync_line_count_reg;
+		interlace_switch_count_next <= interlace_switch_count_reg;
+
+		-- vsync end
+		if (vsync_reg = '1') and (vsync_next = '0') and (ANTIC_DMA_ENABLED = '1') then
+			if (interlace_reg /= highres_reg) or (interlace_reg /= interlace_pending_reg) then
+				if (highres_reg xor interlace_pending_reg) = '1' then
+					interlace_switch_count_next <= 0;
+					interlace_pending_next <= highres_reg;
+				else
+					interlace_switch_count_next <= interlace_switch_count_reg + 1;
+				end if;
+				if interlace_switch_count_reg = 8 then
+					interlace_next <= interlace_pending_reg;
+					if (interlace_pending_reg ='1') and (interlace_reg = '0') then
+						field_next <= '1';
+					end if;
+				end if;
+			end if;
+		end if;
 
 		-- vsync start
 		if (vsync_reg = '0') and (vsync_next = '1') then
-			if vsync_line_count_reg /= vsync_line_count_prev_reg then
-				interlace_next <= '1';
-				-- field_next <= not(field_reg);
-				if vsync_line_count_reg > vsync_line_count_prev_reg then
-					field_next <= '1';
-				else
-					field_next <= '0';
-				end if;
-			else
-				interlace_next <= '0';
-			end if;
-			vsync_line_count_next <= 0;
-			vsync_line_count_prev_next <= vsync_line_count_reg;
-		end if;
-
-		-- line tick on vsync
-		if (vsync_reg = '1') and (hpos_reg = x"00") and (colour_clock = '1') then
-			vsync_line_count_next <= vsync_line_count_reg + 1;
+			field_next <= not(field_reg);
 		end if;
 
 	end process;

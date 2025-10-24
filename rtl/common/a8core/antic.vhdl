@@ -72,7 +72,9 @@ PORT
 	shift_out : out std_logic_vector(7 downto 0);
 	dma_clock_out : out std_logic_vector(3 downto 0);
 	hcount_out : out std_logic_vector(7 downto 0);
-	vcount_out : out std_logic_vector(8 downto 0)
+	vcount_out : out std_logic_vector(8 downto 0);
+
+	ANTIC_DMA_ENABLED : out std_logic
 );
 END antic;
 
@@ -1868,6 +1870,7 @@ BEGIN
 	COLOUR_CLOCK_OUT <= colour_clock_selected;
 	HIGHRES_COLOUR_CLOCK_OUT <= colour_clock_selected_highres;
 	VBXE_COLOUR_CLOCK_OUT <= colour_clock_4x;
+	ANTIC_DMA_ENABLED <= playfield_dma_enabled;
 
 	vcount_out <= vcount_reg;
 	hcount_out <= hcount_reg(9 downto 2);
