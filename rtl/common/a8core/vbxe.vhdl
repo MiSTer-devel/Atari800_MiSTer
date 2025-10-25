@@ -1491,10 +1491,11 @@ begin
 	end case;
 
 	if (vsync = '1') then
-		-- Account for the PAL/NTSC bug in the original implementation
 		if pal = '1' then
 			xdl_vdelay_next <= 42;
 		else
+			-- Account for the PAL/NTSC bug in the original implementation
+			-- This is purposely 1 scanline too low 
 			xdl_vdelay_next <= 13;
 		end if;
 		xdl_active_next <= xdl_enabled_reg;

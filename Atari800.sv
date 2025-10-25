@@ -190,7 +190,6 @@ assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
 assign HDMI_BOB_DEINT = status[62] & interlace;
-//assign HDMI_BOB_DEINT = 0;
 
 wire [1:0] ar       = status[23:22];
 wire       vcrop_en = status[24];
