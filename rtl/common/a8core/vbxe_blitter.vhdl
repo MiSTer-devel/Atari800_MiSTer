@@ -501,17 +501,17 @@ begin
 								end if;
 							end if;
 						else
-							if (blitter_pattern_reg = '1') and (blitter_pattern_current_reg = 0) then
-								blitter_src_current_next <= blitter_src_address_reg;
-								blitter_pattern_current_next <= blitter_pattern_count_reg;
-							else
-								blitter_src_current_next <= blitter_src_current_reg + blitter_src_step_x_reg;
-								if (blitter_pattern_reg = '1') then
-									blitter_pattern_current_next <= blitter_pattern_current_reg - 1;
-								end if;
-							end if;
 							blitter_dest_current_next <= blitter_dest_current_reg + blitter_dest_step_x_reg;
 							if blitter_rep_x_reg = 0 then
+								if (blitter_pattern_reg = '1') and (blitter_pattern_current_reg = 0) then
+									blitter_src_current_next <= blitter_src_address_reg;
+									blitter_pattern_current_next <= blitter_pattern_count_reg;
+								else
+									blitter_src_current_next <= blitter_src_current_reg + blitter_src_step_x_reg;
+									if (blitter_pattern_reg = '1') then
+										blitter_pattern_current_next <= blitter_pattern_current_reg - 1;
+									end if;
+								end if;
 								blitter_rep_x_next <= blitter_zoom_x_reg;
 								blitter_x_next <= blitter_x_reg - 1;
 								-- Can skip the read cycle if the and mask is 00
