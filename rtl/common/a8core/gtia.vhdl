@@ -1139,12 +1139,13 @@ begin
 		vsync_half_next <= vsync_half_reg;
 
 		csync_start <= '0';
-		csync_next <= csync_reg;	
+		csync_next <= csync_reg;
 	
 		burst_start <= '0';
 		burst_next <= burst_reg;
 
-		if (unsigned(hpos_reg) = X"6A") then
+		-- 6E probably the exact half scanline away from "regular" vsync
+		if (unsigned(hpos_reg) = X"6E") then
 			vsync_half_next <= vsync_reg;
 		end if;
 
@@ -2066,6 +2067,7 @@ begin
 	colour_out <= colour_reg;
 	
 	vsync<=vsync_reg when (interlace_enable = '0') or (interlace_reg = '0') or (field_reg = '1') else vsync_half_reg;
+--	vsync<=vsync_reg;
 	hsync<=hsync_reg;
 	csync<=csync_reg xor vsync_reg;
 	blank<=hblank_reg or vsync_reg;
