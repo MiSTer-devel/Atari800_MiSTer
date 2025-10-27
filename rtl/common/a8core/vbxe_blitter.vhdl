@@ -1,3 +1,21 @@
+--------------------------------------------------------------------------
+-- (c) 2025 Wojciech Mostowski, firstname.lastname at gmail.com
+--
+-- The VBXE blitter.
+--
+-- This VBXE implementation is a recreation of the original design
+-- from the publicly available documents - the VBXE programmer's manual
+-- by Tomasz Piórek and the Altirra Hardware Reference Manual by
+-- Avery Lee. The original VBXE core and Atari board was designed and
+-- implemented by Tomasz Piórek and Agnieszka Bartkowicz back starting
+-- in 2008. All efforts have been made to keep this as compatible as
+-- possible with the original, but there are surely small inaccuracies,
+-- bugs, and for sure this implementation is not cycle exact with the
+-- original. I am happy for this to be reused in any way suitable by
+-- anyone as long as (a) I am informed by email about it, (b) no interests
+-- or rights of the original authors of VBXE are violated.
+--------------------------------------------------------------------------
+
 library IEEE;
 
 use IEEE.STD_LOGIC_1164.ALL;

@@ -4,7 +4,12 @@
 -- If my vhdl files are used commercially or otherwise sold,
 -- please contact me for explicit permission at scrameta (gmail).
 -- This applies for source and binary form and derived works.
+--
+-- This current version includes modifications for the VBXE which take
+-- this module a bit away from the original design, mostly in the colour
+-- register setting process.
 ---------------------------------------------------------------------------
+
 LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
