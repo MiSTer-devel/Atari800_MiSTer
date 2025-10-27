@@ -2047,18 +2047,18 @@ begin
 				else
 					interlace_switch_count_next <= interlace_switch_count_reg + 1;
 				end if;
-				if interlace_switch_count_reg = 8 then
-					interlace_next <= interlace_pending_reg;
-					if (interlace_pending_reg ='1') and (interlace_reg = '0') then
-						field_next <= '1';
-					end if;
-				end if;
 			end if;
 		end if;
 
 		-- vsync start
 		if (vsync_reg = '0') and (vsync_next = '1') then
 			field_next <= not(field_reg);
+			if interlace_switch_count_reg = 8 then
+				interlace_next <= interlace_pending_reg;
+				if (interlace_pending_reg ='1') and (interlace_reg = '0') then
+					field_next <= '1';
+				end if;
+			end if;
 		end if;
 
 	end process;
@@ -2067,7 +2067,6 @@ begin
 	colour_out <= colour_reg;
 	
 	vsync<=vsync_reg when (interlace_enable = '0') or (interlace_reg = '0') or (field_reg = '1') else vsync_half_reg;
---	vsync<=vsync_reg;
 	hsync<=hsync_reg;
 	csync<=csync_reg xor vsync_reg;
 	blank<=hblank_reg or vsync_reg;

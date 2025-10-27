@@ -220,7 +220,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -277,6 +277,7 @@ localparam CONF_STR = {
 	"P3oTU,Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
 	"P3oRS,VBXE,Disabled,$D640,$D740;",
+	"P3oV,Fix VBXE NTSC bug,Disabled,Enabled;",
 	"P3FC2,ACT,VBXE Palette;",
 	"P3-;",
 	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
@@ -555,7 +556,7 @@ atari800top atari800top
 	.WARM_RESET_MENU(status[39]),
 	.COLD_RESET_MENU(status[40] | load_reset),
 	.RTC(rtc),
-	.VBXE_MODE(status[60:59]),
+	.VBXE_MODE({status[63],status[60],status[59]}),
 	.VBXE_PALETTE_RGB(vbxe_palette_rgb_out),
 	.VBXE_PALETTE_INDEX(vbxe_palette_index),
 	.VBXE_PALETTE_COLOR(vbxe_palette_color),

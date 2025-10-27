@@ -11,6 +11,7 @@ generic (
 port (
 	clk : in std_logic;
 	enable : in std_logic;
+	ntsc_fix : in std_logic := '0';
 	soft_reset : in std_logic;
 	enable_179 : in std_logic; -- Original Atari speed (based on Antic enable, always active)
 	reset_n : in std_logic;
@@ -1493,9 +1494,11 @@ begin
 	if (vsync = '1') then
 		if pal = '1' then
 			xdl_vdelay_next <= 42;
+		elsif ntsc_fix = '1' then
+			xdl_vdelay_next <= 12;
 		else
 			-- Account for the PAL/NTSC bug in the original implementation
-			-- This is purposely 1 scanline too low 
+			-- This is purposely 1 scanline too low
 			xdl_vdelay_next <= 13;
 		end if;
 		xdl_active_next <= xdl_enabled_reg;
