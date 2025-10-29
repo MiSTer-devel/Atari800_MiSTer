@@ -2071,7 +2071,7 @@ begin
 	-- output	
 	colour_out <= colour_reg;
 	
-	vsync<=vsync_reg when (interlace_enable = '0') or (interlace_reg = '0') or (field_reg = '1') else vsync_half_reg;
+	vsync<=vsync_half_reg when (interlace_enable = '1') and (interlace_reg = '1') else vsync_reg;
 	hsync<=hsync_reg;
 	csync<=csync_reg xor vsync_reg;
 	blank<=hblank_reg or vsync_reg;

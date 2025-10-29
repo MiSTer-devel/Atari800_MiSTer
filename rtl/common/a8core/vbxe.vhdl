@@ -1194,7 +1194,7 @@ process(clock_shift_reg,
 	xdl_map_read_reg, xdl_map_fetch_reg, xdl_map_fetch_init_reg, xdl_map_read_count_reg, xdl_map_buffer_data_in_reg, xdl_vdelay_reg,
 	xdl_ov_vcount_reg, xdl_ov_fetch_reg, xdl_ov_fetch_init_reg, xdl_ov_hi_reg, xdl_ov_lo_reg, xdl_pixels_reg,
 	xdl_ptrans_reg, xdl_pixel_buffer_windex_reg, xdl_char_attr_reg, xdl_char_code_reg, no_trans_reg, xdl_vcount_reg, xdl_ov_tlive_reg, vsync, pal,
-	xdl_enabled_reg, xdl_field_end2, xdl_addr_reg)
+	xdl_enabled_reg, xdl_field_end2, xdl_addr_reg, ntsc_fix)
 
 variable blitter_notify : boolean := false;
 variable xdl_or_blitter_notify : boolean := false;
