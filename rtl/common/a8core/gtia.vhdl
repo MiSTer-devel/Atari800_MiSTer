@@ -1127,7 +1127,7 @@ begin
 	begin		
 		invisible_clip <= '0';
 		
-		if (unsigned(hpos_reg) <= to_unsigned(44,8)) then
+		if (unsigned(hpos_reg) <= to_unsigned(45,8)) then
 			invisible_clip <= clip_sides;
 		end if;
 		
