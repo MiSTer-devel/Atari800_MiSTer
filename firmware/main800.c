@@ -636,15 +636,16 @@ xex_eof:
 			pbi_ram_base[3] = get_splashpbi();
 			memcp8(pbi_drives_config, &pbi_ram_base[0x0C], 0, 4);
 			unsigned char boot_drv = get_bootpbi();
+			pbi_ram_base[0x0A] = 0x00;
 			pbi_ram_base[0x0B] = boot_drv;
 			if(boot_drv == 1 && drive_infos[MAX_DRIVES].file)
 			{
 				// APT
-				*((volatile unsigned char *)(atari_regbase+0x0301)) = drive_infos[MAX_DRIVES].info & 0xF;
+				pbi_ram_base[0x0A] = drive_infos[MAX_DRIVES].info & 0xF;
 			}
 			else if(boot_drv)
 			{
-				*((volatile unsigned char *)(atari_regbase+0x0301)) = (boot_drv-1);
+				pbi_ram_base[0x0A] = (boot_drv-1);
 			}
 			pbi_ram_base[2] = 0;
 		}
