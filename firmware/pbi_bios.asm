@@ -4,6 +4,7 @@
 #define VER_MAJOR 0
 #define VER_MINOR 8
 
+warmst	= $008
 pdvmsk	= $247
 pdvrs	= $248
 ddevic	= $300
@@ -20,6 +21,7 @@ pbi_splash_flag = $d103
 pbi_req_proc_flag = $d104
 pbi_req_proc_res = $d105
 pbi_stack_save = $d106
+pbi_drive_boot_act = $d10a
 pbi_drive_boot = $d10b
 pbi_drive_conf = $d10c
 ; HSIO RAM variables sit upwards of $d1f0 incl.
@@ -51,6 +53,10 @@ pdinit
 	lda #$a5 : sta pbi_magic : sta pbi_magic+1
 	; ask for init
 	inc pbi_req_init_flag : lda pbi_req_init_flag : bne *-3
+	lda warmst : bmi pdinit_1
+	lda pbi_drive_boot_act : beq pdinit_1
+	sta dunit
+pdinit_1
 	; Do we want the splash?
 	lda pbi_splash_flag : beq pdinit_ret
 	jsr boot_screen_init
