@@ -1085,10 +1085,10 @@ end generate;
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					-- PBI BIOS rom emulation
 					if (emu_pbi_enable = '1') then
-						MEMORY_DATA_INT(15 downto 8) <= emu_pbi_cache_data_out;
 						emu_pbi_d1xx <= '1';
 						if (write_enable_next = '0') and (emu_pbi_data_out_enable = '1') then
 							MEMORY_DATA_INT(7 downto 0) <= emu_pbi_data_out;
+							MEMORY_DATA_INT(15 downto 8) <= emu_pbi_cache_data_out;
 						end if;
 					end if;
 					
