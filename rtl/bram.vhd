@@ -13,6 +13,7 @@ ENTITY spram IS
 		addr_width    : integer := 8;
 		data_width    : integer := 8;
 		mem_init_file : string := " ";
+		mem_depth     : integer := 8192;
 		mem_name      : string := "MEM" -- for InSystem Memory content editor.
 	);
 	PORT
@@ -31,7 +32,7 @@ END spram;
 ARCHITECTURE SYN OF spram IS
 BEGIN
 	spram_sz : work.spram_sz
-	generic map(addr_width, data_width, 2**addr_width, mem_init_file, mem_name)
+	generic map(addr_width, data_width, 2**addr_width, mem_init_file, mem_depth, mem_name)
 	port map(clock,address,data,enable,wren,q,cs);
 END SYN;
 
@@ -52,6 +53,7 @@ ENTITY spram_sz IS
 		data_width    : integer := 8;
 		numwords      : integer := 2**8;
 		mem_init_file : string := " ";
+		mem_depth     : integer := 8192;
 		mem_name      : string := "MEM" -- for InSystem Memory content editor.
 	);
 	PORT
@@ -78,6 +80,7 @@ BEGIN
 		intended_device_family => "Cyclone V",
 		lpm_hint => "ENABLE_RUNTIME_MOD=YES,INSTANCE_NAME="&mem_name,
 		lpm_type => "altsyncram",
+		maximum_depth => mem_depth,
 		numwords_a => numwords,
 		operation_mode => "SINGLE_PORT",
 		outdata_aclr_a => "NONE",

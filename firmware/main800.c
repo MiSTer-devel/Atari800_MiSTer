@@ -113,8 +113,6 @@ struct CartDef {
 #define TC_MODE_CORINA_1024	0x72
 #define TC_MODE_BOUNTY_40	0x73
 
-#define TC_MODE_TURBO_FREEZER   0xFE
-
 static struct CartDef cartdef[] =
 {
 	{ 1,  "Standard 8K    \x00", TC_MODE_8K,          8 },
@@ -243,26 +241,15 @@ int load_car(struct SimpleFile* file, u08 stacked)
 		{
 			if(!n && stacked) return 0;
 			unsigned char *one_block = (unsigned char *)(CARTRIDGE_MEM + 0x1FE000);
-			if(byte_len == 0x10000)
-			{
-				// Try to recognize TurboFreezer rom image
-				// it is 64K in size and has Hias' signature at 0x7EE0
-				file_seek(file, 0x6000);
-			}
 			ok = file_read(file, one_block, 0x2000, &len);
 			file_seek(file, 0);
 			if(ok == SimpleFile_OK && len == 0x2000)
 			{
-				if(byte_len == 0x10000 && one_block[0x1EE0] == 'H' && one_block[0x1EE1] == 'i' && one_block[0x1EE2] == 'a' && one_block[0x1EE3] == 's')
-				{
-					mode = TC_MODE_TURBO_FREEZER;
-					n = 1;
-				}
-				else if(one_block[0] == 'S' && one_block[1] == 'D' && one_block[2] == 'X' && (one_block[0x1FF3] == 0xE0 || one_block[0x1FF3] == 0xE1))
+				if(one_block[0] == 'S' && one_block[1] == 'D' && one_block[2] == 'X' && (one_block[0x1FF3] == 0xE0 || one_block[0x1FF3] == 0xE1))
 				{
 					mode = (one_block[0x1FF3] == 0xE1) ? TC_MODE_SDX_SIDE2 : TC_MODE_SDX_U1MB;
 					n = 1;
-				}				
+				}
 			}
 			if(!n)
 			{
@@ -370,11 +357,6 @@ int load_car(struct SimpleFile* file, u08 stacked)
 		memset8((unsigned char *)(CARTRIDGE_MEM+0x80000), 0, 0x80000);
 	}
 	//LOG("cart type: %d size: %dk\n", def->mode, def->size);
-	else if(mode == TC_MODE_TURBO_FREEZER)
-	{
-		memcp8((unsigned char *)CARTRIDGE_MEM, (unsigned char *)FREEZER_ROM_MEM, 0, 0x10000);
-		memset8((unsigned char *)FREEZER_RAM_MEM, 0, 0x20000);
-	}
 	return mode;
 }
 
@@ -537,21 +519,14 @@ void actions()
 					{
 						if(type != TC_MODE_SDX64 && type != TC_MODE_SDX128 &&
 							type != TC_MODE_ATRAX_SDX64 && type != TC_MODE_ATRAX_SDX128 && 
-							type != TC_MODE_SDX_U1MB && type != TC_MODE_SDX_SIDE2 && type != TC_MODE_TURBO_FREEZER)
+							type != TC_MODE_SDX_U1MB && type != TC_MODE_SDX_SIDE2)
 						{
 							for(mounted = 0; mounted < 4; mounted ++)
 							{
 								set_drive_status(mounted, 0);
 							}
 						}
-						if(type == TC_MODE_TURBO_FREEZER)
-						{
-							turbo_freezer_loaded = 1;
-						}
-						else
-						{
-							set_cart_select(type);
-						}
+						set_cart_select(type);
 					}
 				}
 			}

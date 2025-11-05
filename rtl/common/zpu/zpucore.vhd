@@ -160,64 +160,60 @@ begin
 	ZPU_STACK_WRITE_DMA <= ZPU_STACK_WRITE;
 end process;
 
-ram_31_24 : entity work.generic_ram_infer
+ram_31_24 : entity work.spram
 	GENERIC MAP
 	(
-		ADDRESS_WIDTH => memory_bits-2,
-		SPACE => memory/4,
+		ADDR_WIDTH => memory_bits-2,
 		DATA_WIDTH => 8
 	)
 	PORT MAP
 	(
-		we => ZPU_STACK_WRITE_DMA(3),
+		wren => ZPU_STACK_WRITE_DMA(3),
 		clock => CLK,
 		address => ZPU_ADDR_ROM_RAM_DMA(memory_bits-1 DOWNTO 2),
 		data => ZPU_DO_DMA(31 DOWNTO 24),
 		q => ZPU_RAM_DATA(31 DOWNTO 24)
 	);
 
-ram23_16 : entity work.generic_ram_infer
+ram23_16 : entity work.spram
 	GENERIC MAP
 	(
-		ADDRESS_WIDTH => memory_bits-2,
-		SPACE => memory/4,
+		ADDR_WIDTH => memory_bits-2,
 		DATA_WIDTH => 8
 	)
 	PORT MAP
 	(
-		we => ZPU_STACK_WRITE_DMA(2),
+		wren => ZPU_STACK_WRITE_DMA(2),
 		clock => CLK,
 		address => ZPU_ADDR_ROM_RAM_DMA(memory_bits-1 DOWNTO 2),
 		data => ZPU_DO_DMA(23 DOWNTO 16),
 		q => ZPU_RAM_DATA(23 DOWNTO 16)
 	);
 
-ram_15_8 : entity work.generic_ram_infer
+ram_15_8 : entity work.spram
 	GENERIC MAP
 	(
-		ADDRESS_WIDTH => memory_bits-2,
-		SPACE => memory/4,
+		ADDR_WIDTH => memory_bits-2,
 		DATA_WIDTH => 8
 	)
 	PORT MAP
 	(
-		we => ZPU_STACK_WRITE_DMA(1),
+		wren => ZPU_STACK_WRITE_DMA(1),
 		clock => CLK,
 		address => ZPU_ADDR_ROM_RAM_DMA(memory_bits-1 DOWNTO 2),
 		data => ZPU_DO_DMA(15 DOWNTO 8),
 		q => ZPU_RAM_DATA(15 DOWNTO 8)
 	);
 
-ram_7_0 : entity work.generic_ram_infer
+ram_7_0 : entity work.spram
 	GENERIC MAP
 	(
-		ADDRESS_WIDTH => memory_bits-2,
-		SPACE => memory/4,
+		ADDR_WIDTH => memory_bits-2,
 		DATA_WIDTH => 8
 	)
 	PORT MAP
 	(
-		we => ZPU_STACK_WRITE_DMA(0),
+		wren => ZPU_STACK_WRITE_DMA(0),
 		clock => CLK,
 		address => ZPU_ADDR_ROM_RAM_DMA(memory_bits-1 DOWNTO 2),
 		data => ZPU_DO_DMA(7 DOWNTO 0),
