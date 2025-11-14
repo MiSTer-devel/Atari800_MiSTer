@@ -246,6 +246,7 @@ process(soft_reset,
 	variable source_data : std_logic_vector(7 downto 0);
 	variable blitter_write_destination : boolean;
 	variable blitter_update_state : boolean;
+	variable blitter_src_current_tmp : unsigned(18 downto 0);
 begin
 
 	blitter_load_address_next <= blitter_load_address_reg;
@@ -500,19 +501,23 @@ begin
 								blitter_x_next <= blitter_width_reg;
 								blitter_rep_x_next <= blitter_zoom_x_reg;
 								if blitter_rep_y_reg = 0 then
-									blitter_src_current_next <= blitter_src_address_reg + blitter_src_step_y_reg;
+									blitter_src_current_tmp := blitter_src_address_reg + blitter_src_step_y_reg;
 									blitter_src_address_next <= blitter_src_address_reg + blitter_src_step_y_reg;
 									blitter_rep_y_next <= blitter_zoom_y_reg;
 									blitter_y_next <= blitter_y_reg - 1;
 								else
-									blitter_src_current_next <= blitter_src_address_reg;
+									blitter_src_current_tmp := blitter_src_address_reg;
 									blitter_rep_y_next <= blitter_rep_y_reg - 1;
 								end if;
+								blitter_src_current_next <= blitter_src_current_tmp;
 								blitter_pattern_current_next <= blitter_pattern_count_reg;
 								blitter_dest_current_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
 								blitter_dest_address_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
-								-- Can skip the read cycle if the and mask is 00
-								if (blitter_and_mask_reg = x"00") then
+								if (not(blitter_write_destination) or (blitter_and_mask_reg = x"00")) then
+									if blitter_and_mask_reg /= x"00" then
+										blitter_vram_wren_next <= '0';
+										blitter_vram_address_next <= std_logic_vector(blitter_src_current_tmp);
+									end if;
 									blitter_state_next <= "000010";
 								else
 									blitter_state_next <= "000001";
@@ -522,18 +527,22 @@ begin
 							blitter_dest_current_next <= blitter_dest_current_reg + blitter_dest_step_x_reg;
 							if blitter_rep_x_reg = 0 then
 								if (blitter_pattern_reg = '1') and (blitter_pattern_current_reg = 0) then
-									blitter_src_current_next <= blitter_src_address_reg;
+									blitter_src_current_tmp := blitter_src_address_reg;
 									blitter_pattern_current_next <= blitter_pattern_count_reg;
 								else
-									blitter_src_current_next <= blitter_src_current_reg + blitter_src_step_x_reg;
+									blitter_src_current_tmp := blitter_src_current_reg + blitter_src_step_x_reg;
 									if (blitter_pattern_reg = '1') then
 										blitter_pattern_current_next <= blitter_pattern_current_reg - 1;
 									end if;
 								end if;
+								blitter_src_current_next <= blitter_src_current_tmp;
 								blitter_rep_x_next <= blitter_zoom_x_reg;
 								blitter_x_next <= blitter_x_reg - 1;
-								-- Can skip the read cycle if the and mask is 00
-								if (blitter_and_mask_reg = x"00") then
+								if (not(blitter_write_destination) or (blitter_and_mask_reg = x"00")) then
+									if blitter_and_mask_reg /= x"00" then
+										blitter_vram_wren_next <= '0';
+										blitter_vram_address_next <= std_logic_vector(blitter_src_current_tmp);
+									end if;
 									blitter_state_next <= "000010";
 								else
 									blitter_state_next <= "000001";
