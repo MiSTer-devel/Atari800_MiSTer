@@ -37,7 +37,7 @@ entity CartLogic is
 		--s5_n_out: out std_logic;
 		rd4: out std_logic;
 		rd5: out std_logic;
-		cart_address: out std_logic_vector(20 downto 0);
+		cart_address: out std_logic_vector(21 downto 0);
 		cart_address_enable: out boolean;
 		cctl_dout: out std_logic_vector(7 downto 0);
 		cctl_dout_enable: out std_logic_vector(2 downto 0);
@@ -53,7 +53,7 @@ end CartLogic;
 architecture vhdl of CartLogic is
 
 -- general cart configuration
-signal cfg_bank: std_logic_vector(20 downto 13) := (others => '0');
+signal cfg_bank: std_logic_vector(21 downto 13) := (others => '0');
 signal cfg_enable: std_logic := '1';
 
 subtype cart_mode_type is std_logic_vector(7 downto 0);
@@ -113,6 +113,7 @@ constant cart_mode_mega_256:	cart_mode_type := "00101100";
 constant cart_mode_mega_512:	cart_mode_type := "00101101";
 constant cart_mode_mega_1024:	cart_mode_type := "00101110";
 constant cart_mode_mega_2048:	cart_mode_type := "00101111";
+constant cart_mode_mega_4096:	cart_mode_type := "00100000";
 
 constant cart_mode_xegs_32:	cart_mode_type := "00110000";
 constant cart_mode_xegs_64:	cart_mode_type := "00110001";
@@ -155,8 +156,8 @@ constant cart_mode_sdx_side2:			cart_mode_type := "01001100";
 constant cart_mode_sdx_u1mb:			cart_mode_type := "01001101";
 
 constant cart_mode_db_32:			cart_mode_type := "01110000";
-constant cart_mode_corina_512:		cart_mode_type := "01110001";
-constant cart_mode_corina_1024:		cart_mode_type := "01110010";
+--constant cart_mode_corina_512:		cart_mode_type := "01110001";
+--constant cart_mode_corina_1024:		cart_mode_type := "01110010";
 constant cart_mode_bounty_bob:		cart_mode_type := "01110011";
 
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
@@ -168,8 +169,9 @@ signal oss_bank: std_logic_vector(2 downto 0) := "000";
 signal cart_8xxx_enable: std_logic := '0';
 signal cart_axxx_enable: std_logic := '1';
 signal disable_rom: std_logic := '0'; -- for XEGS 8-15 bank cart
-signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
-signal cart_write_enable: std_logic := '0'; -- let's try making the SRAM part of the Corina cart work
+-- Corina carts do not work anyhow ATM!
+--signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
+--signal cart_write_enable: std_logic := '0'; -- let's try making the SRAM part of the Corina cart work
 signal cart_passthru: std_logic := '0';
 
 signal access_8xxx: boolean;
@@ -250,23 +252,29 @@ begin
 			cctl_dout_enable(0) <= '1';
 			cctl_dout <= (not cfg_enable) & (not cart_passthru) & cfg_bank(18 downto 13);			
 		end if;
+		if (cart_mode = cart_mode_mega_4096) and (a(7 downto 5) = "000") then
+			cctl_dout_enable(0) <= '1';
+			cctl_dout <= cfg_bank(21 downto 14);
+		end if;
 	end if;
 end process config_io;
 
 set_config: process(clk)
-	variable bank_counter : integer range 0 to 127 := 0;
+	variable bank_counter_4 : integer range 0 to 7 := 0;
+	variable bank_counter_128 : integer range 0 to 127 := 0;
 begin
 	if rising_edge(clk) then
 		if (reset_n = '0') then
 			cfg_bank <= (others => '0');
-			bank_counter := 0;
+			bank_counter_4 := 0;
+			bank_counter_128 := 0;
 			cfg_enable <= '1';
 			oss_bank <= "001";
 			cart_8xxx_enable <= '0';
 			cart_axxx_enable <= '1';
 			disable_rom <= '0';
-			mirror_8a <= '0';
-			cart_write_enable <= '0';
+			--mirror_8a <= '0';
+			--cart_write_enable <= '0';
 			bb_bank_8x <= "00";
 			bb_bank_9x <= "00";
 			cart_passthru <= '0';
@@ -274,11 +282,14 @@ begin
 			-- cart specific initialization
 			case cart_mode is
 			when cart_mode_atarimax8 =>
-				cfg_bank <= x"7F"; -- startup in last bank
+				cfg_bank(20 downto 13) <= x"7F"; -- startup in last bank
+				--cfg_bank <= '0' & x"7F"; -- startup in last bank
 			when cart_mode_oss_043M =>
 				oss_bank <= "000";
 			when cart_mode_jrc_int_64 => 
-				cfg_bank <= "00000111";
+				cfg_bank(15 downto 13) <= "111";
+			when cart_mode_mega_4096 =>
+				cfg_bank(21 downto 14) <= x"FE";
 			when others => null;
 			end case;
 		else
@@ -339,6 +350,16 @@ begin
 						end case;
 					end if;
 					
+					-- MegaCart 4MB 
+					if (cart_mode = cart_mode_mega_4096) and (a(7 downto 5) = "000") then
+						if d_in(7 downto 0) = x"FF" then
+							cfg_enable <= '0';
+						else
+							cfg_enable <= '1';
+						end if;
+						cfg_bank(21 downto 14) <= d_in(7 downto 0);
+					end if;
+					
 					-- atrax 128
 					if (cart_mode = cart_mode_atrax_128) or (cart_mode = cart_mode_atrax_int_128) then
 						cfg_enable <= not d_in(7);
@@ -354,23 +375,23 @@ begin
 						end if;
 					end if;
 
-					-- Corina
-					if ((cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024)) and (a(7 downto 0) = x"00") then
-					   if d_in(7) = '1' then
-							cfg_enable <= '0';
-						else
-							if d_in(6 downto 5) /= "11" then
-								cart_write_enable <= '0';
-								cfg_enable <= '1';
-								cfg_bank(19 downto 14) <= d_in(5 downto 0);
-								mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
-								-- try to imitate the SRAM
-								if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
-									cart_write_enable <= '1';
-								end if;
-							end if;
-						end if;
-					end if;
+					---- Corina
+					--if ((cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024)) and (a(7 downto 0) = x"00") then
+					--	if d_in(7) = '1' then
+					--		cfg_enable <= '0';
+					--	else
+					--		if d_in(6 downto 5) /= "11" then
+					--			cart_write_enable <= '0';
+					--			cfg_enable <= '1';
+					--			cfg_bank(19 downto 14) <= d_in(5 downto 0);
+					--			mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
+					--			-- try to imitate the SRAM
+					--			if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
+					--				cart_write_enable <= '1';
+					--			end if;
+					--		end if;
+					--	end if;
+					--end if;
 					
 					-- sic
 					if (cart_mode(7 downto 2) = "001001") and ((a(7 downto 5) = "000")  or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
@@ -440,8 +461,8 @@ begin
 					-- ast 32
 					if (cart_mode = cart_mode_ast_32) then
 						cfg_enable <= '0';
-						bank_counter := bank_counter + 1;
-						cfg_bank(19 downto 13) <= std_logic_vector(to_unsigned(bank_counter,7));
+						bank_counter_128 := bank_counter_128 + 1;
+						cfg_bank(19 downto 13) <= std_logic_vector(to_unsigned(bank_counter_128,7));
 					end if;
 
 					if ((cart_mode = cart_mode_sdx_u1mb) and (a(7 downto 0) = x"E0")) or ((cart_mode = cart_mode_sdx_side2) and (a(7 downto 0) = x"E1"))then
@@ -459,28 +480,28 @@ begin
 					cfg_enable <= '0';
 				-- ultracart 32
 				when cart_mode_ultracart_32 =>
-					bank_counter := bank_counter + 1;
-				 	if (bank_counter = 4) then
+					bank_counter_4 := bank_counter_4 + 1;
+				 	if (bank_counter_4 = 4) then
 						cfg_enable <= '0';
-						bank_counter := 127;
+						bank_counter_4 := 7;
 					else
 						cfg_enable <= '1';
-						cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter,2));
+						cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter_4,2));
 					end if;
 				-- adawliah 32/64
 				when cart_mode_dawli_32 =>
-					bank_counter := bank_counter + 1;
-					cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter,2));
+					bank_counter_4 := bank_counter_4 + 1;
+					cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter_4,2));
 				when cart_mode_dawli_64 =>
-					bank_counter := bank_counter + 1;
-					cfg_bank(15 downto 13) <= std_logic_vector(to_unsigned(bank_counter,3));
+					bank_counter_4 := bank_counter_4 + 1;
+					cfg_bank(15 downto 13) <= std_logic_vector(to_unsigned(bank_counter_4,3));
 				-- blizzard 32
 				when cart_mode_blizzard_32 =>
-				 	if (bank_counter = 3) then
+					if (bank_counter_4 = 3) then
 						cfg_enable <= '0';
 					else
-						bank_counter := bank_counter + 1;
-						cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter,2));
+						bank_counter_4 := bank_counter_4 + 1;
+						cfg_bank(14 downto 13) <= std_logic_vector(to_unsigned(bank_counter_4,2));
 					end if;
 				when cart_mode_db_32 =>
 					cfg_bank(14 downto 13) <= a(1 downto 0);
@@ -599,13 +620,10 @@ begin
 	end if;
 end process set_config;
 
-access_cart_data: process(a, rw, access_8xxx, access_axxx,
-	cfg_bank, cfg_enable,
-	cart_mode,
-	oss_bank,
-	cart_8xxx_enable, cart_axxx_enable,
-	disable_rom,mirror_8a,bb_bank_8x,bb_bank_9x,cart_write_enable,
-	master)
+access_cart_data: process(a, rw, access_8xxx, access_axxx,cfg_bank, cfg_enable,cart_mode,oss_bank,
+	cart_8xxx_enable, cart_axxx_enable,disable_rom,
+	--mirror_8a,cart_write_enable,
+	bb_bank_8x,bb_bank_9x,master)
 
 variable bool_rd4: boolean;
 variable bool_rd5: boolean;
@@ -646,7 +664,7 @@ begin
 		bool_rd4 := true;
 		cart_address_enable <= access_8xxx;
 	when cart_mode_ast_32 =>
-		cart_address <= "000000" & cfg_bank(19 downto 13) & a(7 downto 0);
+		cart_address <= "0000000" & cfg_bank(19 downto 13) & a(7 downto 0);
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
 		if (access_8xxx) then
 			cart_address(13) <= '0';
@@ -705,17 +723,18 @@ begin
 			cart_address(19 downto 13) <= (others => '1');
 		end if;
 	when cart_mode_mega_16 | cart_mode_mega_32 | cart_mode_mega_64 | cart_mode_mega_128 |
-	     cart_mode_mega_256 | cart_mode_mega_512 | cart_mode_mega_1024 | cart_mode_mega_2048 =>
+	     cart_mode_mega_256 | cart_mode_mega_512 | cart_mode_mega_1024 | cart_mode_mega_2048 |
+	     cart_mode_mega_4096 =>
 		if (access_8xxx) then
 			cart_address(13) <= '0';
 		else
 			cart_address(13) <= '1';
 		end if;
-	when cart_mode_corina_512 | cart_mode_corina_1024 =>
-		cart_address(13) <= '0';
-		if(mirror_8a = '0' and access_axxx) then
-			cart_address(13) <= '1';
-		end if;
+	--when cart_mode_corina_512 | cart_mode_corina_1024 =>
+	--	cart_address(13) <= '0';
+	--	if(mirror_8a = '0' and access_axxx) then
+	--		cart_address(13) <= '1';
+	--	end if;
 	when cart_mode_sic_128 | cart_mode_sic_256 | cart_mode_sic_512 | cart_mode_sic_1024 |
 	     cart_mode_xemulti_16 | cart_mode_xemulti_32 | cart_mode_xemulti_64 | cart_mode_xemulti_128 |
 	     cart_mode_xemulti_256 | cart_mode_xemulti_512 | cart_mode_xemulti_1024 =>
@@ -767,7 +786,8 @@ begin
 	end if;
 
 	-- disable writes
-	if  (rw = '0' and cart_write_enable = '0') then
+	--if  (rw = '0' and cart_write_enable = '0') then
+	if rw = '0' then
 		cart_address_enable <= false;
 	end if;
 

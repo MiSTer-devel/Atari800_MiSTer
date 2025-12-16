@@ -27,7 +27,7 @@ ENTITY zpucore IS
 		RESET_N : in std_logic;
 
 		-- dma bus master (with many waitstates...)
-		ZPU_ADDR_FETCH : out std_logic_vector(23 downto 0);
+		ZPU_ADDR_FETCH : out std_logic_vector(25 downto 0);
 		ZPU_DATA_OUT : out std_logic_vector(31 downto 0);
 		ZPU_FETCH : out std_logic;
 		ZPU_32BIT_WRITE_ENABLE : out std_logic;
