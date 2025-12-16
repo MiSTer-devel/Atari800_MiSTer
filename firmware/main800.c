@@ -68,6 +68,7 @@ struct CartDef {
 #define TC_MODE_MEGA_512        0x2D
 #define TC_MODE_MEGA_1024       0x2E
 #define TC_MODE_MEGA_2048       0x2F
+#define TC_MODE_MEGA_4096       0x20
 
 #define TC_MODE_XEGS_32         0x30           // non-switchable XEGS carts
 #define TC_MODE_XEGS_64         0x31
@@ -109,8 +110,6 @@ struct CartDef {
 #define TC_MODE_SDX_SIDE2	0x4C
 #define TC_MODE_SDX_U1MB	0x4D
 #define TC_MODE_DB_32		0x70
-#define TC_MODE_CORINA_512	0x71
-#define TC_MODE_CORINA_1024	0x72
 #define TC_MODE_BOUNTY_40	0x73
 
 static struct CartDef cartdef[] =
@@ -173,6 +172,7 @@ static struct CartDef cartdef[] =
 	{ 59, "Right 4K       \x00", TC_MODE_RIGHT_4K,    4 },
 	{ 60, "Blizzard 32K   \x00", TC_MODE_BLIZZARD_32,32 },
 	{ 61, "MegaMax 2048K  \x00", TC_MODE_MEGAMAX16,2048 },
+	{ 63, "MegaCart 4096K \x00", TC_MODE_MEGA_4096,4096 },
 	{ 64, "MegaCart 2048K \x00", TC_MODE_MEGA_2048,2048 },
 	{ 67, "XEGS 64K (8-15)\x00", TC_MODE_XEGS_64_2,  64 },
 	{ 68, "Atrax ENC 128K \x00", TC_MODE_ATRAX_INT128, 128 },
@@ -182,8 +182,6 @@ static struct CartDef cartdef[] =
 	{ 76, "Williams 16K   \x00", TC_MODE_WILLIAMS16, 16 },
 	{ 80, "JRC 64K (LIN)  \x00", TC_MODE_JRC_LIN_64, 64 },
 	{ 83, "SIC+ 1024K     \x00", TC_MODE_SIC_1024,  1024 },
-	{ 84, "Corina 1MB     \x00", TC_MODE_CORINA_1024, 1032 },
-	{ 85, "Corina 512K    \x00", TC_MODE_CORINA_512, 520 },
 	{ 86, "XE Multi 8K    \x00", TC_MODE_XEMULTI_8,   8 },
 	{ 87, "XE Multi 16K   \x00", TC_MODE_XEMULTI_16, 16 },
 	{ 88, "XE Multi 32K   \x00", TC_MODE_XEMULTI_32, 32 },
@@ -348,13 +346,6 @@ int load_car(struct SimpleFile* file, u08 stacked)
 			*((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x4000+i)) = *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x0000+i));
 			*((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x5000+i)) = *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x2000+i)) & *((unsigned char *)(CARTRIDGE_MEM + (stacked ? 0x100000 : 0)+0x1000+i));
 		}
-	}
-	// Corina 512K cart, move the last 8K EEPROM data to the 1024K boundary
-	// clean the SRAM part
-	else if(carttype == 85)
-	{
-		memcp8((unsigned char *)(CARTRIDGE_MEM+0x80000), (unsigned char *)(CARTRIDGE_MEM+0x100000), 0, 0x2000);
-		memset8((unsigned char *)(CARTRIDGE_MEM+0x80000), 0, 0x80000);
 	}
 	//LOG("cart type: %d size: %dk\n", def->mode, def->size);
 	return mode;

@@ -91,7 +91,7 @@ signal SDRAM_REQUEST : std_logic;
 signal SDRAM_REQUEST_COMPLETE : std_logic;
 signal SDRAM_READ_ENABLE :  STD_LOGIC;
 signal SDRAM_WRITE_ENABLE : std_logic;
-signal SDRAM_ADDR : STD_LOGIC_VECTOR(22 DOWNTO 0);
+signal SDRAM_ADDR : STD_LOGIC_VECTOR(24 DOWNTO 0);
 signal SDRAM_DO : STD_LOGIC_VECTOR(31 DOWNTO 0);
 signal SDRAM_DI : STD_LOGIC_VECTOR(31 DOWNTO 0);
 signal SDRAM_WIDTH_8bit_ACCESS : std_logic;
@@ -102,7 +102,7 @@ signal SDRAM_REFRESH : std_logic;
 signal SDRAM_RESET_N : std_logic;
 
 -- dma/virtual drive
-signal DMA_ADDR_FETCH : std_logic_vector(23 downto 0);
+signal DMA_ADDR_FETCH : std_logic_vector(25 downto 0);
 signal DMA_WRITE_DATA : std_logic_vector(31 downto 0);
 signal DMA_FETCH : std_logic;
 signal DMA_32BIT_WRITE_ENABLE : std_logic;
@@ -256,7 +256,7 @@ PORT MAP
 	WORD_ACCESS => SDRAM_WIDTH_16BIT_ACCESS,
 	LONGWORD_ACCESS => SDRAM_WIDTH_32BIT_ACCESS,
 	REFRESH => SDRAM_REFRESH,
-	ADDRESS_IN => "00"&SDRAM_ADDR,
+	ADDRESS_IN => SDRAM_ADDR,
 	DATA_IN => SDRAM_DI,
 	SDRAM_DQ => SDRAM_DQ,
 	COMPLETE => SDRAM_REQUEST_COMPLETE,
@@ -282,8 +282,8 @@ port map
 	q => BIOS_DATA
 );
 
-RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(22 downto 14) = "111000001"  else
-            (others=>'1')        when SDRAM_ADDR(22 downto 20) = "111" else
+RAM_DATA <= x"FFFFFF"&BIOS_DATA  when SDRAM_ADDR(24 downto 14) = "00111000001"  else
+            (others=>'1')        when SDRAM_ADDR(24 downto 20) = "00111" else
             SDRAM_DO;
 
 zpu: entity work.zpucore

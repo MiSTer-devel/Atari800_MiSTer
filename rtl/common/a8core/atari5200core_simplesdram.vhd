@@ -67,7 +67,7 @@ ENTITY atari5200core_simplesdram is
 		SDRAM_REQUEST_COMPLETE : IN std_logic;
 		SDRAM_READ_ENABLE : out STD_LOGIC;
 		SDRAM_WRITE_ENABLE : out std_logic;
-		SDRAM_ADDR : out STD_LOGIC_VECTOR(22 DOWNTO 0);
+		SDRAM_ADDR : out STD_LOGIC_VECTOR(24 DOWNTO 0);
 		SDRAM_DO : in STD_LOGIC_VECTOR(31 DOWNTO 0);
 		SDRAM_DI : out STD_LOGIC_VECTOR(31 DOWNTO 0);
 		SDRAM_32BIT_WRITE_ENABLE : out std_logic;
@@ -80,7 +80,7 @@ ENTITY atari5200core_simplesdram is
 		DMA_32BIT_WRITE_ENABLE : in std_logic;
 		DMA_16BIT_WRITE_ENABLE : in std_logic;
 		DMA_8BIT_WRITE_ENABLE : in std_logic;
-		DMA_ADDR : in std_logic_vector(23 downto 0);
+		DMA_ADDR : in std_logic_vector(25 downto 0);
 		DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
 		MEMORY_READY_DMA : out std_logic; -- op complete
 		DMA_MEMORY_DATA : out std_logic_vector(31 downto 0);

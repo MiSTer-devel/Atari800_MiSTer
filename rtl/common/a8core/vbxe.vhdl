@@ -62,7 +62,7 @@ port (
 	memac_request : in std_logic;
 	memac_request_complete : out std_logic;
 	memac_dma_enable : out std_logic;
-	memac_dma_address : in std_logic_vector(23 downto 0);
+	memac_dma_address : in std_logic_vector(25 downto 0);
 	-- Blitter irq
 	irq_n : out std_logic;
 	
@@ -667,7 +667,7 @@ memac_request_complete <= memac_request_complete_next;
 
 memac_dma_enable <=
 	not(enable) or -- VBXE is not active 
-	or_reduce(memac_dma_address(23 downto 18)) -- The DMA access is not to the Atari
+	or_reduce(memac_dma_address(25 downto 18)) -- The DMA access is not to the Atari
 	or clock_shift_reg(1) -- we are at the earliest possible cycle not to push out other reqests
 	or not(mems_reg(7) or memb_reg(7) or memb_reg(6)); -- MEMAC is disabled
 
