@@ -2,7 +2,7 @@
 #define MEMORY_H
 
 // #define SRAM_BASE ((void*) 0x200000)
-#define SDRAM_BASE ((void*) 0x800000)
+#define SDRAM_BASE ((void*) 0x2000000)
 
 // Memory usage...
 // 0x410000-0x44FFFF (0xc10000 in zpu space) = directory cache - 256k
@@ -18,7 +18,7 @@
 #define FREEZER_ROM_MEM (SDRAM_BASE + 0x4A0000)
 #define HAVE_FREEZER_ROM_MEM 1
 
-#define CARTRIDGE_MEM (SDRAM_BASE + 0x500000)
+#define CARTRIDGE_MEM (SDRAM_BASE + 0x800000)
 
 // offset into SDRAM
 #define ROM_OFS 0x700000

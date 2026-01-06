@@ -111,28 +111,13 @@ ENTITY atari800core_simple_sdram is
 		-- we can dma from memory space
 		-- etc.
 
-		-- External RAM/ROM - adhere to standard memory map
-		-- TODO - lower/upper memory split defined by generic
-		-- (TODO SRAM lower ram, SDRAM upper ram - no overlap?)
-		---- SDRAM memory map (8MB) (lower 512k if USE_SDRAM=1)
-		---- base 64k RAM  - banks 0-3    "000 0000 1111 1111 1111 1111" (TOP)
-		---- to 512k RAM   - banks 4-31   "000 0111 1111 1111 1111 1111" (TOP) 
-		---- to 4MB RAM    - banks 32-255 "011 1111 1111 1111 1111 1111" (TOP)
-		---- +64k          - banks 256-259"100 0000 0000 1111 1111 1111" (TOP)
-		---- SCRATCH       - 4MB+64k-5MB
-		---- CARTS         -              "101 YYYY YYY0 0000 0000 0000" (BOT) - 2MB! 8kb banks
-		--SDRAM_CART_ADDR      <= "101"&cart_select& "0000000000000";
-		---- BASIC/OS ROM  -              "111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K				
-		--SDRAM_BASIC_ROM_ADDR <= "111"&"000000"   &"00000000000000";
-		--SDRAM_OS_ROM_ADDR    <= "111"&rom_select &"00000000000000";
-		---- SYSTEM        -              "111 1000 0000 0000 0000 0000" (BOT) - LAST 512K
 		-- TODO - review if we need to pass out so many of these
 		-- Perhaps we can simplify address decoder and have an external layer?
 		SDRAM_REQUEST : OUT std_logic;
 		SDRAM_REQUEST_COMPLETE : IN std_logic;
 		SDRAM_READ_ENABLE : out STD_LOGIC;
 		SDRAM_WRITE_ENABLE : out std_logic;
-		SDRAM_ADDR : out STD_LOGIC_VECTOR(22 DOWNTO 0);
+		SDRAM_ADDR : out STD_LOGIC_VECTOR(24 DOWNTO 0);
 		SDRAM_DO : in STD_LOGIC_VECTOR(31 DOWNTO 0);
 		SDRAM_DI : out STD_LOGIC_VECTOR(31 DOWNTO 0);
 		SDRAM_32BIT_WRITE_ENABLE : out std_logic;
@@ -143,16 +128,16 @@ ENTITY atari800core_simple_sdram is
 		-- DMA memory map differs
 		-- e.g. some special addresses to read behind hardware registers
 		-- 0x0000-0xffff: Atari registers + 3 mirrors (bit 16/17)
-		-- 23 downto 21:
-		-- 001 : SRAM,512k
-		-- 010|011 : ROM, 4MB
-		-- 10xx : SDRAM, 8MB (If you have more, its unmapped for now... Can bank switch! Atari can't access this much anyway...)
+		-- 25 downto 21:
+		-- 00001 : SRAM,512k
+		-- 00010|00011 : ROM, 4MB
+		-- 1xxxx : SDRAM, 32MB
 		DMA_FETCH : in STD_LOGIC; -- we want to read/write
 		DMA_READ_ENABLE : in std_logic;
 		DMA_32BIT_WRITE_ENABLE : in std_logic;
 		DMA_16BIT_WRITE_ENABLE : in std_logic;
 		DMA_8BIT_WRITE_ENABLE : in std_logic;
-		DMA_ADDR : in std_logic_vector(23 downto 0);
+		DMA_ADDR : in std_logic_vector(25 downto 0);
 		DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
 		MEMORY_READY_DMA : out std_logic; -- op complete
 		DMA_MEMORY_DATA : out std_logic_vector(31 downto 0);
@@ -230,7 +215,7 @@ CB1_IN <= SIO_IRQ;
 CA2_IN <= CA2_OUT when CA2_DIR_OUT='1' else '1';
 CB2_IN <= CB2_OUT when CB2_DIR_OUT='1' else '1';
 SIO_COMMAND <= CB2_OUT;
-SIO_MOTOR <= not(CA2_OUT);
+SIO_MOTOR <= CA2_OUT;
 
 PORTA_IN <= (not(PORTA_DIR_OUT) or PORTA_OUT) and (JOY2_n(3)&JOY2_n(2)&JOY2_n(1)&JOY2_n(0)&JOY1_n(3)&JOY1_n(2)&JOY1_n(1)&JOY1_n(0));
 PORTB_IN <= PORTB_OUT when atari800mode = '0' else (not(PORTB_DIR_OUT) or PORTB_OUT) and (JOY4_n(3)&JOY4_n(2)&JOY4_n(1)&JOY4_n(0)&JOY3_n(3)&JOY3_n(2)&JOY3_n(1)&JOY3_n(0));
