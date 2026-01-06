@@ -29,7 +29,7 @@ PORT
 	ZPU_DO : out std_logic_vector(31 downto 0);
 	
 	ZPU_ADDR_ROM_RAM : out std_logic_vector(15 downto 0); -- direct from zpu, for short paths
-	ZPU_ADDR_FETCH : out std_logic_vector(23 downto 0); -- clk->q, for longer paths
+	ZPU_ADDR_FETCH : out std_logic_vector(25 downto 0); -- clk->q, for longer paths
 	
 	-- request
 	MEMORY_FETCH : out std_logic;
@@ -57,7 +57,7 @@ architecture sticky of zpu_glue is
 component ZPUMediumCore is
    generic(
       WORD_SIZE    : integer:=32;  -- 16/32 (2**wordPower)
-      ADDR_W       : integer:=24;  -- Total address space width (incl. I/O)
+      ADDR_W       : integer:=26;  -- Total address space width (incl. I/O)
       MEM_W        : integer:=16;  -- Memory (prog+data+stack) width - stack at end of memory - so end of sdram. 32K ROM, 32K RAM (MAX)
       D_CARE_VAL   : std_logic:='X'; -- Value used to fill the unsused bits
       MULT_PIPE    : boolean:=false; -- Pipeline multiplication
@@ -86,7 +86,7 @@ component ZPUMediumCore is
 		short_write_o: out std_logic); -- never happens
 	end component;	
 			
-	signal zpu_addr_unsigned : unsigned(23 downto 0);
+	signal zpu_addr_unsigned : unsigned(25 downto 0);
 	signal zpu_do_unsigned : unsigned(31 downto 0);
 	signal ZPU_DI_unsigned : unsigned(31 downto 0);
 	
@@ -147,8 +147,8 @@ component ZPUMediumCore is
 	
 	signal zpu_enable : std_logic;
 	
-	signal zpu_addr_next : std_logic_vector(23 downto 0);
-	signal zpu_addr_reg : std_logic_vector(23 downto 0);
+	signal zpu_addr_next : std_logic_vector(25 downto 0);
+	signal zpu_addr_reg : std_logic_vector(25 downto 0);
 
 	signal ZPU_DO_next : std_logic_vector(31 downto 0);
 	signal ZPU_DO_reg : std_logic_vector(31 downto 0);
@@ -192,7 +192,7 @@ begin
 		-- $10000-$1FFFF = Atari
 		-- $20000-$2FFFF = Atari - savestate (gtia/antic/pokey have memory behind them)
 		-- $40000-$4FFFF = Config area
-		if (or_reduce(std_logic_vector(zpu_ADDR_unsigned(23 downto 21))) = '0') then -- special area
+		if (or_reduce(std_logic_vector(zpu_ADDR_unsigned(25 downto 21))) = '0') then -- special area
 			block_mem <= not(zpu_addr_unsigned(18) or zpu_addr_unsigned(17) or zpu_addr_unsigned(16));
 			config_mem <= zpu_addr_unsigned(18);
 			special_mem <= zpu_addr_unsigned(17);

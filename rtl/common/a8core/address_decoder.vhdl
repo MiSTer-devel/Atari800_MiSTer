@@ -14,7 +14,7 @@ use IEEE.STD_LOGIC_MISC.all;
 ENTITY address_decoder IS
 GENERIC
 (
-	low_memory : integer := 0; -- if 0, we assume 8MB SDRAM, if 1, we assume 1MB 'SDRAM', if 2 we assume 512KB 'SDRAM'.
+	low_memory : integer := 0; -- if 0, we assume 32MB SDRAM, if 1, we assume 1MB 'SDRAM', if 2 we assume 512KB 'SDRAM'.
 	system : integer := 0; -- 0=Atari XL/XE, 10=Atari5200 (space left for more systems)
 	sdram_start_bank : integer := 0 -- 0=sdram only. Number of banks in SRAM (SRAM_SIZE/16384)
 );
@@ -32,7 +32,7 @@ PORT
 	ANTIC_ADDR : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
 	ANTIC_FETCH : IN STD_LOGIC;
 
-	DMA_ADDR : in std_logic_vector(23 downto 0);	
+	DMA_ADDR : in std_logic_vector(25 downto 0);
 	DMA_FETCH : in std_logic;
 	DMA_READ_ENABLE : in std_logic;
 	DMA_32BIT_WRITE_ENABLE : in std_logic; -- common case
@@ -147,7 +147,7 @@ PORT
 	WIDTH_32bit_ACCESS : out std_logic;
 	
 		-- interface as though SRAM - this module can take care of caching/write combining etc etc. For first cut... nothing. TODO: What extra info would help me here?
-	SDRAM_ADDR : out std_logic_vector(22 downto 0); -- 1 extra bit for byte alignment
+	SDRAM_ADDR : out std_logic_vector(24 downto 0);
 	SDRAM_READ_EN : out std_logic; -- if no reads pending may be a good time to do a refresh
 	SDRAM_WRITE_EN : out std_logic;
 	--SDRAM_REQUEST : out std_logic; -- Toggle this to issue a new request
@@ -170,8 +170,8 @@ PORT
 END address_decoder;
 
 ARCHITECTURE vhdl OF address_decoder IS
-	signal ADDR_next : std_logic_vector(23 downto 0);
-	signal ADDR_reg : std_logic_vector(23 downto 0);
+	signal ADDR_next : std_logic_vector(25 downto 0);
+	signal ADDR_reg : std_logic_vector(25 downto 0);
 
 	signal DATA_WRITE_next : std_logic_vector(31 downto 0);
 	signal DATA_WRITE_reg : std_logic_vector(31 downto 0);
@@ -238,11 +238,11 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal cpu_fetch_real_next : std_logic;
 	signal cpu_fetch_real_reg : std_logic;
 
-	signal SDRAM_CART_ADDR   : std_logic_vector(22 downto 0);
-	signal SDRAM_BASIC_ROM_ADDR  : std_logic_vector(22 downto 0);
-	signal SDRAM_OS_ROM_ADDR : std_logic_vector(22 downto 0);
-	signal SDRAM_FREEZER_RAM_ADDR   : std_logic_vector(22 downto 0);
-	signal SDRAM_FREEZER_ROM_ADDR   : std_logic_vector(22 downto 0);
+	signal SDRAM_CART_ADDR   : std_logic_vector(24 downto 0);
+	signal SDRAM_BASIC_ROM_ADDR  : std_logic_vector(24 downto 0);
+	signal SDRAM_OS_ROM_ADDR : std_logic_vector(24 downto 0);
+	signal SDRAM_FREEZER_RAM_ADDR   : std_logic_vector(24 downto 0);
+	signal SDRAM_FREEZER_ROM_ADDR   : std_logic_vector(24 downto 0);
 	
 	signal emu_cart_enable: std_logic;
 
@@ -255,7 +255,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	--signal emu_cart_s5_n_out: std_logic;
 	signal emu_cart_rd4: std_logic;
 	signal emu_cart_rd5: std_logic;
-	signal emu_cart_address: std_logic_vector(20 downto 0);
+	signal emu_cart_address: std_logic_vector(21 downto 0);
 	signal emu_cart_address_enable: boolean;
 	signal emu_cart_cctl_dout: std_logic_vector(7 downto 0);
 	signal emu_cart_cctl_dout_enable: std_logic_vector(2 downto 0);
@@ -268,7 +268,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart1_s5_n: std_logic;
 	signal emu_cart1_rd4: std_logic;
 	signal emu_cart1_rd5: std_logic;
-	signal emu_cart1_address: std_logic_vector(20 downto 0);
+	signal emu_cart1_address: std_logic_vector(21 downto 0);
 	signal emu_cart1_address_enable: boolean;
 	signal emu_cart1_cctl_dout: std_logic_vector(7 downto 0);
 	signal emu_cart1_cctl_dout_enable: std_logic_vector(2 downto 0);
@@ -279,7 +279,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart2_s5_n: std_logic;
 	signal emu_cart2_rd4: std_logic;
 	signal emu_cart2_rd5: std_logic;
-	signal emu_cart2_address: std_logic_vector(20 downto 0);
+	signal emu_cart2_address: std_logic_vector(21 downto 0);
 	signal emu_cart2_address_enable: boolean;
 	signal emu_cart2_cctl_dout: std_logic_vector(7 downto 0);
 	signal emu_cart2_cctl_dout_enable: std_logic_vector(2 downto 0);
@@ -368,18 +368,18 @@ BEGIN
 			bank1reg <= bank1next;
 			basic_reg <= basic_next;
 
-			if addr_next(23 downto 12) = x"804" then
+			if addr_next(25 downto 12) = "10" & x"004" then
 				bbtype <= '0';
 				sctype <= '0';
-			elsif addr_next(23 downto 16) = x"90" then
+			elsif addr_next(25 downto 16) = "10" & x"10" then
 				bbtype <= '1';
-			elsif addr_next(23 downto 16) = x"A0" then
+			elsif addr_next(25 downto 16) = "10" & x"20" then
 				sctype <= '1';
 			end if;
 		end if;
 	end process;
 
-	atari_dma_access <= not(or_reduce(addr_next(23 downto 18)));
+	atari_dma_access <= not(or_reduce(addr_next(25 downto 18)));
 	atari_clk_enable <= notify_cpu or notify_antic; -- i.e. we enable cart and freezer on the final cycle of a 6502 or antic access
 	atari_with_dma_clk_enable <= notify_cpu or notify_antic or (notify_dma and atari_dma_access);
 
@@ -635,7 +635,7 @@ BEGIN
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
 					pbi_cycle_next <= pbi_takeover_adj;
-					addr_next <= "00000000"&antic_ADDR;
+					addr_next <= "0000000000"&antic_ADDR;
 					width_8bit_next <= '1';					
 					if (pbi_takeover_adj='0' and request_complete = '1') then
 						notify_antic <= '1';
@@ -673,7 +673,7 @@ BEGIN
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
 					pbi_cycle_next <= pbi_takeover_adj;
-					addr_next <= "00000000"&cpu_ADDR;
+					addr_next <= "0000000000"&cpu_ADDR;
 					data_WRITE_next(7 downto 0) <= cpu_WRITE_DATA;
 					width_8bit_next <= '1';
 					write_enable_next <= not(cpu_WRITE_N) and not(pbi_takeover_adj);
@@ -689,7 +689,7 @@ BEGIN
 				elsif upload_request = '1' then
 					start_request <= '1';
 					width_8bit_next <= '1';
-					addr_next <= '1' & upload_addr;
+					addr_next <= "100" & upload_addr;
 					data_write_next(7 downto 0) <= upload_data;
 					write_enable_next <= '1';
 					if (request_complete = '1') then
@@ -834,39 +834,37 @@ BEGIN
 
 gen_normal_memory : if low_memory=0 generate
 
-	-- SRAM memory map (512k)
-	-- base 64k RAM  - banks 0-3    "000 0000 1111 1111 1111 1111" (TOP)
-	-- to 512k RAM   - banks 4-31   "000 0111 1111 1111 1111 1111" (TOP)
-	-- SDRAM memory map (8MB)
-	-- base 64k RAM  - banks 0-3    "000 0000 1111 1111 1111 1111" (TOP)
-	-- to 512k RAM   - banks 4-31   "000 0111 1111 1111 1111 1111" (TOP) 
-	-- to 4MB RAM    - banks 32-255 "011 1111 1111 1111 1111 1111" (TOP)
-	-- +64k          - banks 256-259"100 0000 0000 1111 1111 1111" (TOP)
+	-- The beginning of this might reside in internal RAM, depending on how much of it is specified
+	-- base 64k RAM  - banks 0-3    "0 0000 0000 1111 1111 1111 1111" (TOP)
+	-- to 512k RAM   - banks 4-31   "0 0000 0111 1111 1111 1111 1111" (TOP)
+	-- SDRAM memory map (32MB)
+	-- base 64k RAM  - banks 0-3    "0 0000 0000 1111 1111 1111 1111" (TOP)
+	-- to 512k RAM   - banks 4-31   "0 0000 0111 1111 1111 1111 1111" (TOP) 
+	-- to 4MB RAM    - banks 32-255 "0 0011 1111 1111 1111 1111 1111" (TOP)
+	-- +64k          - banks 256-259"0 0100 0000 0000 1111 1111 1111" (TOP)
 	-- SCRATCH       - 4MB+64k-5MB
-	-- 128k freezer ram		"100 100Y YYYY YYYY YYYY YYYY"
-	SDRAM_FREEZER_RAM_ADDR <= "100100" & freezer_access_address;
-	-- 64k freezer rom		"100 1010 YYYY YYYY YYYY YYYY"
-	SDRAM_FREEZER_ROM_ADDR <= "1001010" & freezer_access_address(15 downto 0);
-	-- CARTS         -              "101 YYYY YYY0 0000 0000 0000" (BOT) - 2MB! 8kb banks
-	--SDRAM_CART_ADDR      <= "101"&cart_select& "0000000000000";
-	SDRAM_CART_ADDR	<= "1" & emu_cart_address(20) & (not emu_cart_address(20)) & emu_cart_address(19 downto 0);
-	
-	-- BASIC/OS ROM  -              "111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K
-	SDRAM_BASIC_ROM_ADDR <= "111"&"000000" &"00000000000000";
-	SDRAM_OS_ROM_ADDR    <= "111"&"000010" &"00000000000000" when atari800mode = '1' else
-	                        "111"&"000001" &"00000000000000";
-	-- SYSTEM        -              "111 1000 0000 0000 0000 0000" (BOT) - LAST 512K
+	-- 128k freezer ram		"0 0100 100Y YYYY YYYY YYYY YYYY"
+	SDRAM_FREEZER_RAM_ADDR <= "00100100" & freezer_access_address;
+	-- 64k freezer rom		"0 0100 1010 YYYY YYYY YYYY YYYY"
+	SDRAM_FREEZER_ROM_ADDR <= "001001010" & freezer_access_address(15 downto 0);
+	-- CARTS         -              "0 0101 YYYY YYY0 0000 0000 0000" (BOT) - 2MB! 8kb banks
+	SDRAM_CART_ADDR	<= "010" & emu_cart_address(21 downto 0);
+	-- BASIC/OS ROM  -              "0 0111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K below 8MB
+	SDRAM_BASIC_ROM_ADDR <= "00111"&"000000" &"00000000000000";
+	SDRAM_OS_ROM_ADDR    <= "00111"&"000010" &"00000000000000" when atari800mode = '1' else
+				"00111"&"000001" &"00000000000000";
+	-- SYSTEM        -              "0 0111 1000 0000 0000 0000 0000" (BOT) - Free 512K below 8MB
 
 end generate;
 
 gen_low_memory1 : if low_memory=1 generate
 
 	-- SRAM memory map (1024k) for Aeon lite 
-	SDRAM_CART_ADDR      <= "0000" & "1"&emu_cart_address(17 downto 0); 
-	SDRAM_BASIC_ROM_ADDR <= "000" & x"68000";
-	SDRAM_OS_ROM_ADDR    <= "000" & x"6c000";
-	SDRAM_FREEZER_RAM_ADDR <= "000" & "001" & freezer_access_address;
-	SDRAM_FREEZER_ROM_ADDR <= "000" & x"7" & freezer_access_address(15 downto 0);
+	SDRAM_CART_ADDR      <= "000000" & "1"&emu_cart_address(17 downto 0);
+	SDRAM_BASIC_ROM_ADDR <= "00000" & x"68000";
+	SDRAM_OS_ROM_ADDR    <= "00000" & x"6c000";
+	SDRAM_FREEZER_RAM_ADDR <= "00000" & "001" & freezer_access_address;
+	SDRAM_FREEZER_ROM_ADDR <= "00000" & x"7" & freezer_access_address(15 downto 0);
 
 -- 0x10000-0x1FFFF (0x810000 in zpu space) = freeze backup - 64k
 -- 0x20000-0x3FFFF (0x820000 in zpu space) = freezer ram (128k)
@@ -880,9 +878,9 @@ end generate;
 gen_low_memory2 : if low_memory=2 generate
 
 	-- SRAM memory map (512k) for Papilio duo 
-	SDRAM_CART_ADDR      <= "0000" & "01"&emu_cart_address(16 downto 0); 
-	SDRAM_BASIC_ROM_ADDR <= "0000" & "0111000000000000000";
-	SDRAM_OS_ROM_ADDR    <= "0000" & "0111100000000000000";
+	SDRAM_CART_ADDR      <= "000000" & "01"&emu_cart_address(16 downto 0);
+	SDRAM_BASIC_ROM_ADDR <= "000000" & "0111000000000000000";
+	SDRAM_OS_ROM_ADDR    <= "000000" & "0111100000000000000";
 
 end generate;
 
@@ -962,7 +960,7 @@ end generate;
 		
 		ROM_ADDR <= (others=>'0');
 		RAM_ADDR <= addr_next(18 downto 0);
-		SDRAM_ADDR <= addr_next(22 downto 0);
+		SDRAM_ADDR <= addr_next(24 downto 0);
 		
 		PBI_ADDR <= ADDR_next(15 downto 0);
 		
@@ -1297,7 +1295,7 @@ end generate;
 						emu_pbi_d8xx <= '1';
 						-- remap to SDRAM
 						if (emu_pbi_rom_address_enable = '1') then
-							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR(22 downto 14) & '1' & emu_pbi_rom_address;
+							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR(24 downto 14) & '1' & emu_pbi_rom_address;
 							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
 							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;
@@ -1614,27 +1612,27 @@ end generate;
 		else		
 			sdram_chip_select <= '0';
 			ram_chip_select <= '0';													
-			case addr_next(23 downto 21) is			
-				when "000" =>				
+			case addr_next(25 downto 21) is
+				when "00000" =>
 					-- internal area for zpu, never happens!
-				when "001" => -- sram, 512K
+				when "00001" => -- sram, 512K
 					MEMORY_DATA_INT(15 downto 0) <= RAM_DATA;
 					ram_chip_select <= start_request;
 					request_complete <= ram_request_COMPLETE;									
 					RAM_ADDR <= addr_next(18 downto 0);
-				when "010"|"011" => -- flash rom, 4MB/internal rom
+				when "00010"|"00011" => -- flash rom, 4MB/internal rom
 					request_complete <= ROM_REQUEST_COMPLETE;
 					MEMORY_DATA_INT(7 downto 0) <= ROM_DATA;
 					rom_request <= start_request;
 					ROM_ADDR <= addr_next(21 downto 0);
 					ROM_WR_ENABLE <= write_enable_next;
 					
-				when "100"|"101"|"110"|"111" => -- sdram, 8MB
-					if (addr_next(22 downto 14)>=std_logic_vector(to_unsigned(sdram_start_bank,9))) then
+				when "10000"|"10001"|"10010"|"10011"|"10100"|"10101"|"10110"|"10111"|"11000"|"11001"|"11010"|"11011"|"11100"|"11101"|"11110"|"11111" => -- sdram, 32MB
+					if (addr_next(24 downto 14)>=std_logic_vector(to_unsigned(sdram_start_bank,11))) then
 						MEMORY_DATA_INT <= SDRAM_DATA;
 						sdram_chip_select <= start_request;
 						request_complete <= sdram_request_COMPLETE;
-						SDRAM_ADDR <= addr_next(22 downto 0);
+						SDRAM_ADDR <= addr_next(24 downto 0);
 					else
 						MEMORY_DATA_INT(7 downto 0) <= RAM_DATA(7 downto 0);
 						ram_chip_select <= start_request;
