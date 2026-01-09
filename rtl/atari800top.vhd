@@ -53,7 +53,7 @@ PORT
 	SDRAM_DQ   : INOUT STD_LOGIC_VECTOR(15 DOWNTO 0);
 
 	TURBOFREEZER_ROM_LOADED : in std_logic;
-	UPLOAD_ADDR : in std_logic_vector(22 downto 0);
+	UPLOAD_ADDR : in std_logic_vector(24 downto 0);
 	UPLOAD_REQUEST : in std_logic;
 	UPLOAD_DATA : in std_logic_vector(7 downto 0);
 	UPLOAD_READY : out std_logic;

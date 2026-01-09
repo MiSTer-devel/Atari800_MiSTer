@@ -40,7 +40,7 @@ PORT
 	DMA_8BIT_WRITE_ENABLE : in std_logic; -- for hardware regs	
 	DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
 
-	UPLOAD_ADDR : in std_logic_vector(22 downto 0) := (others => '0');
+	UPLOAD_ADDR : in std_logic_vector(24 downto 0) := (others => '0');
 	UPLOAD_REQUEST : in std_logic := '0';
 	UPLOAD_DATA : in std_logic_vector(7 downto 0) := (others => '0');
 	UPLOAD_READY : out std_logic;
@@ -689,7 +689,7 @@ BEGIN
 				elsif upload_request = '1' then
 					start_request <= '1';
 					width_8bit_next <= '1';
-					addr_next <= "100" & upload_addr;
+					addr_next <= '1' & upload_addr;
 					data_write_next(7 downto 0) <= upload_data;
 					write_enable_next <= '1';
 					if (request_complete = '1') then
