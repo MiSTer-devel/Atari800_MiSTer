@@ -1018,7 +1018,7 @@ end generate;
 		RAM_ADDR(13 downto 0) <= addr_next(13 downto 0);
 		RAM_ADDR(18 downto 14) <= extended_bank(4 downto 0);
 
-		if (memac_check = '1') then
+		if (memac_check = '1') and not((emu_cart_enable = '1') and emu_cart_address_enable) then
 			MEMORY_DATA_INT(7 DOWNTO 0) <= memac_data_read;
 			memac_chip_select <= start_request;
 			request_complete <= memac_request_complete;
@@ -1222,17 +1222,17 @@ end generate;
 					if (emu_cart_enable = '1' and emu_cart_rd4 = '1') then
 						emu_cart_s4_n <= '0';
 						-- remap to SDRAM
+						sdram_chip_select <= '0';
+						ram_chip_select <= '0';
+						request_complete <= '1';
+						MEMORY_DATA_INT(7 downto 0) <= x"ff";
 						if (emu_cart_address_enable) then
 							SDRAM_ADDR <= SDRAM_CART_ADDR;
-							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
-							request_complete <= sdram_request_COMPLETE;
-							sdram_chip_select <= start_request;
-							ram_chip_select <= '0';
-						else
-							MEMORY_DATA_INT(7 downto 0) <= x"ff";
-							request_complete <= '1';
-							sdram_chip_select <= '0';
-							ram_chip_select <= '0';
+							if (write_enable_next = '0') then
+								MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+								request_complete <= sdram_request_COMPLETE;
+								sdram_chip_select <= start_request;
+							end if;
 						end if;
 					end if;	
 			
@@ -1244,18 +1244,18 @@ end generate;
 					if (emu_cart_enable = '1' and emu_cart_rd5 = '1') then
 						emu_cart_s5_n <= '0';
 						-- remap to SDRAM
+						sdram_chip_select <= '0';
+						ram_chip_select <= '0';
+						request_complete <= '1';
+						MEMORY_DATA_INT(7 downto 0) <= x"ff";
 						if (emu_cart_address_enable) then
 							SDRAM_ADDR <= SDRAM_CART_ADDR;
 							-- emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
-							MEMORY_DATA_INT(7 downto 0) <= emu_cart_int_d_out;
-							request_complete <= sdram_request_COMPLETE;
-							sdram_chip_select <= start_request;
-							ram_chip_select <= '0';
-						else
-							MEMORY_DATA_INT(7 downto 0) <= x"ff";
-							request_complete <= '1';
-							sdram_chip_select <= '0';
-							ram_chip_select <= '0';
+							if (write_enable_next = '0') then
+								MEMORY_DATA_INT(7 downto 0) <= emu_cart_int_d_out;
+								request_complete <= sdram_request_COMPLETE;
+								sdram_chip_select <= start_request;
+							end if;
 						end if;
 					else
 						if (atari800mode = '0' and basic_reg = '1') then
@@ -1280,10 +1280,9 @@ end generate;
 									rom_request <= start_request;															
 								end if;
 							end if;
-						
 							ROM_ADDR <= "000000"&"110"&ADDR_next(12 downto 0); -- x0C000 based 8k
-						 SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR;
-						 SDRAM_ADDR(12 downto 0) <= ADDR_next(12 downto 0); -- x0C000 based 8k							
+							SDRAM_ADDR <= SDRAM_BASIC_ROM_ADDR;
+							SDRAM_ADDR(12 downto 0) <= ADDR_next(12 downto 0); -- x0C000 based 8k
 						end if;
 					end if;
 					
