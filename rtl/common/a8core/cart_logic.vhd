@@ -785,12 +785,6 @@ begin
 		rd5 <= '0';
 	end if;
 
-	-- disable writes
-	--if  (rw = '0' and cart_write_enable = '0') then
-	if rw = '0' then
-		cart_address_enable <= false;
-	end if;
-
 end process access_cart_data;
 
 end vhdl;
