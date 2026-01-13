@@ -146,7 +146,7 @@ ENTITY atari800core_simple_sdram is
 		DMA_MEMORY_DATA : out std_logic_vector(31 downto 0);
 
 		-- OS data uploading interface
-		UPLOAD_ADDR : in std_logic_vector(22 downto 0);
+		UPLOAD_ADDR : in std_logic_vector(24 downto 0);
 		UPLOAD_REQUEST : in std_logic;
 		UPLOAD_DATA : in std_logic_vector(7 downto 0);
 		UPLOAD_READY : out std_logic;

@@ -235,8 +235,8 @@ localparam CONF_STR = {
 	"-;",
 	"S5,XEXCOMEXE,Load XEX;",
 	"-;",
-	"S4,CARROMBIN,Load Cart;",
-	"S7,CARROMBIN,Stack Cart;",
+	"F8,CARROMBIN,Load Cart;",
+	"F9,CARROMBIN,Stack Cart;",
 	"-;",
 	"P1,Drives & Loader;",
 	"P1-;",
@@ -302,7 +302,7 @@ localparam CONF_STR = {
 	"-;",
 	"r7,Warm Reset (F9);",
 	"r8,Cold Reset (F10);",
-	"R0,Core Reset;",
+	"R0,Reset & Detach Carts;",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
 	"V,v",`BUILD_DATE
 };
@@ -361,7 +361,7 @@ wire        sd_buff_wr;
 wire  [7:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
-wire [15:0] ioctl_addr;
+wire [23:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        ioctl_wr;
 wire        ioctl_download;
@@ -373,6 +373,17 @@ wire        sdram_ready;
 
 wire [64:0] rtc;
 
+reg ioctl_download_old = 0;
+reg [31:0] ioctl_download_size = 0;
+
+always @(posedge clk_sys) begin
+	if(!ioctl_download & !ioctl_download_old)
+		ioctl_download_size <= 32'h0;
+	if(ioctl_download & cart_rom_index & ioctl_wr)
+		ioctl_download_size <= ioctl_download_size + 32'h1;
+	ioctl_download_old <= ioctl_download;
+end
+
 always @(posedge clk_sys) begin
 	reg started = 0;
 	if(sdram_ready && sdram_erased) begin
@@ -380,7 +391,7 @@ always @(posedge clk_sys) begin
 			started <= 1;
 			ioctl_wait <= 0;
 		end
-		if(ioctl_download & system_rom_index) begin
+		if(ioctl_download & (system_rom_index | cart_rom_index)) begin
 			if(upload_ready) begin
 				ioctl_wait <= 0;
 				ioctl_req <= 0;
@@ -520,7 +531,7 @@ atari800top atari800top
 	.SDRAM_DQML(SDRAM_DQML),
 
 	.TURBOFREEZER_ROM_LOADED(turbofreezer_rom_loaded),
-	.UPLOAD_ADDR(sdram_erased ? rom_upload_addr : {7'b1110000, sdram_erase_addr[15:0]}),
+	.UPLOAD_ADDR(sdram_erased ? (cart_rom_index ? cart_upload_addr : rom_upload_addr) : {7'b001110000, sdram_erase_addr[15:0]}),
 	.UPLOAD_DATA(sdram_erased ? ioctl_dout : 8'hff),
 	.UPLOAD_REQUEST(sdram_erased ? ioctl_req : sdram_erase_req),
 	.UPLOAD_READY(upload_ready),
@@ -699,13 +710,26 @@ wire turbofreezer_rom_index = ioctl_index[5:0] == 3;
 // Should be set when anything that goes into SDRAM gets loaded
 wire system_rom_index = xl_rom_index | basic_rom_index | osab_rom_index | pbi_rom_index | turbofreezer_rom_index;
 
-wire[22:0] rom_upload_addr;
+wire[24:0] rom_upload_addr;
 assign rom_upload_addr =
-	xl_rom_index ? {9'b111000001, ioctl_addr[13:0]} :
-	(osab_rom_index ? {9'b111000010, ioctl_addr[13:0]} + 14'h1800 :
-	(basic_rom_index ? {9'b111000000, 1'b0, ioctl_addr[12:0]} :
-	(pbi_rom_index ? {9'b111000000, 1'b1, ioctl_addr[12:0]} : 
-	{7'b1001010, ioctl_addr[15:0]}))); // Turbo Freezer
+	xl_rom_index ? {11'b00111000001, ioctl_addr[13:0]} :
+	(osab_rom_index ? {11'b00111000010, ioctl_addr[13:0]} + 14'h1800 :
+	(basic_rom_index ? {11'b00111000000, 1'b0, ioctl_addr[12:0]} :
+	(pbi_rom_index ? {11'b00111000000, 1'b1, ioctl_addr[12:0]} : 
+	{9'b001001010, ioctl_addr[15:0]}))); // Turbo Freezer
+
+wire cart1_rom_index = ioctl_index[5:0] == 8;
+wire cart2_rom_index = ioctl_index[5:0] == 9;
+wire cart_rom_index = cart1_rom_index | cart2_rom_index;
+
+wire[24:0] cart_upload_addr;
+wire[24:0] cart1_upload_addr;
+wire[24:0] cart2_upload_addr;
+
+assign cart1_upload_addr = ioctl_index[7:6] ? {2'b01, ioctl_addr[22:0]} : {2'b01, ioctl_addr[22:0]} - 25'h10;
+assign cart2_upload_addr = ioctl_index[7:6] ? {5'b01001, ioctl_addr[19:0]} : {5'b01001, ioctl_addr[19:0]} - 25'h10;
+
+assign cart_upload_addr = cart1_rom_index ? cart1_upload_addr : cart2_upload_addr;
 
 reg mode800 = 0;
 reg modepbi = 0;
@@ -840,17 +864,24 @@ always @(posedge clk_sys) begin
 		if(img_mounted[1]) zpu_fileno <= 1;
 		if(img_mounted[2]) zpu_fileno <= 2;
 		if(img_mounted[3]) zpu_fileno <= 3;
-		if(img_mounted[4]) zpu_fileno <= 4;
 		if(img_mounted[5]) zpu_fileno <= 5;
 		if(img_mounted[6]) zpu_fileno <= 6;
-		if(img_mounted == 128) zpu_fileno <= 7;
 
 		zpu_filetype <= ioctl_index[7:6];
-		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5] | status[57];
+		zpu_readonly <= img_readonly | img_mounted[5] | status[57];
 		zpu_mounted  <= ~zpu_mounted;
 		zpu_filesize <= img_size[31:0];
 	end
 	
+	if(!ioctl_download & ioctl_download_old & cart_rom_index) begin
+		if(cart1_rom_index) zpu_fileno <= 4;
+		if(cart2_rom_index) zpu_fileno <= 7;
+		zpu_filetype <= ioctl_index[7:6];
+		zpu_readonly <= 1;
+		zpu_mounted  <= ~zpu_mounted;
+		zpu_filesize <= ioctl_download_size;
+	end
+
 	if(reset) zpu_mounted <= 0;
 end
 

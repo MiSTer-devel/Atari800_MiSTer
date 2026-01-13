@@ -205,14 +205,9 @@ static struct CartDef cartdef[] =
 
 char comp[sizeof(cartdef)/sizeof(cartdef[0])];
 
-int load_car(struct SimpleFile* file, u08 stacked)
+int check_car(struct SimpleFile* file, u08 stacked)
 {
 	int i;
-	if (CARTRIDGE_MEM == 0)
-	{
-		//LOG("no cartridge memory\n");
-		return 0;
-	}
 
 	struct joystick_status joy;
 	joy.x_ = joy.y_ = joy.fire_ = joy.escape_ = 0;
@@ -238,16 +233,11 @@ int load_car(struct SimpleFile* file, u08 stacked)
 		if(n != 1)
 		{
 			if(!n && stacked) return 0;
-			unsigned char *one_block = (unsigned char *)(CARTRIDGE_MEM + 0x1FE000);
-			ok = file_read(file, one_block, 0x2000, &len);
-			file_seek(file, 0);
-			if(ok == SimpleFile_OK && len == 0x2000)
+			unsigned char *one_block = (unsigned char *)CARTRIDGE_MEM;
+			if(one_block[0] == 'S' && one_block[1] == 'D' && one_block[2] == 'X' && (one_block[0x1FF3] == 0xE0 || one_block[0x1FF3] == 0xE1))
 			{
-				if(one_block[0] == 'S' && one_block[1] == 'D' && one_block[2] == 'X' && (one_block[0x1FF3] == 0xE0 || one_block[0x1FF3] == 0xE1))
-				{
-					mode = (one_block[0x1FF3] == 0xE1) ? TC_MODE_SDX_SIDE2 : TC_MODE_SDX_U1MB;
-					n = 1;
-				}
+				mode = (one_block[0x1FF3] == 0xE1) ? TC_MODE_SDX_SIDE2 : TC_MODE_SDX_U1MB;
+				n = 1;
 			}
 			if(!n)
 			{
@@ -294,13 +284,7 @@ int load_car(struct SimpleFile* file, u08 stacked)
 	}
 	else
 	{
-		unsigned char header[16];
-		ok = file_read(file, header, 16, &len);
-		if (ok != SimpleFile_OK || len != 16)
-		{
-			//LOG("cannot read cart header\n");
-			return 0;
-		}
+		unsigned char *header = (unsigned char *)(CARTRIDGE_MEM - 16);
 		carttype = header[7];
 
 		// search for cartridge definition
@@ -318,13 +302,6 @@ int load_car(struct SimpleFile* file, u08 stacked)
 	}
 	if(stacked && (byte_len > 0x100000 || carttype == 85))
 	{
-		return 0;
-	}
-
-	ok = file_read(file, CARTRIDGE_MEM + (stacked ? 0x100000 : 0), byte_len, &len);
-	if (ok != SimpleFile_OK || len != byte_len)
-	{
-		//LOG("cannot read cart data\n");
 		return 0;
 	}
 
@@ -398,7 +375,6 @@ void actions()
 
 		if(num<4)
 		{
-			//set_cart_select(0);
 			set_drive_status(num, file->size ? file : 0);
 		}
 		else if(num == 6)
@@ -408,7 +384,6 @@ void actions()
 				set_pause_6502(1);
 				set_cart_select(0);
 				set_cart2_select(0);
-				// TODO Unmount all the other drives?
 				set_drive_status(0, file);
 				reboot(1, 0);
 				// Important: if you set Option key before reset it will be cleared by reset
@@ -469,59 +444,33 @@ void actions()
 			set_pause_6502(1);
 			freeze();
 
-			if(!file->size)
+			int type = check_car(file, stacked);
+
+			set_cart2_select(0);
+			if(!stacked)
 			{
-				if(stacked)
-				{
-					set_cart2_select(0);	
-				}
-				else
-				{
-					set_cart_select(0);
-				}
+				set_cart_select(0);
+			}
+
+			if(!type)
+			{
+				clearscreen();
+				debug_pos = 0;
+				debug_adjust = 0;
+				printf("Unknown cart type!");
+				wait_us(2000000);
 			}
 			else
 			{
-				int type = load_car(file, stacked);
-
 				if(stacked)
 				{
-					set_cart2_select(0);	
+					set_cart2_select(type);	
 				}
 				else
 				{
-					set_cart_select(0);					
-				}
-				if(!type)
-				{
-					clearscreen();
-					debug_pos = 0;
-					debug_adjust = 0;
-					printf("Unknown cart type!");
-					wait_us(2000000);
-				}
-				else
-				{
-					if(stacked)
-					{
-						set_cart2_select(type);	
-					}
-					else
-					{
-						if(type != TC_MODE_SDX64 && type != TC_MODE_SDX128 &&
-							type != TC_MODE_ATRAX_SDX64 && type != TC_MODE_ATRAX_SDX128 && 
-							type != TC_MODE_SDX_U1MB && type != TC_MODE_SDX_SIDE2)
-						{
-							for(mounted = 0; mounted < 4; mounted ++)
-							{
-								set_drive_status(mounted, 0);
-							}
-						}
-						set_cart_select(type);
-					}
+					set_cart_select(type);
 				}
 			}
-
 			restore();
 			if(!stacked || get_mode800())
 			{
