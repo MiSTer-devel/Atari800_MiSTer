@@ -492,8 +492,8 @@ assign CLK_VIDEO = clk_vdo;
 wire cpu_halt;
 
 wire [15:0] laudio, raudio;
-assign AUDIO_L = {laudio[15],laudio[15:1]};
-assign AUDIO_R = status[20] ? {raudio[15],raudio[15:1]} : AUDIO_L;
+assign AUDIO_L = cpu_halt ? 16'b0000000000000000 : {laudio[15],laudio[15:1]};
+assign AUDIO_R = cpu_halt ? 16'b0000000000000000 : (status[20] ? {raudio[15],raudio[15:1]} : AUDIO_L);
 assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
 
@@ -537,6 +537,7 @@ atari800top atari800top
 	.UPLOAD_READY(upload_ready),
 	.SDRAM_READY(sdram_ready),
 	.INIT_HOLD(init_hold),
+	.OSD_PAUSE(ioctl_download),
 
 	.PAL(pal_video),
 	.EXT_ANTIC(status[33]),
