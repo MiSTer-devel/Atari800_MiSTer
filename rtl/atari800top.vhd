@@ -58,6 +58,7 @@ PORT
 	UPLOAD_DATA : in std_logic_vector(7 downto 0);
 	UPLOAD_READY : out std_logic;
 	INIT_HOLD : in std_logic;
+	OSD_PAUSE : in std_logic;
 	SDRAM_READY : out std_logic;
 
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
@@ -535,7 +536,7 @@ PORT MAP
 	ZPU_OUT3 => zpu_out3
 );
 
-pause_atari <= zpu_out1(0) or INIT_HOLD;
+pause_atari <= zpu_out1(0) or INIT_HOLD or OSD_PAUSE;
 reset_atari <= zpu_out1(1);
 emulated_cartridge2_select <= zpu_out1(16 downto 9);
 emulated_cartridge_select <= zpu_out1(24 downto 17);
