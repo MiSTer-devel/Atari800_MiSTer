@@ -300,7 +300,7 @@ int check_car(struct SimpleFile* file, u08 stacked)
 		byte_len = (unsigned int) def->size << 10;
 		mode = def->mode;
 	}
-	if(stacked && (byte_len > 0x100000 || carttype == 85))
+	if(stacked && (byte_len > 0x100000 || carttype == 85)) // This was Corina cart, no longer with us...
 	{
 		return 0;
 	}
@@ -442,9 +442,9 @@ void actions()
 		{
 			u08 stacked = (num == 7) ? 1 : 0;
 			set_pause_6502(1);
-			freeze();
+			//freeze();
 
-			int type = check_car(file, stacked);
+			int type = 1; // check_car(file, stacked);
 
 			set_cart2_select(0);
 			if(!stacked)
@@ -452,16 +452,16 @@ void actions()
 				set_cart_select(0);
 			}
 
-			if(!type)
-			{
-				clearscreen();
-				debug_pos = 0;
-				debug_adjust = 0;
-				printf("Unknown cart type!");
-				wait_us(2000000);
-			}
-			else
-			{
+			//if(!type)
+			//{
+			//	clearscreen();
+			//	debug_pos = 0;
+			//	debug_adjust = 0;
+			//	printf("Unknown cart type!");
+			//	wait_us(2000000);
+			//}
+			//else
+			//{
 				if(stacked)
 				{
 					set_cart2_select(type);	
@@ -470,8 +470,8 @@ void actions()
 				{
 					set_cart_select(type);
 				}
-			}
-			restore();
+			//}
+			//restore();
 			if(!stacked || get_mode800())
 			{
 				reboot(1, 0);

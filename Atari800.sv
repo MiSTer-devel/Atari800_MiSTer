@@ -181,7 +181,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
 
-assign LED_USER  = drive_led | ioctl_download;
+assign LED_USER  = drive_led | file_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -324,15 +324,18 @@ pll pll
 	.locked(locked)
 );
 
-wire reset = RESET | (status[0] & ~init_hold) | ~initReset_n | buttons[1];
+//wire reset = RESET | (status[0] & ~init_hold) | ~initReset_n | buttons[1];
 
-reg initReset_n = 0;
-always @(posedge clk_sys) begin
-	integer timeout = 0;
-	
-	if(timeout < 1000000) timeout <= timeout + 1;
-	else initReset_n <= 1;
-end
+wire reset = RESET;
+
+
+//reg initReset_n = 0;
+//always @(posedge clk_sys) begin
+//	integer timeout = 0;
+//	
+//	if(timeout < 1000000) timeout <= timeout + 1;
+//	else initReset_n <= 1;
+//end
 
 //////////////////   HPS I/O   ///////////////////
 wire [15:0] joy_0;
@@ -361,17 +364,35 @@ wire        sd_buff_wr;
 wire  [7:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
-wire [23:0] ioctl_addr;
+wire [26:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
+reg   [7:0] ioctl_din;
 wire        ioctl_wr;
+wire        ioctl_rd;
 wire        ioctl_download;
+wire        ioctl_upload;
 wire  [7:0] ioctl_index;
 reg         ioctl_wait = 1;
 reg         ioctl_req = 0;
 wire        upload_ready;
 wire        sdram_ready;
 
+wire [35:0] EXT_BUS;
+wire  [7:0] cart1_select;
+wire  [7:0] cart2_select;
+wire        set_reset;
+wire        set_pause;
+wire        set_freezer;
+wire        set_reset_rnmi;
+
+wire  [7:0] hps_dma_data_in;
+wire        dma_ready;
+reg         dma_req = 0;
+
 wire [64:0] rtc;
+
+wire file_download;
+assign file_download = ioctl_download & (system_rom_index | cart_rom_index);
 
 reg ioctl_download_old = 0;
 reg [31:0] ioctl_download_size = 0;
@@ -391,17 +412,32 @@ always @(posedge clk_sys) begin
 			started <= 1;
 			ioctl_wait <= 0;
 		end
-		if(ioctl_download & (system_rom_index | cart_rom_index)) begin
-			if(upload_ready) begin
-				ioctl_wait <= 0;
-				ioctl_req <= 0;
+		if(ioctl_download | ioctl_upload) begin
+			if(ioctl_download & (system_rom_index | cart_rom_index)) begin
+				if(upload_ready) begin
+					ioctl_wait <= 0;
+					ioctl_req <= 0;
+				end
+				if(ioctl_wr) begin
+					ioctl_wait <= 1;
+					ioctl_req <= 1;
+				end
 			end
-			if(ioctl_wr) begin
-				ioctl_wait <= 1;
-				ioctl_req <= 1;
+			if(ioctl_index == 99) begin
+				if(dma_ready) begin
+					if(ioctl_upload)
+						ioctl_din <= hps_dma_data_in;
+					ioctl_wait <= 0;
+					dma_req <= 0;
+				end
+				if((ioctl_wr & ioctl_download) | (ioctl_rd & ioctl_upload)) begin
+					ioctl_wait <= 1;
+					dma_req <= 1;
+				end
 			end
 		end
-		else ioctl_wait <= 0;
+		else
+			ioctl_wait <= 0;
 	end
 end
 
@@ -451,7 +487,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({~status[2] & pbi_rom_loaded, status[31] & status[5], status[5] & ~status[59] & ~status[60], ~status[2] & status[42], status[2], en216p}),
+	.status_menumask({~status[2] & pbi_rom_loaded, status[31] & status[5], status[5] & ~status[59] & ~status[60], ~status[2] & status[42] & pbi_rom_loaded, status[2], en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -471,13 +507,17 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 	.img_size(img_size),
 
 	.ioctl_download(ioctl_download),
+	.ioctl_upload(ioctl_upload),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
+	.ioctl_din(ioctl_din),
 	.ioctl_wr(ioctl_wr),
+	.ioctl_rd(ioctl_rd),
 	.ioctl_index(ioctl_index),
 	.ioctl_wait(ioctl_wait),
 
-	.RTC(rtc)
+	.RTC(rtc),
+	.EXT_BUS(EXT_BUS)
 );
 
 
@@ -536,8 +576,21 @@ atari800top atari800top
 	.UPLOAD_REQUEST(sdram_erased ? ioctl_req : sdram_erase_req),
 	.UPLOAD_READY(upload_ready),
 	.SDRAM_READY(sdram_ready),
-	.INIT_HOLD(init_hold),
-	.OSD_PAUSE(ioctl_download),
+	.OSD_PAUSE(file_download),
+	.SET_RESET_IN(set_reset),
+	.SET_PAUSE_IN(set_pause),
+	.SET_FREEZER_IN(set_freezer),
+	.SET_RESET_RNMI_IN(set_reset_rnmi),
+	.CART1_SELECT_IN(cart1_select),
+	.CART2_SELECT_IN(cart2_select),
+	.HOT_KEYS(atari_hotkeys),
+	
+	.HPS_DMA_ADDR(ioctl_addr[25:0]),
+	.HPS_DMA_REQ(dma_req),
+	.HPS_DMA_READ_ENABLE(ioctl_upload),
+	.HPS_DMA_DATA_OUT(ioctl_dout),
+	.HPS_DMA_DATA_IN(hps_dma_data_in),
+	.HPS_DMA_READY(dma_ready),
 
 	.PAL(pal_video),
 	.EXT_ANTIC(status[33]),
@@ -566,7 +619,7 @@ atari800top atari800top
 	.ATX_MODE(~status[38]),
 	.DRIVE_LED(drive_led),
 	.WARM_RESET_MENU(status[39]),
-	.COLD_RESET_MENU(status[40] | load_reset),
+	.COLD_RESET_MENU(status[40] | buttons[1] | load_reset),
 	.RTC(rtc),
 	.VBXE_MODE({status[63],status[60],status[59]}),
 	.VBXE_PALETTE_RGB(vbxe_palette_rgb_out),
@@ -706,6 +759,12 @@ wire basic_rom_index = (~status[41] && ioctl_index[7:0] == 8'b01000000) || ioctl
 wire osab_rom_index = (~status[41] && ioctl_index[7:0] == 8'b10000000) || ioctl_index[5:0] == 6;
 // boot3.rom (no menu index for this!)
 wire pbi_rom_index = ioctl_index[7:0] == 8'b11000000;
+
+//wire xl_rom_index = ioctl_index[5:0] == 4;
+//wire basic_rom_index = ioctl_index[5:0] == 5;
+//wire osab_rom_index = ioctl_index[5:0] == 6;
+//wire pbi_rom_index = ioctl_index[5:0] == 1;
+
 wire turbofreezer_rom_index = ioctl_index[5:0] == 3;
 
 // Should be set when anything that goes into SDRAM gets loaded
@@ -727,8 +786,8 @@ wire[24:0] cart_upload_addr;
 wire[24:0] cart1_upload_addr;
 wire[24:0] cart2_upload_addr;
 
-assign cart1_upload_addr = ioctl_index[7:6] ? {2'b01, ioctl_addr[22:0]} : {2'b01, ioctl_addr[22:0]} - 25'h10;
-assign cart2_upload_addr = ioctl_index[7:6] ? {5'b01001, ioctl_addr[19:0]} : {5'b01001, ioctl_addr[19:0]} - 25'h10;
+assign cart1_upload_addr = {2'b01, ioctl_addr[22:0]};
+assign cart2_upload_addr = {5'b01001, ioctl_addr[19:0]};
 
 assign cart_upload_addr = cart1_rom_index ? cart1_upload_addr : cart2_upload_addr;
 
@@ -739,6 +798,10 @@ reg [7:0] drivesmodepbi = 0;
 reg [2:0] bootpbi = 0;
 reg [2:0] ram_config = 0;
 reg pal_video = 0;
+
+wire [15:0] atari_status1;
+wire [2:0] atari_hotkeys;
+assign atari_status1 = {11'b00000000000, modepbi, mode800, atari_hotkeys}; 
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];
@@ -751,7 +814,6 @@ always @(posedge clk_sys) if(areset) begin
 end
 
 reg load_reset = 0;
-reg init_hold = 1;
 reg pbi_rom_loaded = 0;
 reg turbofreezer_rom_loaded = 0;
 
@@ -766,21 +828,22 @@ always @(posedge clk_sys) begin
 	// already starts, and it needs to be longer than any pause between
 	// downloading two subsequent ROMs when the core is loading for the 
 	// first time. 
-	if(load_reset_timeout < 10000000) begin
-		if(initReset_n) load_reset_timeout <= load_reset_timeout + 1;
+	//if(load_reset_timeout < 20000000) begin
+	if(load_reset_timeout < 1000000) begin
+		//if(initReset_n) load_reset_timeout <= load_reset_timeout + 1;
+		load_reset_timeout <= load_reset_timeout + 1;
 	end
 	else begin
 		load_reset <= load_reset_required;
 		load_reset_required <= 0;
-		init_hold <= 0;
 	end
 	
 	if (ioctl_download) begin
 		load_reset_timeout <= 0;
 		if(pbi_rom_index) pbi_rom_loaded <= 1;
 		if(turbofreezer_rom_index) turbofreezer_rom_loaded <= 1;
-		load_reset_required <= !init_hold && ((ioctl_index[5:0] == 6 && status[2]) ||
-			((ioctl_index[5:0] == 4 || ioctl_index[5:0] == 5) && ~status[2]));
+		load_reset_required <= !status[0] && ((osab_rom_index && status[2]) ||
+			((xl_rom_index | basic_rom_index) && ~status[2]));
 	end
 end
 
@@ -941,5 +1004,18 @@ assign SIO_CLKIN = ~SIO_MODE | USER_IN[3];
 assign SIO_PROC  = ~SIO_MODE | USER_IN[4];
 assign SIO_IRQ   = ~SIO_MODE | USER_IN[5];
 
+hps_ext hps_ext
+(
+        .clk_sys(clk_sys),
+        .EXT_BUS(EXT_BUS),
+
+	.set_reset(set_reset),
+	.set_pause(set_pause),
+	.set_freezer(set_freezer),
+	.set_reset_rnmi(set_reset_rnmi),
+        .cart1_select(cart1_select),
+        .cart2_select(cart2_select),
+        .atari_status1(atari_status1)
+);
 
 endmodule

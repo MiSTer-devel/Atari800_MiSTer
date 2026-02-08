@@ -57,9 +57,23 @@ PORT
 	UPLOAD_REQUEST : in std_logic;
 	UPLOAD_DATA : in std_logic_vector(7 downto 0);
 	UPLOAD_READY : out std_logic;
-	INIT_HOLD : in std_logic;
 	OSD_PAUSE : in std_logic;
 	SDRAM_READY : out std_logic;
+	
+	HPS_DMA_ADDR : in std_logic_vector(25 downto 0);
+	HPS_DMA_REQ : in std_logic;
+	HPS_DMA_READ_ENABLE : in std_logic;
+	HPS_DMA_DATA_OUT : in std_logic_vector(7 downto 0);
+	HPS_DMA_DATA_IN : out std_logic_vector(7 downto 0);
+	HPS_DMA_READY : out std_logic;
+
+	SET_RESET_IN : in std_logic;
+	SET_PAUSE_IN : in std_logic;
+	SET_FREEZER_IN : in std_logic;
+	SET_RESET_RNMI_IN : in std_logic;
+	CART1_SELECT_IN : in std_logic_vector(7 downto 0);
+	CART2_SELECT_IN : in std_logic_vector(7 downto 0);
+	HOT_KEYS : out std_logic_vector(2 downto 0);
 
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
@@ -218,7 +232,7 @@ signal cold_reset_request : std_logic;
 
 BEGIN
 
-areset_n <= (RESET_N and SDRAM_RESET_N and not(reset_atari)) or (INIT_HOLD and SDRAM_RESET_N);
+areset_n <= (SDRAM_RESET_N and not(reset_atari));
 areset <= not areset_n;
 SDRAM_READY <= SDRAM_RESET_N;
 
@@ -387,15 +401,25 @@ PORT MAP
 	SDRAM_8BIT_WRITE_ENABLE => SDRAM_WIDTH_8bit_ACCESS,
 	SDRAM_REFRESH => SDRAM_REFRESH,
 
-	DMA_FETCH => dma_fetch,
-	DMA_READ_ENABLE => dma_read_enable,
-	DMA_32BIT_WRITE_ENABLE => dma_32bit_write_enable,
-	DMA_16BIT_WRITE_ENABLE => dma_16bit_write_enable,
-	DMA_8BIT_WRITE_ENABLE => dma_8bit_write_enable,
-	DMA_ADDR => dma_addr_fetch,
-	DMA_WRITE_DATA => dma_write_data,
-	MEMORY_READY_DMA => dma_memory_ready,
-	DMA_MEMORY_DATA => dma_memory_data, 
+--	DMA_FETCH => dma_fetch,
+--	DMA_READ_ENABLE => dma_read_enable,
+--	DMA_32BIT_WRITE_ENABLE => dma_32bit_write_enable,
+--	DMA_16BIT_WRITE_ENABLE => dma_16bit_write_enable,
+--	DMA_8BIT_WRITE_ENABLE => dma_8bit_write_enable,
+--	DMA_ADDR => dma_addr_fetch,
+--	DMA_WRITE_DATA => dma_write_data,
+--	MEMORY_READY_DMA => dma_memory_ready,
+--	DMA_MEMORY_DATA => dma_memory_data, 
+
+	DMA_FETCH => HPS_DMA_REQ,
+	DMA_READ_ENABLE => HPS_DMA_READ_ENABLE,
+	DMA_32BIT_WRITE_ENABLE => '0',
+	DMA_16BIT_WRITE_ENABLE => '0',
+	DMA_8BIT_WRITE_ENABLE => '1',
+	DMA_ADDR => HPS_DMA_ADDR,
+	DMA_WRITE_DATA => x"000000" & HPS_DMA_DATA_OUT,
+	MEMORY_READY_DMA => HPS_DMA_READY,
+	DMA_MEMORY_DATA => dma_memory_data,
 
 	UPLOAD_ADDR => UPLOAD_ADDR,
 	UPLOAD_REQUEST => UPLOAD_REQUEST,
@@ -434,6 +458,8 @@ zpu_sio_command <= sio_command when SIO_MODE = '0' else '1';
 zpu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
 
 sio_rxd <= zpu_sio_txd when SIO_MODE = '0' else SIO_IN;
+
+HPS_DMA_DATA_IN <= dma_memory_data(7 downto 0);
 
 sdram_adaptor : entity work.sdram_statemachine
 GENERIC MAP
@@ -484,7 +510,7 @@ PORT MAP
 (
 	-- standard...
 	CLK => CLK,
-	RESET_N => RESET_N and sdram_reset_n and not(INIT_HOLD),
+	RESET_N => RESET_N and sdram_reset_n,
 
 	-- dma bus master (with many waitstates...)
 	ZPU_ADDR_FETCH => dma_addr_fetch,
@@ -494,8 +520,10 @@ PORT MAP
 	ZPU_16BIT_WRITE_ENABLE => dma_16bit_write_enable,
 	ZPU_8BIT_WRITE_ENABLE => dma_8bit_write_enable,
 	ZPU_READ_ENABLE => dma_read_enable,
-	ZPU_MEMORY_READY => dma_memory_ready,
-	ZPU_MEMORY_DATA => dma_memory_data, 
+	--ZPU_MEMORY_READY => dma_memory_ready,
+	ZPU_MEMORY_READY => '1',
+	--ZPU_MEMORY_DATA => dma_memory_data,
+	ZPU_MEMORY_DATA => x"00000000",
 
 	-- rom bus master
 	-- data on next cycle after addr
@@ -536,12 +564,14 @@ PORT MAP
 	ZPU_OUT3 => zpu_out3
 );
 
-pause_atari <= zpu_out1(0) or INIT_HOLD or OSD_PAUSE;
-reset_atari <= zpu_out1(1);
-emulated_cartridge2_select <= zpu_out1(16 downto 9);
-emulated_cartridge_select <= zpu_out1(24 downto 17);
-freezer_enable <= zpu_out1(25);
-reset_rnmi_atari <= zpu_out1(26);
+HOT_KEYS <= ps2_keys(16#111#) & (FKEYS(9) or cold_reset_request) & (FKEYS(8) or warm_reset_request);
+
+pause_atari <= set_pause_in or OSD_PAUSE;
+reset_atari <= set_reset_in;
+emulated_cartridge_select <= cart1_select_in;
+emulated_cartridge2_select <= cart2_select_in;
+freezer_enable <= set_freezer_in;
+reset_rnmi_atari <= set_reset_rnmi_in;
 DRIVE_LED <= zpu_out1(27);
 option_force <= zpu_out1(28);
 
