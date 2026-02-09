@@ -395,6 +395,7 @@ void actions()
 				set_drive_status(0, 0);
 			}
 		}
+/*
 		else if(num == 5)
 		{
 			if(file->size)
@@ -438,6 +439,7 @@ void actions()
 				set_pause_6502(0);
 			}
 		}
+*/
 		else if(num == 4 || num == 7)
 		{
 			u08 stacked = (num == 7) ? 1 : 0;

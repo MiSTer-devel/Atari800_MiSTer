@@ -777,7 +777,7 @@ reg pal_video = 0;
 
 wire [15:0] atari_status1;
 wire [2:0] atari_hotkeys;
-assign atari_status1 = {10'b0000000000, ~status[41], modepbi, mode800, atari_hotkeys};
+assign atari_status1 = {9'b000000000, status[32], ~status[41], modepbi, mode800, atari_hotkeys};
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];
