@@ -373,8 +373,6 @@ wire        ioctl_download;
 wire        ioctl_upload;
 wire  [7:0] ioctl_index;
 reg         ioctl_wait = 1;
-reg         ioctl_req = 0;
-wire        upload_ready;
 wire        sdram_ready;
 
 wire [35:0] EXT_BUS;
@@ -561,11 +559,6 @@ atari800top atari800top
 	.SDRAM_DQML(SDRAM_DQML),
 
 	.TURBOFREEZER_ROM_LOADED(turbofreezer_rom_loaded),
-	.UPLOAD_ADDR(sdram_erased ? (cart_rom_index ? cart_upload_addr : rom_upload_addr) : {7'b001110000, sdram_erase_addr[15:0]}),
-	.UPLOAD_DATA(sdram_erased ? ioctl_dout : 8'hff),
-	//.UPLOAD_REQUEST(sdram_erased ? ioctl_req : sdram_erase_req),
-	.UPLOAD_REQUEST(ioctl_req),
-	.UPLOAD_READY(upload_ready),
 	.SDRAM_READY(sdram_ready),
 	.OSD_PAUSE(file_download),
 	.SET_RESET_IN(set_reset),

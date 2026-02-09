@@ -53,10 +53,6 @@ PORT
 	SDRAM_DQ   : INOUT STD_LOGIC_VECTOR(15 DOWNTO 0);
 
 	TURBOFREEZER_ROM_LOADED : in std_logic;
-	UPLOAD_ADDR : in std_logic_vector(24 downto 0);
-	UPLOAD_REQUEST : in std_logic;
-	UPLOAD_DATA : in std_logic_vector(7 downto 0);
-	UPLOAD_READY : out std_logic;
 	OSD_PAUSE : in std_logic;
 	SDRAM_READY : out std_logic;
 	
@@ -420,11 +416,6 @@ PORT MAP
 	DMA_WRITE_DATA => x"000000" & HPS_DMA_DATA_OUT,
 	MEMORY_READY_DMA => HPS_DMA_READY,
 	DMA_MEMORY_DATA => dma_memory_data,
-
-	UPLOAD_ADDR => UPLOAD_ADDR,
-	UPLOAD_REQUEST => UPLOAD_REQUEST,
-	UPLOAD_DATA => UPLOAD_DATA,
-	UPLOAD_READY => UPLOAD_READY,
 
 	RAM_SELECT => RAM_SIZE,
 	PAL => PAL,

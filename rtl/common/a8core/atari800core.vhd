@@ -172,11 +172,6 @@ ENTITY atari800core IS
 		DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
 		MEMORY_READY_DMA : out std_logic; -- op complete
 
-		UPLOAD_ADDR : in std_logic_vector(24 downto 0);
-		UPLOAD_REQUEST : in std_logic;
-		UPLOAD_DATA : in std_logic_vector(7 downto 0);
-		UPLOAD_READY : out std_logic;
-
 		-- Special config params
    		RAM_SELECT : in std_logic_vector(2 downto 0); 
 			-- XL/XE mode  : 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
@@ -203,7 +198,7 @@ ENTITY atari800core IS
 
 		-- debugging
 		freezer_state_out: out std_logic_vector(2 downto 0);
-		state_reg_out :  OUT  STD_LOGIC_VECTOR(2 downto 0);
+		state_reg_out :  OUT  STD_LOGIC_VECTOR(1 downto 0);
 		memory_ready_antic_out :  OUT  STD_LOGIC;
 		memory_ready_cpu_out :  OUT  STD_LOGIC;
 		shared_enable_out :  OUT  STD_LOGIC;
@@ -585,10 +580,6 @@ PORT MAP(CLK => CLK,
 		 DMA_32BIT_WRITE_ENABLE => DMA_32BIT_WRITE_ENABLE,
 		 DMA_16BIT_WRITE_ENABLE => DMA_16BIT_WRITE_ENABLE,
 		 DMA_8BIT_WRITE_ENABLE => DMA_8BIT_WRITE_ENABLE,
-		 UPLOAD_ADDR => UPLOAD_ADDR,
-		 UPLOAD_REQUEST => UPLOAD_REQUEST,
-		 UPLOAD_DATA => UPLOAD_DATA,
-		 UPLOAD_READY => UPLOAD_READY,
 		 RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
 		 ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
 		 PBI_REQUEST_COMPLETE => PBI_REQUEST_COMPLETE,

@@ -145,12 +145,6 @@ ENTITY atari800core_simple_sdram is
 		MEMORY_READY_DMA : out std_logic; -- op complete
 		DMA_MEMORY_DATA : out std_logic_vector(31 downto 0);
 
-		-- OS data uploading interface
-		UPLOAD_ADDR : in std_logic_vector(24 downto 0);
-		UPLOAD_REQUEST : in std_logic;
-		UPLOAD_DATA : in std_logic_vector(7 downto 0);
-		UPLOAD_READY : out std_logic;
-
 		-- Special config params
 		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
@@ -525,11 +519,6 @@ PORT MAP
 	DMA_ADDR => DMA_ADDR,
 	DMA_WRITE_DATA => DMA_WRITE_DATA,
 	MEMORY_READY_DMA => MEMORY_READY_DMA,
-
-	UPLOAD_ADDR => UPLOAD_ADDR,
-	UPLOAD_REQUEST => UPLOAD_REQUEST,
-	UPLOAD_DATA => UPLOAD_DATA,
-	UPLOAD_READY => UPLOAD_READY,
 
 	RAM_SELECT => RAM_SELECT,
 	CART_EMULATION_SELECT => emulated_cartridge_select,

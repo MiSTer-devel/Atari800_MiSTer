@@ -40,11 +40,6 @@ PORT
 	DMA_8BIT_WRITE_ENABLE : in std_logic; -- for hardware regs	
 	DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
 
-	UPLOAD_ADDR : in std_logic_vector(24 downto 0) := (others => '0');
-	UPLOAD_REQUEST : in std_logic := '0';
-	UPLOAD_DATA : in std_logic_vector(7 downto 0) := (others => '0');
-	UPLOAD_READY : out std_logic;
-
 	-- VBXE, including the registers (excl. below)
 	VBXE_SWITCH : in std_logic := '0'; -- On / off
 	VBXE_REG_BASE : in std_logic := '0'; -- 0 -> $D640, 1 -> $D740
@@ -164,7 +159,7 @@ PORT
 	freezer_state_out: out std_logic_vector(2 downto 0);
 
 	-- debugging!
-	state_reg_out: out std_logic_vector(2 downto 0)
+	state_reg_out: out std_logic_vector(1 downto 0)
 );
 
 END address_decoder;
@@ -192,7 +187,6 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal notify_antic : std_logic;
 	signal notify_DMA : std_logic;
 	signal notify_cpu : std_logic;
-	signal notify_UPLOAD : std_logic;
 	signal start_request : std_logic;
 	signal pbi_cycle_next : std_logic;
 	signal pbi_cycle_reg : std_logic;
@@ -217,14 +211,13 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal axlon_bank_next : std_logic_vector(7 downto 0);
 	
 	-- even though we have 3 targets (flash, ram, rom) and 3 masters, only allow access to one a a time - simpler.
-	signal state_next : std_logic_vector(2 downto 0);
-	signal state_reg : std_logic_vector(2 downto 0);
-	constant state_idle : std_logic_vector(2 downto 0) := "000";
-	constant state_waiting_cpu : std_logic_vector(2 downto 0) := "001";
-	constant state_waiting_DMA : std_logic_vector(2 downto 0) := "010";
-	constant state_waiting_antic : std_logic_vector(2 downto 0) := "011";
-	constant state_waiting_UPLOAD : std_logic_vector(2 downto 0) := "100";
-		
+	signal state_next : std_logic_vector(1 downto 0);
+	signal state_reg : std_logic_vector(1 downto 0);
+	constant state_idle : std_logic_vector(1 downto 0) := "00";
+	constant state_waiting_cpu : std_logic_vector(1 downto 0) := "01";
+	constant state_waiting_DMA : std_logic_vector(1 downto 0) := "10";
+	constant state_waiting_antic : std_logic_vector(1 downto 0) := "11";
+	
 	signal ram_chip_select : std_logic;
 	signal sdram_chip_select : std_logic;
 	signal memac_chip_select : std_logic;
@@ -596,15 +589,13 @@ BEGIN
 	-- state machine impl
 	pbi_takeover_adj <= (pbi_takeover) when (freezer_enable='0' or not(freezer_disable_atari)) else '0';
 
-	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
-		upload_request, upload_data, upload_addr)
+	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg)
 	begin
 		start_request <= '0';
 		pbi_request <= '0';
 		notify_antic <= '0';
 		notify_cpu <= '0';
 		notify_DMA <= '0';
-		notify_UPLOAD <= '0';
 		state_next <= state_reg;
 		pbi_cycle_next <= pbi_cycle_reg;
 
@@ -686,22 +677,6 @@ BEGIN
 					end if;
 					cpu_fetch_real_next <= '1';
 					antic_fetch_real_next <= '0';
-				elsif upload_request = '1' then
-					start_request <= '1';
-					width_8bit_next <= '1';
-					addr_next <= '1' & upload_addr;
-					data_write_next(7 downto 0) <= upload_data;
-					write_enable_next <= '1';
-					if (request_complete = '1') then
-						notify_UPLOAD <= '1';
-					else
-						state_next <= state_waiting_UPLOAD;
-					end if;
-				end if;
-			when state_waiting_UPLOAD =>
-				notify_UPLOAD <= request_complete;
-				if (request_complete = '1') then
-					state_next <= state_idle;
 				end if;
 			when state_waiting_antic =>
 				notify_antic <= request_complete;
@@ -729,7 +704,6 @@ BEGIN
 	MEMORY_READY_ANTIC <= notify_antic;
 	MEMORY_READY_DMA <= notify_DMA;
 	MEMORY_READY_CPU <= notify_cpu;
-	UPLOAD_READY <= notify_UPLOAD;
 	
 	RAM_REQUEST <= ram_chip_select;
 		
