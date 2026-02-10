@@ -28,9 +28,17 @@ module hps_ext
 	output reg        set_reset,
 	output reg        set_pause,
 	output reg        set_reset_rnmi,
+	output reg        set_option_force,
 	output reg  [7:0] cart1_select,
 	output reg  [7:0] cart2_select,
-	input      [15:0] atari_status1
+	input      [15:0] atari_status1,
+	
+	// Pokey SIO bridge
+	output reg  [4:0] uart_addr,
+	output reg        uart_enable,
+	output reg        uart_wr,
+	output reg  [7:0] uart_data_write,
+	input      [15:0] uart_data_read
 );
 
 assign EXT_BUS[15:0] = io_dout;
@@ -39,8 +47,14 @@ assign EXT_BUS[32] = dout_en;
 wire io_strobe = EXT_BUS[33];
 wire io_enable = EXT_BUS[34];
 
-localparam EXT_CMD_MIN     = A800_GET_REGISTER;
+localparam EXT_CMD_MIN     = A800_SIO_TX_STATUS;
 localparam EXT_CMD_MAX     = A800_SET_REGISTER;
+
+localparam A800_SIO_TX_STATUS = 3;
+localparam A800_SIO_RX = 4;
+localparam A800_SIO_RX_STATUS = 5;
+localparam A800_SIO_GETDIV = 6;
+localparam A800_SIO_ERROR = 7;
 
 localparam A800_GET_REGISTER = 8;
 localparam A800_SET_REGISTER = 9;
@@ -52,9 +66,16 @@ localparam REG_RESET = 3;
 localparam REG_PAUSE = 4;
 localparam REG_FREEZER = 5;
 localparam REG_RESET_RNMI = 6;
+localparam REG_OPTION_FORCE = 7;
+// TODO 8 drive LED?
 
-// Reading
+// SIO part
+localparam REG_SIO_TX = 9;
+localparam REG_SIO_SETDIV = 10;
+
+// General reading for side effect free registers
 localparam REG_ATARI_STATUS1 = 1;
+
 
 reg [15:0] io_dout;
 reg        dout_en = 0;
@@ -62,6 +83,9 @@ reg  [9:0] byte_cnt;
 
 always@(posedge clk_sys) begin
 	reg [15:0] cmd;
+
+	uart_enable <= 0;
+	uart_wr <= 0;
 
 	if(~io_enable) begin
 		dout_en <= 0;
@@ -76,6 +100,16 @@ always@(posedge clk_sys) begin
 		if(byte_cnt == 0) begin
 			cmd <= io_din;
 			dout_en <= (io_din >= EXT_CMD_MIN && io_din <= EXT_CMD_MAX);
+			if(io_din >= A800_SIO_TX_STATUS && io_din <= A800_SIO_ERROR) begin
+				uart_enable <= 1;
+				case(io_din)
+					A800_SIO_TX_STATUS: uart_addr <= 5'h4;
+					A800_SIO_RX: uart_addr <= 5'h8;
+					A800_SIO_RX_STATUS: uart_addr <= 5'hC;
+					A800_SIO_GETDIV: uart_addr <= 5'h10;
+					A800_SIO_ERROR: uart_addr <= 5'h14;
+				endcase
+			end
 		end else begin
 			case(cmd)
 
@@ -87,12 +121,27 @@ always@(posedge clk_sys) begin
 						REG_PAUSE: set_pause <= |io_din[7:0];
 						REG_FREEZER: set_freezer <= |io_din[7:0];
 						REG_RESET_RNMI: set_reset_rnmi <= |io_din[7:0];
+						REG_OPTION_FORCE: set_option_force <= |io_din[7:0];
+						REG_SIO_TX, REG_SIO_SETDIV:
+							begin
+								uart_data_write <= io_din[7:0];
+								uart_enable <= 1;
+								uart_wr <= 1;
+								if(io_din[15:8] == REG_SIO_SETDIV)
+									uart_addr <= 5'h10;
+								else
+									uart_addr <= 5'h0;
+							end
 					endcase
 
 				A800_GET_REGISTER:
 					case(io_din[15:8])
 						REG_ATARI_STATUS1: io_dout <= atari_status1;
 					endcase
+
+				A800_SIO_TX_STATUS, A800_SIO_RX, A800_SIO_RX_STATUS, A800_SIO_GETDIV, A800_SIO_ERROR:
+					io_dout <= uart_data_read;
+
 			endcase
 		end
 	end
