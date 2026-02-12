@@ -29,9 +29,11 @@ module hps_ext
 	output reg        set_pause,
 	output reg        set_reset_rnmi,
 	output reg        set_option_force,
+	output reg        set_drive_led,
 	output reg  [7:0] cart1_select,
 	output reg  [7:0] cart2_select,
 	input      [15:0] atari_status1,
+	input      [15:0] atari_status2,
 	
 	// Pokey SIO bridge
 	output reg  [4:0] uart_addr,
@@ -67,7 +69,7 @@ localparam REG_PAUSE = 4;
 localparam REG_FREEZER = 5;
 localparam REG_RESET_RNMI = 6;
 localparam REG_OPTION_FORCE = 7;
-// TODO 8 drive LED?
+localparam REG_DRIVE_LED = 8;
 
 // SIO part
 localparam REG_SIO_TX = 9;
@@ -75,7 +77,7 @@ localparam REG_SIO_SETDIV = 10;
 
 // General reading for side effect free registers
 localparam REG_ATARI_STATUS1 = 1;
-
+localparam REG_ATARI_STATUS2 = 2;
 
 reg [15:0] io_dout;
 reg        dout_en = 0;
@@ -103,11 +105,11 @@ always@(posedge clk_sys) begin
 			if(io_din >= A800_SIO_TX_STATUS && io_din <= A800_SIO_ERROR) begin
 				uart_enable <= 1;
 				case(io_din)
-					A800_SIO_TX_STATUS: uart_addr <= 5'h4;
-					A800_SIO_RX: uart_addr <= 5'h8;
-					A800_SIO_RX_STATUS: uart_addr <= 5'hC;
-					A800_SIO_GETDIV: uart_addr <= 5'h10;
-					A800_SIO_ERROR: uart_addr <= 5'h14;
+					A800_SIO_TX_STATUS: uart_addr <= 5'h1;
+					A800_SIO_RX: uart_addr <= 5'h2;
+					A800_SIO_RX_STATUS: uart_addr <= 5'h3;
+					A800_SIO_GETDIV: uart_addr <= 5'h4;
+					A800_SIO_ERROR: uart_addr <= 5'h5;
 				endcase
 			end
 		end else begin
@@ -122,13 +124,13 @@ always@(posedge clk_sys) begin
 						REG_FREEZER: set_freezer <= |io_din[7:0];
 						REG_RESET_RNMI: set_reset_rnmi <= |io_din[7:0];
 						REG_OPTION_FORCE: set_option_force <= |io_din[7:0];
+						REG_DRIVE_LED: set_drive_led <= |io_din[7:0];
 						REG_SIO_TX, REG_SIO_SETDIV:
 							begin
 								uart_data_write <= io_din[7:0];
-								uart_enable <= 1;
 								uart_wr <= 1;
 								if(io_din[15:8] == REG_SIO_SETDIV)
-									uart_addr <= 5'h10;
+									uart_addr <= 5'h4;
 								else
 									uart_addr <= 5'h0;
 							end
@@ -137,6 +139,7 @@ always@(posedge clk_sys) begin
 				A800_GET_REGISTER:
 					case(io_din[15:8])
 						REG_ATARI_STATUS1: io_dout <= atari_status1;
+						REG_ATARI_STATUS2: io_dout <= atari_status2;
 					endcase
 
 				A800_SIO_TX_STATUS, A800_SIO_RX, A800_SIO_RX_STATUS, A800_SIO_GETDIV, A800_SIO_ERROR:

@@ -243,30 +243,30 @@ begin
 	end process;
 	
 	-- Read from registers
-	process(en,addr_decoded, fifo_rx_data, fifo_tx_full, fifo_tx_empty, fifo_tx_count, fifo_rx_full, fifo_rx_empty, fifo_rx_count, s2p_framing_error_reg, sio_command_framing_error_reg, receive_divisor_reg)
+	process(en,addr_decoded, data_out_reg, fifo_rx_data, fifo_tx_full, fifo_tx_empty, fifo_tx_count, fifo_rx_full, fifo_rx_empty, fifo_rx_count, s2p_framing_error_reg, sio_command_framing_error_reg, receive_divisor_reg)
 	begin
-		data_out_next <= X"0000";
+		data_out_next <= data_out_reg;
 		fifo_rx_advance <= '0';
 		framing_error_clear <= '0';
 
 		if (en = '1') then
 			if (addr_decoded(1) = '1') then
-				data_out_next(9 downto 0) <= fifo_tx_full&fifo_tx_empty&fifo_tx_count;
+				data_out_next <= "000000" & fifo_tx_full&fifo_tx_empty&fifo_tx_count;
 			end if;
 			if (addr_decoded(2) = '1') then
 				if fifo_rx_empty = '0' then
-					data_out_next(14 downto 0) <= fifo_rx_data; -- assumed to be already valid
+					data_out_next <= '0' & fifo_rx_data; -- assumed to be already valid
 					fifo_rx_advance <= '1'; -- data read, next byte please
 				end if;
 			end if;
 			if (addr_decoded(3) = '1') then
-				data_out_next(9 downto 0) <= fifo_rx_full&fifo_rx_empty&fifo_rx_count;
+				data_out_next <= "000000" & fifo_rx_full&fifo_rx_empty&fifo_rx_count;
 			end if;
 			if (addr_decoded(4) = '1') then
-				data_out_next(7 downto 0) <= receive_divisor_reg;
+				data_out_next <= "00000000" & receive_divisor_reg;
 			end if;
 			if (addr_decoded(5) = '1') then
-				data_out_next(1 downto 0) <= sio_command_framing_error_reg&s2p_framing_error_reg;
+				data_out_next <= "00000000000000" & sio_command_framing_error_reg&s2p_framing_error_reg;
 				framing_error_clear <= '1';
 			end if;
 		end if;

@@ -181,7 +181,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
 
-assign LED_USER  = file_download; // | drive_led
+assign LED_USER  = file_download | drive_led;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -302,7 +302,7 @@ localparam CONF_STR = {
 	"-;",
 	"r7,Warm Reset (F9);",
 	"r8,Cold Reset (F10);",
-	"R0,Reset & Detach Carts;",
+	"R0,Reset (Detach All);",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
 	"V,v",`BUILD_DATE
 };
@@ -510,9 +510,11 @@ hps_ext hps_ext
 	.set_freezer(set_freezer),
 	.set_reset_rnmi(set_reset_rnmi),
 	.set_option_force(set_option_force),
+	.set_drive_led(drive_led),
 	.cart1_select(cart1_select),
 	.cart2_select(cart2_select),
 	.atari_status1(atari_status1),
+	.atari_status2(atari_status2),
 	
 	.uart_addr(uart_addr),
 	.uart_enable(uart_enable),
@@ -551,7 +553,7 @@ assign SDRAM_CKE = 1;
 wire SIO_MODE = status[16];
 wire SIO_IN,SIO_OUT, SIO_CLKOUT, SIO_CLKIN, SIO_CMD, SIO_PROC, SIO_MOTOR, SIO_IRQ;
 
-// wire drive_led;
+wire drive_led;
 
 atari800top atari800top
 (
@@ -612,15 +614,9 @@ atari800top atari800top
 	.VBLANK(VBlank_o),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
-	.RAM_SIZE(ram_config), 
-	.DRV_SPEED(status[12:10]),
-	.XEX_LOC(status[32]),
+	.RAM_SIZE(ram_config),
 	.OS_MODE_800(mode800),
 	.PBI_MODE(modepbi),
-	.PBI_SPLASH(splashpbi),
-	.PBI_DRIVES_MODE(drivesmodepbi),
-	.PBI_BOOT(bootpbi),
-	.ATX_MODE(~status[38]),
 	.WARM_RESET_MENU(status[39]),
 	.COLD_RESET_MENU(status[40] | buttons[1]),
 	.RTC(rtc),
@@ -794,12 +790,14 @@ reg [2:0] ram_config = 0;
 reg pal_video = 0;
 
 wire [15:0] atari_status1;
+wire [15:0] atari_status2;
 wire [2:0] atari_hotkeys;
-assign atari_status1 = {8'b00000000, status[57], status[32], ~status[41], modepbi, mode800, atari_hotkeys};
+assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi, status[57], status[32], ~status[41], mode800, atari_hotkeys};
+assign atari_status2 = {4'b0000, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];
-	modepbi <= ~status[2] & status[42];
+	modepbi <= ~status[2] & status[42] & pbi_rom_loaded;
 	splashpbi <= status[43];
 	bootpbi <= status[54:52];
 	drivesmodepbi <= status[51:44];

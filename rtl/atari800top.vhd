@@ -82,14 +82,8 @@ PORT
 
 	CPU_SPEED  : IN  STD_LOGIC_VECTOR(5 downto 0);
 	RAM_SIZE   : IN  STD_LOGIC_VECTOR(2 downto 0);
-	DRV_SPEED  : IN  STD_LOGIC_VECTOR(2 downto 0);
-	XEX_LOC    : IN  STD_LOGIC;
 	OS_MODE_800   : IN  STD_LOGIC;
 	PBI_MODE      : IN  STD_LOGIC;
-	PBI_SPLASH    : IN  STD_LOGIC;
-	PBI_DRIVES_MODE : IN STD_LOGIC_VECTOR(7 downto 0);
-	PBI_BOOT      : IN STD_LOGIC_VECTOR(2 downto 0);
-	ATX_MODE   : IN  STD_LOGIC;
 	WARM_RESET_MENU : IN STD_LOGIC;
 	COLD_RESET_MENU : IN STD_LOGIC;
 	RTC        : IN STD_LOGIC_VECTOR(64 downto 0);
@@ -273,7 +267,7 @@ begin
 			if JOY4(6) = '1'             then paddle_4(2) <= '1';   end if;
 			if JOY4(8 downto 7) /= "00"  then paddle_4    <= "001"; end if;
 
-			if cnt < 75000000 then
+			if cnt < 50000000 then
 				cnt := cnt + 1;
 				option_tmp <= option_tmp or SET_OPTION_FORCE_IN or JOY(5);
 			else
@@ -386,6 +380,7 @@ PORT MAP
 	SIO_PROC => SIO_PROC,
 	SIO_IRQ  => SIO_IRQ,
 	SIO_MOTOR => SIO_MOTOR,
+	ENABLE_179_EARLY => emu_pokey_enable,
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
@@ -581,9 +576,9 @@ CPU_HALT <= pause_atari;
 --	q => zpu_rom_data
 --);
 
-enable_179_clock_div_emu_pokey : entity work.enable_divider
-	generic map (COUNT=>16) -- cycle_length
-	port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>emu_pokey_enable);
+--enable_179_clock_div_emu_pokey : entity work.enable_divider
+--	generic map (COUNT=>16) -- cycle_length
+--	port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>emu_pokey_enable);
 
 simple_uart_inst : entity work.sio_handler
 PORT  MAP

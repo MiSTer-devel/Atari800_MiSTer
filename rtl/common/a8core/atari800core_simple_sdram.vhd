@@ -102,6 +102,7 @@ ENTITY atari800core_simple_sdram is
 		SIO_PROC : in std_logic := '1';
 		SIO_IRQ  : in std_logic := '1';
 		SIO_MOTOR : out std_logic;
+		ENABLE_179_EARLY : out std_logic;
 
 		-- GTIA consol
 		CONSOL_OPTION : IN STD_LOGIC;
@@ -459,6 +460,7 @@ PORT MAP
 	POT_RESET => POT_RESET,
 	
 	-- PBI
+	ENABLE_179_EARLY => ENABLE_179_EARLY,
 	PBI_ADDR => open,
 	PBI_WRITE_ENABLE => open,
 	PBI_SNOOP_DATA => DMA_MEMORY_DATA,
