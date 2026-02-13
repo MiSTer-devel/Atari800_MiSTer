@@ -324,18 +324,7 @@ pll pll
 	.locked(locked)
 );
 
-//wire reset = RESET | (status[0] & ~init_hold) | ~initReset_n | buttons[1];
-
 wire reset = RESET;
-
-
-//reg initReset_n = 0;
-//always @(posedge clk_sys) begin
-//	integer timeout = 0;
-//	
-//	if(timeout < 1000000) timeout <= timeout + 1;
-//	else initReset_n <= 1;
-//end
 
 //////////////////   HPS I/O   ///////////////////
 wire [15:0] joy_0;
@@ -352,18 +341,6 @@ wire [24:0] ps2_mouse;
 wire [10:0] ps2_key;
 wire        forced_scandoubler;
 wire [21:0] gamma_bus;
-
-//reg  [31:0] sd_lba;
-//reg   [7:0] sd_rd;
-//reg   [7:0] sd_wr;
-//wire  [7:0] sd_ack;
-//wire  [8:0] sd_buff_addr;
-//wire  [7:0] sd_buff_dout;
-//wire  [7:0] sd_buff_din;
-//wire        sd_buff_wr;
-//wire  [7:0] img_mounted;
-//wire        img_readonly;
-//wire [63:0] img_size;
 
 wire [26:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
@@ -474,18 +451,6 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
-//	.sd_lba('{sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba}),
-//	.sd_rd(sd_rd),
-//	.sd_wr(sd_wr),
-//	.sd_ack(sd_ack),
-//	.sd_buff_addr(sd_buff_addr),
-//	.sd_buff_dout(sd_buff_dout),
-//	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din}),
-//	.sd_buff_wr(sd_buff_wr),
-//	.img_mounted(img_mounted),
-//	.img_readonly(img_readonly),
-//	.img_size(img_size),
-
 	.ioctl_download(ioctl_download),
 	.ioctl_upload(ioctl_upload),
 	.ioctl_addr(ioctl_addr),
@@ -539,13 +504,6 @@ assign AUDIO_R = (cpu_halt | areset | reset) ? 16'b0000000000000000 : (status[20
 assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
 
-//wire  [7:0]	ZPU_IN2;
-//wire [31:0]	ZPU_OUT2;
-//wire [31:0]	ZPU_IN3;
-//wire [31:0]	ZPU_OUT3;
-//wire [15:0]	ZPU_RD;
-//wire [15:0]	ZPU_WR;
-
 wire areset;
 
 assign SDRAM_CKE = 1;
@@ -590,7 +548,7 @@ atari800top atari800top
 	.UART_DATA_WRITE(uart_data_write),
 	.UART_DATA_READ(uart_data_read),
 
-	// TODO make a nice wire for this contraption
+	// TODO make a nice wire for this contraption?
 	.HPS_DMA_ADDR(sdram_erased ? (ioctl_index == 99 ? ioctl_addr[25:0] : (cart_rom_index ? cart_upload_addr : rom_upload_addr)) : {10'h270, sdram_erase_addr[15:0]}),
 	.HPS_DMA_REQ(sdram_erased ? dma_req : sdram_erase_req),
 	.HPS_DMA_READ_ENABLE(ioctl_upload),
@@ -628,13 +586,6 @@ atari800top atari800top
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
-
-//	.ZPU_IN2(ZPU_IN2),
-//	.ZPU_OUT2(ZPU_OUT2),
-//	.ZPU_IN3(ZPU_IN3),
-//	.ZPU_OUT3(ZPU_OUT3),
-//	.ZPU_RD(ZPU_RD),
-//	.ZPU_WR(ZPU_WR),
 
 	.SIO_MODE(SIO_MODE),
 	.SIO_IN(SIO_IN),
@@ -812,100 +763,6 @@ always @(posedge clk_sys) if (ioctl_download) begin
 	if(pbi_rom_index) pbi_rom_loaded <= 1;
 	if(turbofreezer_rom_index) turbofreezer_rom_loaded <= 1;
 end
-
-//////////////////   SD   ///////////////////
-
-//dpram #(9,8) sdbuf
-//(
-//	.clock(clk_sys),
-//
-//	.address_a(sd_buff_addr),
-//	.data_a(sd_buff_dout),
-//	.wren_a(sd_buff_wr),
-//	.q_a(sd_buff_din),
-//
-//	.address_b(zpu_buff_addr),
-//	.data_b(ZPU_OUT3[7:0]),
-//	.wren_b(zpu_buf_wr),
-//	.q_b(zpu_buf_q)
-//);
-
-//wire[7:0] zpu_buf_q;
-
-//assign ZPU_IN2[0]   = zpu_io_done;
-//assign ZPU_IN2[1]   = zpu_mounted;
-//assign ZPU_IN2[4:2] = zpu_fileno;
-//assign ZPU_IN2[6:5] = zpu_filetype;
-//assign ZPU_IN2[7]   = zpu_readonly;
-
-//assign ZPU_IN3 = zpu_lba ? zpu_filesize : zpu_buf_q;
-
-//reg [8:0] zpu_buff_addr;
-//reg       zpu_buf_wr;
-//reg       zpu_io_done;
-//reg       zpu_mounted = 0;
-//reg [2:0] zpu_fileno;
-//reg [1:0] zpu_filetype;
-//reg       zpu_readonly;
-//reg[31:0] zpu_filesize;
-
-//wire      zpu_lba      = ZPU_OUT2[0];
-//wire      zpu_block_rd = ZPU_OUT2[1];
-//wire      zpu_block_wr = ZPU_OUT2[2];
-//wire[2:0] zpu_drv_num  = ZPU_OUT2[5:3];
-//wire      zpu_io_wr    = ZPU_WR[5];
-//wire      zpu_data_wr  = ZPU_WR[6];
-//wire      zpu_data_rd  = ZPU_RD[2];
-
-//always @(posedge clk_sys) begin
-//	reg old_wr, old_wr2, old_rd, old_lba;
-//	reg old_blrd, old_blwr, old_ack;
-//	reg old_mounted;
-//
-//	zpu_buf_wr <= 0;
-//	if(zpu_buf_wr) zpu_buff_addr <= zpu_buff_addr + 1'd1;
-//
-//	old_wr <= zpu_data_wr;
-//	old_wr2 <= old_wr;
-//	if(~old_wr2 & old_wr) begin
-//		if(zpu_lba) sd_lba <= ZPU_OUT3;
-//		else zpu_buf_wr <= 1;
-//	end
-//
-//	old_rd <= zpu_data_rd;
-//	if(old_rd & ~zpu_data_rd) zpu_buff_addr <= zpu_buff_addr + 1'd1;
-//
-//	if(zpu_io_wr) zpu_buff_addr <= 0;
-//
-//	old_blrd <= zpu_block_rd;
-//	if(~old_blrd & zpu_block_rd) {zpu_io_done,sd_rd[zpu_drv_num[2:0]]} <= 1;
-//
-//	old_blwr <= zpu_block_wr;
-//	if(~old_blwr & zpu_block_wr) {zpu_io_done,sd_wr[zpu_drv_num[2:0]]} <= 1;
-//
-//	if(|sd_ack) {sd_rd, sd_wr} <= 0;
-//
-//	old_ack <= |sd_ack;
-//	if(old_ack & ~|sd_ack) zpu_io_done <= 1;
-//
-//	old_mounted <= |img_mounted;
-//	if(~old_mounted && |img_mounted) begin
-//		if(img_mounted[0]) zpu_fileno <= 0;
-//		if(img_mounted[1]) zpu_fileno <= 1;
-//		if(img_mounted[2]) zpu_fileno <= 2;
-//		if(img_mounted[3]) zpu_fileno <= 3;
-//		if(img_mounted[5]) zpu_fileno <= 5;
-//		if(img_mounted[6]) zpu_fileno <= 6;
-//
-//		zpu_filetype <= ioctl_index[7:6];
-//		zpu_readonly <= img_readonly | img_mounted[5] | status[57];
-//		zpu_mounted  <= ~zpu_mounted;
-//		zpu_filesize <= img_size[31:0];
-//	end
-//	
-//	if(reset) zpu_mounted <= 0;
-//end
-
 
 //////////////////   ANALOG AXIS   ///////////////////
 reg        emu = 0;

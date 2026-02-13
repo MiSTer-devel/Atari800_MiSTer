@@ -116,13 +116,6 @@ PORT
 	SIO_PROC   : IN  STD_LOGIC;
 	SIO_MOTOR  : OUT STD_LOGIC;
 	SIO_IRQ    : IN  STD_LOGIC
-
---	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
---	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
---	ZPU_IN3    : IN  STD_LOGIC_VECTOR(31 downto 0);
---	ZPU_OUT3   : OUT STD_LOGIC_VECTOR(31 downto 0);
---	ZPU_RD     : OUT STD_LOGIC_VECTOR(15 downto 0);
---	ZPU_WR     : OUT STD_LOGIC_VECTOR(15 downto 0)
 );
 
 END atari800top;
@@ -180,11 +173,6 @@ signal DMA_8BIT_WRITE_ENABLE : std_logic;
 signal DMA_READ_ENABLE : std_logic;
 signal DMA_MEMORY_READY : std_logic;
 signal DMA_MEMORY_DATA : std_logic_vector(31 downto 0);
-
---signal ZPU_ADDR_ROM : std_logic_vector(15 downto 0);
---signal ZPU_ROM_DATA :  std_logic_vector(31 downto 0);
-
---signal ZPU_OUT1 : std_logic_vector(31 downto 0);
 
 signal emu_pokey_enable : std_logic;
 signal emu_sio_txd : std_logic;
@@ -398,16 +386,6 @@ PORT MAP
 	SDRAM_8BIT_WRITE_ENABLE => SDRAM_WIDTH_8bit_ACCESS,
 	SDRAM_REFRESH => SDRAM_REFRESH,
 
---	DMA_FETCH => dma_fetch,
---	DMA_READ_ENABLE => dma_read_enable,
---	DMA_32BIT_WRITE_ENABLE => dma_32bit_write_enable,
---	DMA_16BIT_WRITE_ENABLE => dma_16bit_write_enable,
---	DMA_8BIT_WRITE_ENABLE => dma_8bit_write_enable,
---	DMA_ADDR => dma_addr_fetch,
---	DMA_WRITE_DATA => dma_write_data,
---	MEMORY_READY_DMA => dma_memory_ready,
---	DMA_MEMORY_DATA => dma_memory_data, 
-
 	DMA_FETCH => HPS_DMA_REQ,
 	DMA_READ_ENABLE => HPS_DMA_READ_ENABLE,
 	DMA_32BIT_WRITE_ENABLE => '0',
@@ -493,69 +471,6 @@ PORT MAP
 
 joy <= joy1 or joy2 or joy3 or joy4;
 
---zpu: entity work.zpucore
---GENERIC MAP
---(
---	platform => 1
---)
---PORT MAP
---(
---	-- standard...
---	CLK => CLK,
---	RESET_N => RESET_N and sdram_reset_n,
---
---	-- dma bus master (with many waitstates...)
---	ZPU_ADDR_FETCH => dma_addr_fetch,
---	ZPU_DATA_OUT => dma_write_data,
---	ZPU_FETCH => dma_fetch,
---	ZPU_32BIT_WRITE_ENABLE => dma_32bit_write_enable,
---	ZPU_16BIT_WRITE_ENABLE => dma_16bit_write_enable,
---	ZPU_8BIT_WRITE_ENABLE => dma_8bit_write_enable,
---	ZPU_READ_ENABLE => dma_read_enable,
---	--ZPU_MEMORY_READY => dma_memory_ready,
---	ZPU_MEMORY_READY => '1',
---	--ZPU_MEMORY_DATA => dma_memory_data,
---	ZPU_MEMORY_DATA => x"00000000",
---
---	-- rom bus master
---	-- data on next cycle after addr
---	ZPU_ADDR_ROM => zpu_addr_rom,
---	ZPU_ROM_DATA => zpu_rom_data,
---
---	ZPU_ROM_WREN => open,
---
---	-- SIO
---	-- Ditto for speaking to Atari, we have a built in Pokey
---	ZPU_POKEY_ENABLE => zpu_pokey_enable,
---	ZPU_SIO_TXD => zpu_sio_txd,
---	ZPU_SIO_RXD => zpu_sio_rxd,
---	ZPU_SIO_COMMAND => zpu_sio_command,
---	ZPU_SIO_CLK => zpu_sio_clk,
---
---	-- external control
---	-- switches etc. sector DMA blah blah.
---	-- Originally WinKey Left + Right (#11F + #127) for pausing the core
---	-- Potential alternatives for MiSTer not to conflict with Win+PrintScreen:
---	-- Right Ctrl #114, Home #16C, End #169, Right Alt #111, Scroll Lock #7E
---	-- Right Alt seems to be the only option to account for reduced keyboards
---	ZPU_IN1 => X"000"&
---			--'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
---			'0'&ps2_keys(16#111#)&
---			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
---			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&(FKEYS(9) or cold_reset_request)&(FKEYS(8) or warm_reset_request)&FKEYS(7 downto 0),
---	ZPU_IN2 => X"0" & '0' & PBI_BOOT & PBI_DRIVES_MODE & ZPU_IN2 & PBI_SPLASH & PBI_MODE & ATX_MODE & XEX_LOC & OS_MODE_800 & DRV_SPEED,
---	ZPU_IN3 => ZPU_IN3,
---	ZPU_IN4 => X"00000000",
---	
---	ZPU_RD => ZPU_RD,
---	ZPU_WR => ZPU_WR,
---
---	-- ouputs - e.g. Atari system control, halt, throttle, rom select
---	ZPU_OUT1 => zpu_out1,
---	ZPU_OUT2 => zpu_out2,
---	ZPU_OUT3 => zpu_out3
---);
-
 HOT_KEYS <= ps2_keys(16#111#) & (FKEYS(9) or cold_reset_request) & (FKEYS(8) or warm_reset_request);
 
 pause_atari <= set_pause_in or OSD_PAUSE;
@@ -566,19 +481,6 @@ freezer_enable <= set_freezer_in;
 reset_rnmi_atari <= set_reset_rnmi_in;
 
 CPU_HALT <= pause_atari;
-
---zpu_rom1: entity work.spram
---generic map(12,32,"firmware/zpu_rom_800.mif")
---port map
---(
---	clock => clk,
---	address => zpu_addr_rom(13 downto 2),
---	q => zpu_rom_data
---);
-
---enable_179_clock_div_emu_pokey : entity work.enable_divider
---	generic map (COUNT=>16) -- cycle_length
---	port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>emu_pokey_enable);
 
 simple_uart_inst : entity work.sio_handler
 PORT  MAP
