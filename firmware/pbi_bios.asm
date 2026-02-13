@@ -16,10 +16,10 @@ setvbv	= $e45c
 
 ; PBI BIOS RAM
 pbi_magic = $d100 ; word
-pbi_req_init_flag = $d102
-pbi_splash_flag = $d103
-pbi_req_proc_flag = $d104
-pbi_req_proc_res = $d105
+pbi_splash_flag = $d102
+pbi_req_init_flag = $d103
+pbi_req_proc_res = $d104
+pbi_req_proc_flag = $d105
 pbi_stack_save = $d106
 pbi_drive_boot_act = $d10a
 pbi_drive_boot = $d10b
