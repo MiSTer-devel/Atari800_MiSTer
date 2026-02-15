@@ -87,6 +87,7 @@ END atari5200top;
 ARCHITECTURE vhdl OF atari5200top IS 
 
 SIGNAL FKEYS : std_logic_vector(11 downto 0);
+SIGNAL JOY   :  STD_LOGIC_VECTOR(20 DOWNTO 0);
 
 SIGNAL KEYBOARD_RESPONSE :  STD_LOGIC_VECTOR(1 DOWNTO 0);
 SIGNAL KEYBOARD_SCAN :  STD_LOGIC_VECTOR(5 DOWNTO 0);
@@ -115,6 +116,8 @@ signal RAM_DATA : std_logic_vector(31 downto 0);
 
 BEGIN
 
+JOY <= JOY1 or JOY2 or JOY3 or JOY4;
+
 -- PS2 to pokey
 keyboard_map1 : entity work.ps2_to_atari5200
 generic map (ps2_enable => 0, direct_enable => 1)
@@ -123,6 +126,7 @@ PORT MAP
 	CLK => clk,
 	RESET_N => reset_n,
 	INPUT => x"000"&"000"&ps2_key(9)&"000"&ps2_key(8)&x"0"&ps2_key(7 downto 0),
+	INPUT2 => JOY(13 downto 9),
 
 	JOY1 => JOY1,
 	JOY2 => JOY2,
