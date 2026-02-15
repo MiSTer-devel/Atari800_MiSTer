@@ -124,7 +124,7 @@ PORT
 	ROM_WR_ENABLE : OUT STD_LOGIC;	
 	PBI_WR_ENABLE : OUT STD_LOGIC;
 	D6_WR_ENABLE : OUT STD_LOGIC;
- 	
+
 	-- ROM and RAM have extended address busses to allow for bank switching etc.
 	ROM_ADDR : OUT STD_LOGIC_VECTOR(21 downto 0);
 	RAM_ADDR : OUT STD_LOGIC_VECTOR(18 downto 0);
@@ -311,8 +311,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal bank0next : std_logic_vector(1 downto 0);
 	signal bank1reg : std_logic_vector(1 downto 0);
 	signal bank1next : std_logic_vector(1 downto 0);
-	signal bbtype : std_logic;
-	signal sctype : std_logic;
+
 BEGIN
 	-- register
 	process(clk,reset_n)
@@ -361,14 +360,6 @@ BEGIN
 			bank1reg <= bank1next;
 			basic_reg <= basic_next;
 
-			if addr_next(25 downto 12) = "10" & x"004" then
-				bbtype <= '0';
-				sctype <= '0';
-			elsif addr_next(25 downto 16) = "10" & x"10" then
-				bbtype <= '1';
-			elsif addr_next(25 downto 16) = "10" & x"20" then
-				sctype <= '1';
-			end if;
 		end if;
 	end process;
 
@@ -919,8 +910,8 @@ end generate;
 		SDRAM_BASIC_ROM_ADDR,
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
-		
-		bbtype,sctype,bank0reg,bank1reg,bank0next,bank1next,
+
+		cart_select,bank0reg,bank1reg,bank0next,bank1next,
 
 		STEREO,
 
@@ -1445,8 +1436,9 @@ end generate;
 					X"68"|X"69"|X"6A"|X"6B"|X"6C"|X"6D"|X"6E"|X"6F"|
 					X"70"|X"71"|X"72"|X"73"|X"74"|X"75"|X"76"|X"77"|
 					X"78"|X"79"|X"7A"|X"7B"|X"7C"|X"7D"|X"7E"|X"7F" =>
-					
-					if bbtype = '1' then
+
+					case cart_select is
+					when X"07" =>
 						if addr_next(15 downto 0) >= x"4FF6" and addr_next(15 downto 0) <= x"4FF9" then
 							bank0next <= addr_next(3)&addr_next(0);
 						end if;
@@ -1463,7 +1455,8 @@ end generate;
 								RAM_ADDR(15 downto 12)   <= "11"&bank1next;
 							end if;
 						end if;
-					elsif sctype = '1' then
+
+					when X"47" | X"48" | X"49" | X"4A" =>
 						if bank0next(0) = '1' then
 							SDRAM_ADDR(15) <= not(addr_next(15));
 							RAM_ADDR(15) <= not(addr_next(15));
@@ -1473,7 +1466,9 @@ end generate;
 						-- should not matter, it's not used (but it is technically wrong).
 						SDRAM_ADDR(19 downto 16) <= '0' & bank1next & bank0next(1);
 						RAM_ADDR(18 downto 16) <= bank1next & bank0next(1);
-					end if;
+
+					when others =>
+					end case;
 
 					if (write_enable_next = '1') then
 						sdram_chip_select <= '0';
@@ -1503,7 +1498,9 @@ end generate;
 					X"b0"|X"b1"|X"b2"|X"b3"|X"b4"|X"b5"|X"b6"|X"b7"|
 					X"b8"|X"b9"|X"bA"|X"bB"|X"bC"|X"bD"|X"bE"|X"bF" =>
 
-					if sctype = '1' then
+					case cart_select is
+
+					when X"47" | X"48" | X"49" | X"4A" =>
 						if addr_next(15 downto 0) >= x"BFD0" and addr_next(15 downto 0) <= x"BFDF" then
 							bank0next <= addr_next(3 downto 2);
 						elsif addr_next(15 downto 0) >= x"BFC0" and addr_next(15 downto 0) <= x"BFCF" then
@@ -1521,7 +1518,10 @@ end generate;
 							SDRAM_ADDR(19 downto 16) <= '0' & bank1next & bank0next(1);
 							RAM_ADDR(18 downto 16) <= bank1next & bank0next(1);
 						end if;
-					end if;
+
+					when others =>
+					end case;
+
 					if (write_enable_next = '1') then
 						sdram_chip_select <= '0';
 						Ram_chip_select <= '0';							

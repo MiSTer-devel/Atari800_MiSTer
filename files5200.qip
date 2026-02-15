@@ -53,4 +53,5 @@ set_global_assignment -name VHDL_FILE rtl/common/zpu/fifo_transmit.vhd
 set_global_assignment -name VHDL_FILE rtl/common/zpu/fifo_receive.vhd
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
 set_global_assignment -name VHDL_FILE rtl/atari5200top.vhd
+set_global_assignment -name VERILOG_FILE rtl/hps_ext.v
 set_global_assignment -name SYSTEMVERILOG_FILE Atari5200.sv

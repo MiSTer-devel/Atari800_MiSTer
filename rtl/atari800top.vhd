@@ -193,14 +193,11 @@ signal end_command : std_logic;
 signal reset_atari : std_logic;
 signal reset_rnmi_atari : std_logic;
 signal pause_atari : std_logic;
-signal emulated_cartridge_select: std_logic_vector(7 downto 0);
-signal emulated_cartridge2_select: std_logic_vector(7 downto 0);
 
 -- ps2
 signal PS2_KEYS : STD_LOGIC_VECTOR(511 downto 0);
 
 -- turbo freezer!
-signal freezer_enable : std_logic;
 signal freezer_activate: std_logic;
 
 -- paddles
@@ -413,9 +410,9 @@ PORT MAP
 
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
-	emulated_cartridge_select => emulated_cartridge_select,
-	emulated_cartridge2_select => emulated_cartridge2_select,
-	freezer_enable => freezer_enable and TURBOFREEZER_ROM_LOADED,
+	emulated_cartridge_select => CART1_SELECT_IN,
+	emulated_cartridge2_select => CART2_SELECT_IN,
+	freezer_enable => SET_FREEZER_IN and TURBOFREEZER_ROM_LOADED,
 	freezer_activate => freezer_activate
 );
 
@@ -475,9 +472,6 @@ HOT_KEYS <= ps2_keys(16#111#) & (FKEYS(9) or cold_reset_request) & (FKEYS(8) or 
 
 pause_atari <= set_pause_in or OSD_PAUSE;
 reset_atari <= set_reset_in;
-emulated_cartridge_select <= cart1_select_in;
-emulated_cartridge2_select <= cart2_select_in;
-freezer_enable <= set_freezer_in;
 reset_rnmi_atari <= set_reset_rnmi_in;
 
 CPU_HALT <= pause_atari;

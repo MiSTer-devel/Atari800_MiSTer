@@ -146,7 +146,8 @@ ENTITY atari5200core IS
 		-- Special config params
 		ROM_IN_RAM : in std_logic;
 		HALT : in std_logic;
-		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0)
+		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0);
+		EMULATED_CARTRIDGE_SELECT : IN STD_LOGIC_VECTOR(7 DOWNTO 0)
 	);
 END atari5200core;
 
@@ -375,7 +376,7 @@ PORT MAP(CLK => CLK,
 		 SDRAM_ADDR => SDRAM_ADDR,
 		 WRITE_DATA => WRITE_DATA,
 		 d6_wr_enable => open,
-		 cart_select => (others=>'0'),
+		 cart_select => EMULATED_CARTRIDGE_SELECT,
 		 cart2_select => (others=>'0'),
 		 rom_in_ram => ROM_IN_RAM,
 		 freezer_enable => '0',
