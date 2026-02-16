@@ -369,9 +369,7 @@ assign AUDIO_L = (cpu_halt | reset) ? 16'b0000000000000000 : {laudio[15],laudio[
 assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
 
-assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
 assign SDRAM_CKE = 1;
-assign SDRAM_nCS = 0;
 
 atari5200top atari5200top
 (
@@ -385,6 +383,9 @@ atari5200top atari5200top
 	.SDRAM_nWE(SDRAM_nWE),
 	.SDRAM_A(SDRAM_A),
 	.SDRAM_DQ(SDRAM_DQ),
+	.SDRAM_nCS(SDRAM_nCS),
+	.SDRAM_DQMH(SDRAM_DQMH),
+	.SDRAM_DQML(SDRAM_DQML),
 
 	.ROM_ADDR(rom_addr),
 	.ROM_DATA(rom_data),
