@@ -1733,6 +1733,10 @@ begin
 		end if;
 	end process;
 	
+--	enable_179_delay : delay_line
+--		generic map (COUNT=>1)
+--		port map(clk=>clk,sync_reset=>'0',data_in=>enable_179,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>enable_179_adj);
+
 	-- delays...
 	process(enable_179,
 		hposp0_snap_reg,
@@ -1747,7 +1751,7 @@ begin
 		sizep1_snap_reg,
 		sizep2_snap_reg,
 		sizep3_snap_reg,
-		 sizem_snap_reg,
+		sizem_snap_reg,
 		colpm0_snap_reg,
 		colpm1_snap_reg,
 		colpm2_snap_reg,
@@ -1756,8 +1760,8 @@ begin
 		colpf1_snap_reg,
 		colpf2_snap_reg,
 		colpf3_snap_reg,
-	 	 colbk_snap_reg,
-		 prior_snap_reg,
+		colbk_snap_reg,
+		prior_snap_reg,
 		hposp0_raw_reg,
 		hposp1_raw_reg,
 		hposp2_raw_reg,
@@ -1850,44 +1854,44 @@ begin
 		generic map (COUNT=>2, WIDTH=>2)
 		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(7 downto 6),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed2_reg(7 downto 6));		
 		
---	colbk_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colbk_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colbk_delayed_reg(7 downto 0));
-	colbk_delayed_reg <= colbk_snap_reg;
+	colbk_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colbk_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colbk_delayed_reg(7 downto 0));
+--	colbk_delayed_reg <= colbk_snap_reg;
 
---	colpm0_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpm0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm0_delayed_reg(7 downto 0));
---	colpm1_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpm1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm1_delayed_reg(7 downto 0));
---	colpm2_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpm2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm2_delayed_reg(7 downto 0));
---	colpm3_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpm3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpm3_delayed_reg(7 downto 0));
-	colpm0_delayed_reg <= colpm0_snap_reg;
-	colpm1_delayed_reg <= colpm1_snap_reg;
-	colpm2_delayed_reg <= colpm2_snap_reg;
-	colpm3_delayed_reg <= colpm3_snap_reg;
+	colpm0_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm0_delayed_reg(7 downto 0));
+	colpm1_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm1_delayed_reg(7 downto 0));
+	colpm2_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm2_delayed_reg(7 downto 0));
+	colpm3_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm3_delayed_reg(7 downto 0));
+--	colpm0_delayed_reg <= colpm0_snap_reg;
+--	colpm1_delayed_reg <= colpm1_snap_reg;
+--	colpm2_delayed_reg <= colpm2_snap_reg;
+--	colpm3_delayed_reg <= colpm3_snap_reg;
 
---	colpf0_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpf0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf0_delayed_reg(7 downto 0));
---	colpf1_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpf1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf1_delayed_reg(7 downto 0));
---	colpf2_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpf2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf2_delayed_reg(7 downto 0));
---	colpf3_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>8)
---		port map(clk=>clk,sync_reset=>'0',data_in=>colpf3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>colpf3_delayed_reg(7 downto 0));
-	colpf0_delayed_reg <= colpf0_snap_reg;
-	colpf1_delayed_reg <= colpf1_snap_reg;
-	colpf2_delayed_reg <= colpf2_snap_reg;
-	colpf3_delayed_reg <= colpf3_snap_reg;
+	colpf0_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf0_delayed_reg(7 downto 0));
+	colpf1_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf1_delayed_reg(7 downto 0));
+	colpf2_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf2_delayed_reg(7 downto 0));
+	colpf3_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>8)
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf3_delayed_reg(7 downto 0));
+--	colpf0_delayed_reg <= colpf0_snap_reg;
+--	colpf1_delayed_reg <= colpf1_snap_reg;
+--	colpf2_delayed_reg <= colpf2_snap_reg;
+--	colpf3_delayed_reg <= colpf3_snap_reg;
 
 	hposp0_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)

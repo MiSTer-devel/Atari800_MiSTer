@@ -30,6 +30,7 @@ module hps_ext
 	output reg        set_reset_rnmi,
 	output reg        set_option_force,
 	output reg        set_drive_led,
+	output reg        set_xex_loader_mode,
 	output reg  [7:0] cart1_select,
 	output reg  [7:0] cart2_select,
 	input      [15:0] atari_status1,
@@ -70,10 +71,11 @@ localparam REG_FREEZER = 5;
 localparam REG_RESET_RNMI = 6;
 localparam REG_OPTION_FORCE = 7;
 localparam REG_DRIVE_LED = 8;
+localparam REG_XEX_LOADER_MODE = 9;
 
 // SIO part
-localparam REG_SIO_TX = 9;
-localparam REG_SIO_SETDIV = 10;
+localparam REG_SIO_TX = 10;
+localparam REG_SIO_SETDIV = 11;
 
 // General reading for side effect free registers
 localparam REG_ATARI_STATUS1 = 1;
@@ -125,6 +127,7 @@ always@(posedge clk_sys) begin
 						REG_RESET_RNMI: set_reset_rnmi <= |io_din[7:0];
 						REG_OPTION_FORCE: set_option_force <= |io_din[7:0];
 						REG_DRIVE_LED: set_drive_led <= |io_din[7:0];
+						REG_XEX_LOADER_MODE: set_xex_loader_mode <= |io_din[7:0];
 						REG_SIO_TX, REG_SIO_SETDIV:
 							begin
 								uart_data_write <= io_din[7:0];

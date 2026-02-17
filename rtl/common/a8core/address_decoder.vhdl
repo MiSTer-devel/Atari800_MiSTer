@@ -93,6 +93,7 @@ PORT
 
 	atari800mode : in std_logic := '0';
 	pbi_rom_mode : in std_logic := '0';
+	xex_loader_mode : in std_logic := '0';
 
 	cart_select : in std_logic_vector(7 downto 0);
 	cart2_select : in std_logic_vector(7 downto 0);
@@ -523,11 +524,11 @@ BEGIN
 		end if;
 	end process;
 
-	process(pbi_mpd_n,pbi_rom_mode,emu_pbi_rom_address_enable)
+	process(pbi_mpd_n,pbi_rom_mode,xex_loader_mode,emu_pbi_rom_address_enable)
 	begin
 			emu_pbi_enable <= '0';
 			pbi_mpd <= not(pbi_mpd_n);
-			if pbi_rom_mode = '1' then
+			if (pbi_rom_mode = '1') and (xex_loader_mode = '0') then
 				emu_pbi_enable <= '1';
 				pbi_mpd <= emu_pbi_rom_address_enable;
 			end if;
@@ -884,6 +885,7 @@ end generate;
 		emu_pbi_rom_address, emu_pbi_rom_address_enable,
 		emu_pbi_data_out, emu_pbi_data_out_enable,
 		emu_pbi_cache_data_out,
+		xex_loader_mode,
 		-- pbi stuff
 		pbi_mpd,
 		
@@ -1047,7 +1049,7 @@ end generate;
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					-- PBI BIOS rom emulation
-					if (emu_pbi_enable = '1') then
+					if (emu_pbi_enable = '1') or ((xex_loader_mode = '1') and (addr_next(7 downto 0) /= X"FE") and (addr_next(7 downto 0) /= X"FF")) then
 						emu_pbi_d1xx <= '1';
 						if (write_enable_next = '0') and (emu_pbi_data_out_enable = '1') then
 							MEMORY_DATA_INT(7 downto 0) <= emu_pbi_data_out;

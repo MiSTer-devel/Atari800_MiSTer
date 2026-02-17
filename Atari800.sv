@@ -220,7 +220,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -249,8 +249,6 @@ localparam CONF_STR = {
 	"P1-;",
 	"P1OAC,SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1o6,ATX drive timing,1050,810;",
-	"P1-;",
-	"P1o0,XEX loader,Standard,Stack;",
 	"P1-;",
 	"P1oP,Mount read-only,Disabled,Enabled;",
 	"P2,Hardware & OS;",
@@ -476,6 +474,7 @@ hps_ext hps_ext
 	.set_reset_rnmi(set_reset_rnmi),
 	.set_option_force(set_option_force),
 	.set_drive_led(drive_led),
+	.set_xex_loader_mode(xex_loader_mode),
 	.cart1_select(cart1_select),
 	.cart2_select(cart2_select),
 	.atari_status1(atari_status1),
@@ -575,6 +574,7 @@ atari800top atari800top
 	.RAM_SIZE(ram_config),
 	.OS_MODE_800(mode800),
 	.PBI_MODE(modepbi),
+	.XEX_LOADER_MODE(xex_loader_mode),
 	.WARM_RESET_MENU(status[39]),
 	.COLD_RESET_MENU(status[40] | buttons[1]),
 	.RTC(rtc),
@@ -734,6 +734,7 @@ assign cart_upload_addr = cart1_rom_index ? cart1_upload_addr : cart2_upload_add
 
 reg mode800 = 0;
 reg modepbi = 0;
+wire xex_loader_mode;
 reg splashpbi = 0;
 reg [7:0] drivesmodepbi = 0;
 reg [2:0] bootpbi = 0;
@@ -743,7 +744,7 @@ reg pal_video = 0;
 wire [15:0] atari_status1;
 wire [15:0] atari_status2;
 wire [2:0] atari_hotkeys;
-assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi, status[57], status[32], ~status[41], mode800, atari_hotkeys};
+assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], 1'b0, ~status[41], mode800, atari_hotkeys};
 assign atari_status2 = {4'b0000, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
