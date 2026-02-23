@@ -142,7 +142,7 @@ end generate;
 	end process;
 
 	-- map to atari key code
-	process(ps2_keys_reg, JOY1, JOY2, JOY3, JOY4, controller_select)
+	process(ps2_keys_reg, JOY1, JOY2, JOY3, JOY4, INPUT2, controller_select)
 	begin
 		atari_keyboard <= (others=>'0');
 
