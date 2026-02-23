@@ -34,7 +34,6 @@ PORT
 	CLIP_SIDES : IN STD_LOGIC;
 	
 	-- ANTIC interface
-	COLOUR_CLOCK_ORIGINAL : in std_logic;
 	COLOUR_CLOCK : in std_logic;
 	COLOUR_CLOCK_HIGHRES : in std_logic;
 	AN : IN STD_LOGIC_VECTOR(2 downto 0);
@@ -861,7 +860,7 @@ begin
 	
 		
 	-- decode antic input
-	process (AN, COLOUR_CLOCK, COLOUR_CLOCK_ORIGINAL, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, invisible_clip, clip_sides, hpos_reg)
+	process (AN, COLOUR_CLOCK, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, prior6_prev_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, invisible_clip, clip_sides, hpos_reg)
 	begin	
 		hblank_next <= hblank_reg;
 		reset_counter <= '0';
@@ -1126,7 +1125,7 @@ begin
 			end if;
 			
 			-- during vblank we reset our own counter - since Antic does not clear hblank_reg
-			if (hpos_reg = X"E3" and COLOUR_CLOCK_ORIGINAL='1') then
+			if (hpos_reg = X"E3" and COLOUR_CLOCK='1') then
 				reset_counter <= '1';
 				counter_load_value <= X"00";
 			end if;
@@ -1137,7 +1136,7 @@ begin
 	-- hpos
 	counter_hpos : simple_counter
 		generic map (COUNT_WIDTH=>8)
-		port map (clk=>clk, reset_n=>reset_n, increment=>COLOUR_CLOCK_ORIGINAL, load=>reset_counter, load_value=>counter_load_value, current_value=>hpos_reg);
+		port map (clk=>clk, reset_n=>reset_n, increment=>COLOUR_CLOCK, load=>reset_counter, load_value=>counter_load_value, current_value=>hpos_reg);
 	
 	process(hpos_reg, clip_sides)
 	begin		
@@ -1207,15 +1206,15 @@ begin
 
 	hsync_delay : delay_line
 		generic map (COUNT=>15)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hsync_start,enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hsync_end);	
+		port map(clk=>clk,sync_reset=>'0',data_in=>hsync_start,enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hsync_end);	
 		
 	csync_delay : delay_line
 		generic map (COUNT=>15)
-		port map(clk=>clk,sync_reset=>'0',data_in=>csync_start,enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>csync_end);			
+		port map(clk=>clk,sync_reset=>'0',data_in=>csync_start,enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>csync_end);			
 
 	burst_delay : delay_line
 		generic map (COUNT=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>burst_start,enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>burst_end);	
+		port map(clk=>clk,sync_reset=>'0',data_in=>burst_start,enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>burst_end);	
 
 	-- pmg dma
 	process(CPU_ENABLE_ORIGINAL,antic_fetch,memory_data_in,hsync_start,pmg_dma_state_reg,gractl_reg,odd_scanline_reg,vdelay_reg,grafm_reg, visible_live,hpos_reg, hblank_reg)
@@ -1300,26 +1299,26 @@ begin
 	-- pmg display - same for all pmgs
 	-- TODO: priority
 	player0 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposp0_delayed_reg,size=>sizep0_delayed_reg(1 downto 0),bitmap=>grafp0_reg, output=>active_p0_live);	
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposp0_delayed_reg,size=>sizep0_delayed_reg(1 downto 0),bitmap=>grafp0_reg, output=>active_p0_live);	
 	player1 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposp1_delayed_reg,size=>sizep1_delayed_reg(1 downto 0),bitmap=>grafp1_reg, output=>active_p1_live);	
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposp1_delayed_reg,size=>sizep1_delayed_reg(1 downto 0),bitmap=>grafp1_reg, output=>active_p1_live);	
 	player2 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposp2_delayed_reg,size=>sizep2_delayed_reg(1 downto 0),bitmap=>grafp2_reg, output=>active_p2_live);	
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposp2_delayed_reg,size=>sizep2_delayed_reg(1 downto 0),bitmap=>grafp2_reg, output=>active_p2_live);	
 	player3 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposp3_delayed_reg,size=>sizep3_delayed_reg(1 downto 0),bitmap=>grafp3_reg, output=>active_p3_live);				
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposp3_delayed_reg,size=>sizep3_delayed_reg(1 downto 0),bitmap=>grafp3_reg, output=>active_p3_live);				
 
 	grafm_reg10_extended <= grafm_reg(1 downto 0)&"000000";
 	grafm_reg32_extended <= grafm_reg(3 downto 2)&"000000";
 	grafm_reg54_extended <= grafm_reg(5 downto 4)&"000000";
 	grafm_reg76_extended <= grafm_reg(7 downto 6)&"000000";
 	missile0 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposm0_delayed_reg,size=>sizem_delayed_reg(1 downto 0),bitmap=>grafm_reg10_extended, output=>active_m0_live);
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposm0_delayed_reg,size=>sizem_delayed_reg(1 downto 0),bitmap=>grafm_reg10_extended, output=>active_m0_live);
 	missile1 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposm1_delayed_reg,size=>sizem_delayed_reg(3 downto 2),bitmap=>grafm_reg32_extended, output=>active_m1_live);
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposm1_delayed_reg,size=>sizem_delayed_reg(3 downto 2),bitmap=>grafm_reg32_extended, output=>active_m1_live);
 	missile2 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposm2_delayed_reg,size=>sizem_delayed_reg(5 downto 4),bitmap=>grafm_reg54_extended, output=>active_m2_live);
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposm2_delayed_reg,size=>sizem_delayed_reg(5 downto 4),bitmap=>grafm_reg54_extended, output=>active_m2_live);
 	missile3 : gtia_player
-		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK_ORIGINAL,live_position=>hpos_reg,player_position=>hposm3_delayed_reg,size=>sizem_delayed_reg(7 downto 6),bitmap=>grafm_reg76_extended, output=>active_m3_live);
+		port map(clk=>clk,reset_n=>reset_n,colour_enable=>COLOUR_CLOCK,live_position=>hpos_reg,player_position=>hposm3_delayed_reg,size=>sizem_delayed_reg(7 downto 6),bitmap=>grafm_reg76_extended, output=>active_m3_live);
 		
 	-- calculate atari colour
 	priority_rules : gtia_priority
@@ -1860,7 +1859,7 @@ begin
 		-- THESE CAN TAKE MUCH LESS SPACE - only need to store per CPU cycle, not per colour clock original
 --	prior_short_delay : wide_delay_line
 --		generic map (COUNT=>2, WIDTH=>6)
---		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(5 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed_reg(5 downto 0));
+--		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(5 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>prior_delayed_reg(5 downto 0));
 	prior_delayed_reg(5 downto 0) <= prior_snap_reg(5 downto 0);
 
 	prior_long_delay : wide_delay_line
@@ -1912,45 +1911,45 @@ begin
 
 	hposp0_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp0_delayed_reg(7 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposp0_delayed_reg(7 downto 0));		
 	hposp1_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp1_delayed_reg(7 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposp1_delayed_reg(7 downto 0));		
 	hposp2_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp2_delayed_reg(7 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposp2_delayed_reg(7 downto 0));		
 	hposp3_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposp3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposp3_delayed_reg(7 downto 0));				
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposp3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposp3_delayed_reg(7 downto 0));				
 
 	hposm0_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm0_delayed_reg(7 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposm0_delayed_reg(7 downto 0));		
 	hposm1_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm1_delayed_reg(7 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposm1_delayed_reg(7 downto 0));		
 	hposm2_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm2_delayed_reg(7 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposm2_delayed_reg(7 downto 0));		
 	hposm3_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>hposm3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>hposm3_delayed_reg(7 downto 0));				
+		port map(clk=>clk,sync_reset=>'0',data_in=>hposm3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>hposm3_delayed_reg(7 downto 0));				
 		
 	sizep0_delay : wide_delay_line
 		generic map (COUNT=>2, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep0_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep0_delayed_reg(1 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep0_snap_reg(1 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>sizep0_delayed_reg(1 downto 0));		
 	sizep1_delay : wide_delay_line
 		generic map (COUNT=>2, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep1_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep1_delayed_reg(1 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep1_snap_reg(1 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>sizep1_delayed_reg(1 downto 0));		
 	sizep2_delay : wide_delay_line
 		generic map (COUNT=>2, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep2_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep2_delayed_reg(1 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep2_snap_reg(1 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>sizep2_delayed_reg(1 downto 0));		
 	sizep3_delay : wide_delay_line
 		generic map (COUNT=>2, WIDTH=>2)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizep3_snap_reg(1 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizep3_delayed_reg(1 downto 0));		
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizep3_snap_reg(1 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>sizep3_delayed_reg(1 downto 0));		
 	sizem_delay : wide_delay_line
 		generic map (COUNT=>2, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>sizem_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>sizem_delayed_reg(7 downto 0));				
+		port map(clk=>clk,sync_reset=>'0',data_in=>sizem_snap_reg(7 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>sizem_delayed_reg(7 downto 0));				
 		
 	-- joystick
 	process(trig_reg, trig, gractl_reg)

@@ -149,7 +149,6 @@ ENTITY atari800core_simple_sdram is
 		-- Special config params
 		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
-		EXT_ANTIC : in STD_LOGIC;
 		CLIP_SIDES : in STD_LOGIC;
 		RESET_RNMI : in STD_LOGIC;
 		ATARI800MODE : in STD_LOGIC := '0';
@@ -527,7 +526,6 @@ PORT MAP
 	CART_EMULATION_SELECT => emulated_cartridge_select,
 	CART2_EMULATION_SELECT => emulated_cartridge2_select,
 	PAL => PAL,
-	EXT_ANTIC => EXT_ANTIC,
 	CLIP_SIDES => CLIP_SIDES,
 	ATARI800MODE => ATARI800MODE,
 	PBI_ROM_MODE => PBI_ROM_MODE,

@@ -220,7 +220,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 //                                      1         1         1
 // 6     7         8         9          0         1         2
@@ -277,7 +277,6 @@ localparam CONF_STR = {
 	"P3,Video;",
 	"P3-;",
 	"P3O[5],Video mode,PAL,NTSC;",
-	"P3O[33],Hi-Res ANTIC,Disabled,Enabled;",
 	"P3O[62:61],Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
 	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
@@ -562,7 +561,6 @@ atari800top atari800top
 	.HPS_DMA_READY(dma_ready),
 
 	.PAL(pal_video),
-	.EXT_ANTIC(status[33]),
 	.CLIP_SIDES(status[34]),
 	.VGA_VS(VSync_o),
 	.VGA_HS(HSync_o),
