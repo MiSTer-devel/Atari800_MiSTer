@@ -222,6 +222,12 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
 // X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
+//                                      1         1         1
+// 6     7         8         9          0         1         2
+// 45678901234567890123456789012345 67890123456789012345678901234567
+//                                                                  
+
+
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
@@ -240,29 +246,29 @@ localparam CONF_STR = {
 	"-;",
 	"P1,Drives & Loader;",
 	"P1-;",
-	"P1OG,SIO Connected to,Emu,USER I/O;",
+	"P1O[16],SIO Connected to,Emu,USER I/O;",
 	"P1-;",
-	"d2P1oCD,D1 mode,OS/Stock,PBI,HSIO;",
-	"d2P1oEF,D2 mode,OS/Stock,PBI,HSIO;",
-	"d2P1oGH,D3 mode,OS/Stock,PBI,HSIO;",
-	"d2P1oIJ,D4 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[45:44],D1 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[47:46],D2 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[49:48],D3 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[51:50],D4 mode,OS/Stock,PBI,HSIO;",
 	"P1-;",
-	"P1OAC,SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
-	"P1o6,ATX drive timing,1050,810;",
+	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
+	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
-	"P1oP,Mount read-only,Disabled,Enabled;",
+	"P1O[57],Mount read-only,Disabled,Enabled;",
 	"P2,Hardware & OS;",
 	"P2-;",
-	"P2O79,CPU speed,1x,2x,4x,8x,16x;",
+	"P2O[9:7],CPU speed,1x,2x,4x,8x,16x;",
 	"P2-;",
-	"P2O2,Machine,XL/XE,400/800;",
-	"H1P2ODF,RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB(Axlon);",
-	"h1P2o35,RAM 800,8K,16K,32K,48K,52K,4MB(Axlon);",
-	"d5P2oA,PBI BIOS,Disabled,Enabled;",
-	"d2P2oB,PBI splash,Disabled,Enabled;",
-	"d2P2oKM,PBI boot drive,Default,APT,D1:,D2:,D3:,D4:,D5:,D6:;",
+	"P2O[2],Machine,XL/XE,400/800;",
+	"H1P2O[15:13],RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB(Axlon);",
+	"h1P2O[37:35],RAM 800,8K,16K,32K,48K,52K,4MB(Axlon);",
+	"d5P2O[42],PBI BIOS,Disabled,Enabled;",
+	"d2P2O[43],PBI splash,Disabled,Enabled;",
+	"d2P2O[54:52],PBI boot drive,Default,APT,D1:,D2:,D3:,D4:,D5:,D6:;",
 	"P2-;",
-	"P2o9,Use bootX.rom,Enabled,Disabled;",
+	"P2O[41],Use bootX.rom,Enabled,Disabled;",
 	"P2-;",
 	"P2FC4,ROMBIN,XL/XE OS;",
 	"P2FC5,ROMBIN,Basic;",
@@ -270,37 +276,37 @@ localparam CONF_STR = {
 	"P2FC3,ROMBIN,TurboFreezer;",
 	"P3,Video;",
 	"P3-;",
-	"P3O5,Video mode,PAL,NTSC;",
-	"P3o1,Hi-Res ANTIC,Disabled,Enabled;",
-	"P3oTU,Interlace hack,Disabled,Weave,Bob;",
+	"P3O[5],Video mode,PAL,NTSC;",
+	"P3O[33],Hi-Res ANTIC,Disabled,Enabled;",
+	"P3O[62:61],Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
-	"P3oRS,VBXE,Disabled,$D640,$D740;",
-	"P3oV,Fix VBXE NTSC bug,Disabled,Enabled;",
+	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
+	"P3O[63],Fix VBXE NTSC bug,Disabled,Enabled;",
 	"P3FC2,ACT,VBXE Palette;",
 	"P3-;",
-	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"P3OHJ,Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-	"d3P3OV,NTSC artifacting,No,Yes;",
-	"d4P3oN,Artifacting colors,Set 1,Set 2;",
-	"d4P3oQ,Swap artif. colors,No,Yes;",
-	"P3o2,Clip sides,Disabled,Enabled;",
-	"P3OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
-	"d0P3OO,Vertical Crop,Disabled,216p(5x);",
-	"d0P3OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
+	"P3O[23:22],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P3O[19:17],Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"d3P3O[31],NTSC artifacting,No,Yes;",
+	"d4P3O[55],Artifacting colors,Set 1,Set 2;",
+	"d4P3O[58],Swap artif. colors,No,Yes;",
+	"P3O[34],Clip sides,Disabled,Enabled;",
+	"P3O[30:29],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
+	"d0P3O[24],Vertical Crop,Disabled,216p(5x);",
+	"d0P3O[28:25],Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
 	"P4,Audio;",
 	"P4-;",
-	"P4OK,Dual Pokey,Disabled,Enabled;",
-	"P4O34,Stereo mix,None,25%,50%,100%;",
+	"P4O[20],Dual Pokey,Disabled,Enabled;",
+	"P4O[4:3],Stereo mix,None,25%,50%,100%;",
 	"P5,Input;",
 	"P5-;",
-	"P5OL,Swap Joysticks 1&2,No,Yes;",
+	"P5O[21],Swap Joysticks 1&2,No,Yes;",
 	"P5-;",
-	"P5oO,Mouse X,Normal,Inverted;",
-	"P5O6,Mouse Y,Normal,Inverted;",
+	"P5O[56],Mouse X,Normal,Inverted;",
+	"P5O[6],Mouse Y,Normal,Inverted;",
 	"-;",
-	"r7,Warm Reset (F9);",
-	"r8,Cold Reset (F10);",
-	"R0,Reset (Detach All);",
+	"R[39],Warm Reset (F9);",
+	"R[40],Cold Reset (F10);",
+	"R[0],Reset (Detach All);",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
 	"V,v",`BUILD_DATE
 };
@@ -334,7 +340,7 @@ wire [15:0] joya_1;
 wire [15:0] joya_2;
 wire [15:0] joya_3;
 wire  [1:0] buttons;
-wire [63:0] status;
+wire [127:0] status;
 wire [24:0] ps2_mouse;
 wire [10:0] ps2_key;
 wire        forced_scandoubler;

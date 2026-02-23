@@ -1861,11 +1861,11 @@ begin
 --	prior_short_delay : wide_delay_line
 --		generic map (COUNT=>2, WIDTH=>6)
 --		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(5 downto 0),enable=>COLOUR_CLOCK_ORIGINAL,reset_n=>reset_n,data_out=>prior_delayed_reg(5 downto 0));
-	prior_delayed_reg(7 downto 0) <= prior_snap_reg(7 downto 0);
+	prior_delayed_reg(5 downto 0) <= prior_snap_reg(5 downto 0);
 
---	prior_long_delay : wide_delay_line
---		generic map (COUNT=>1, WIDTH=>2)
---		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(7 downto 6),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>prior_delayed_reg(7 downto 6));
+	prior_long_delay : wide_delay_line
+		generic map (COUNT=>1, WIDTH=>2)
+		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(7 downto 6),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>prior_delayed_reg(7 downto 6));
 
 	prior_longer_delay : wide_delay_line
 		generic map (COUNT=>2, WIDTH=>2)
