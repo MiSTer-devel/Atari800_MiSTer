@@ -12,7 +12,7 @@
 *Note:* With the introduction of the VBXE implementation the core no longer has built-in ROM data and ROM files have to be supplied by the user as detailed here.
 This also means that there is no OS built-in HSIO functionality (as it used to be before VBXE introduction), but one is provided through the PBI BIOS (see below).
 
-You should supply XL/XE OS ROM as games/ATARI800/boot.rom, or load a corresponding file through OSD (this file should be 16K in size). 
+You should supply XL/XE OS ROM as games/ATARI800/boot0.rom, or load a corresponding file through OSD (this file should be 16K in size). 
 Supply XL/XE Basic ROM as games/ATARI800/boot1.rom, or load it through OSD (this file should be 8K in size).
 Supply the "classic" A400/A800 OS-A or OS-B ROM as games/ATARI800/boot2.rom, or load it through OSD (this file should be 10K in size). 
 Then, you can provide the PBI BIOS file as games/ATARI800/boot3.rom (8K in size), here there is no OSD menu option as the only file that is usable for this is distributed with the core.
