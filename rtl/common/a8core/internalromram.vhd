@@ -8,18 +8,18 @@ USE ieee.math_real.ceil;
 ENTITY internalromram IS
 	GENERIC
 	(
-		internal_rom : integer := 1;  
+		internal_rom : integer := 0;  
 		internal_ram : integer := 16384 
 	);
 	PORT(
 		clock   : IN STD_LOGIC;      --system clock
 		reset_n : IN STD_LOGIC;      --asynchronous reset
 
-		ROM_ADDR : in STD_LOGIC_VECTOR(21 downto 0);
-		ROM_WR_ENABLE : in std_logic;
-		ROM_DATA_IN : in STD_LOGIC_VECTOR(7 downto 0);
+		ROM_ADDR : in STD_LOGIC_VECTOR(21 downto 0) := (others => '0');
+		ROM_WR_ENABLE : in std_logic := '0'; 
+		ROM_DATA_IN : in STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
 		ROM_REQUEST_COMPLETE : out STD_LOGIC;
-		ROM_REQUEST : in std_logic;
+		ROM_REQUEST : in std_logic := '0';
 		ROM_DATA : out std_logic_vector(7 downto 0);
 
 		RAM_ADDR : in STD_LOGIC_VECTOR(18 downto 0);
@@ -35,8 +35,8 @@ architecture vhdl of internalromram is
 	signal ram_request_reg : std_logic;
 	signal ram_request_next : std_logic;
 	
-	signal RAM1_DATA,RAM2_DATA : std_logic_vector(7 downto 0);
-	signal ram1_sel, ram2_sel : std_logic;
+	--signal RAM1_DATA,RAM2_DATA : std_logic_vector(7 downto 0);
+	--signal ram1_sel, ram2_sel : std_logic;
 	signal ramwe_temp : std_logic;
 
 begin

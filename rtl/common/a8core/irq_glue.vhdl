@@ -16,6 +16,7 @@ PORT
 	pia_irqa : in std_logic;
 	pia_irqb : in std_logic;
 	pbi_irq : in std_logic;
+	vbxe_irq : in std_logic;
 	
 	combined_irq : out std_logic
 );
@@ -23,5 +24,5 @@ end irq_glue;
 
 architecture vhdl of irq_glue is
 begin
-	combined_irq <= pokey_irq and pia_irqa and pia_irqb and pbi_irq;
+	combined_irq <= pokey_irq and pia_irqa and pia_irqb and pbi_irq and vbxe_irq;
 end vhdl;

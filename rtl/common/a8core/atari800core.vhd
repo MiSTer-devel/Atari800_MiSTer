@@ -44,6 +44,10 @@ ENTITY atari800core IS
 		VIDEO_ODD_LINE : out std_logic;
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
+		interlace_field : out std_logic;
+		interlace : out std_logic;
+		interlace_enable : in std_logic;
+
 
 		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
 		-- TODO - choose stereo/mono pokey
@@ -175,7 +179,6 @@ ENTITY atari800core IS
 		CART_EMULATION_SELECT : in std_logic_vector(7 downto 0);
 		CART2_EMULATION_SELECT : in std_logic_vector(7 downto 0);
 		PAL :  in STD_LOGIC;
-		EXT_ANTIC :  in STD_LOGIC;
 		CLIP_SIDES : in STD_LOGIC;
 		ROM_IN_RAM : in std_logic;
 		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0);
@@ -184,7 +187,14 @@ ENTITY atari800core IS
 		freezer_activate: in std_logic;
 		ATARI800MODE : in std_logic := '0';
 		PBI_ROM_MODE : in std_logic := '0';
+		XEX_LOADER_MODE : in std_logic := '0';
 		RTC : IN STD_LOGIC_VECTOR(64 DOWNTO 0);
+		VBXE_SWITCH : IN STD_LOGIC;
+		VBXE_REG_BASE : IN STD_LOGIC;
+		VBXE_NTSC_FIX : IN STD_LOGIC;
+		VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0);
+		VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0);
+		VBXE_PALETTE_COLOR : IN STD_LOGIC_VECTOR(6 downto 0);
 
 		-- debugging
 		freezer_state_out: out std_logic_vector(2 downto 0);
@@ -209,11 +219,12 @@ SIGNAL	ANTIC_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
 SIGNAL	CACHE_ANTIC_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
 SIGNAL	ANTIC_FETCH :  STD_LOGIC;
 SIGNAL	ANTIC_HIGHRES_COLOUR_CLOCK_OUT :  STD_LOGIC;
-SIGNAL	ANTIC_ORIGINAL_COLOUR_CLOCK_OUT :  STD_LOGIC;
 SIGNAL	ANTIC_RDY :  STD_LOGIC;
 SIGNAL	ANTIC_WRITE_ENABLE :  STD_LOGIC;
 SIGNAL	BREAK_PRESSED :  STD_LOGIC;
 signal ANTIC_REFRESH_CYCLE : STD_LOGIC;
+SIGNAL	VBXE_COLOUR_CLOCK_OUT :  STD_LOGIC;
+signal	ANTIC_DMA_ENABLED : STD_LOGIC;
 
 -- GTIA
 SIGNAL	GTIA_SOUND :  STD_LOGIC;
@@ -227,10 +238,37 @@ SIGNAL	GTIA_WRITE_ENABLE :  STD_LOGIC;
 
 signal COLOUR : std_logic_vector(7 downto 0);
 
+signal GTIA_VSYNC : std_logic;
+signal GTIA_HIGHRES_OUT : std_logic;
+signal GTIA_HIGHRES_IN : std_logic;
+signal GTIA_ACTIVE_HR_OUT : std_logic_vector(1 downto 0);
+signal GTIA_ACTIVE_HR_IN : std_logic_vector(1 downto 0);
+signal GTIA_PRIOR : std_logic_vector(7 downto 0);
+signal GTIA_PRIOR_RAW : std_logic_vector(7 downto 0);
+signal GTIA_HPOS : std_logic_vector(7 downto 0);
+signal GTIA_PF0_IN : std_logic_vector(7 downto 0);
+signal GTIA_PF1_IN : std_logic_vector(7 downto 0);
+signal GTIA_PF2_IN : std_logic_vector(7 downto 0);
+signal GTIA_PF0_OUT : std_logic_vector(7 downto 0);
+signal GTIA_PF1_OUT : std_logic_vector(7 downto 0);
+signal GTIA_PF2_OUT : std_logic_vector(7 downto 0);
+signal GTIA_PF3_OUT : std_logic_vector(7 downto 0);
+signal GTIA_XCOLOR : std_logic;
+signal GTIA_PALETTE : std_logic_vector(1 downto 0);
+
 -- GTIA PALETTE
-signal VIDEO_R_WIDE : std_logic_vector(7 downto 0);
-signal VIDEO_G_WIDE : std_logic_vector(7 downto 0);
-signal VIDEO_B_WIDE : std_logic_vector(7 downto 0);
+signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
+signal VIDEO_G_GTIA : std_logic_vector(7 downto 0);
+signal VIDEO_B_GTIA : std_logic_vector(7 downto 0);
+
+-- VBXE PALETTE
+signal VIDEO_R_VBXE : std_logic_vector(7 downto 0);
+signal VIDEO_G_VBXE : std_logic_vector(7 downto 0);
+signal VIDEO_B_VBXE : std_logic_vector(7 downto 0);
+signal VBXE_PF_PALETTE : std_logic_vector(1 downto 0);
+signal VBXE_OV_PALETTE : std_logic_vector(1 downto 0);
+signal VBXE_OV_PIXEL : std_logic_vector(7 downto 0);
+signal VBXE_OV_PIXEL_ACTIVE : std_logic;
 
 -- CPU
 SIGNAL	CPU_6502_RESET :  STD_LOGIC;
@@ -299,6 +337,25 @@ SIGNAL PORTB_OPTIONS : STD_LOGIC_VECTOR(7 downto 0);
 SIGNAL	ULTIME_DO : STD_LOGIC_VECTOR(7 downto 0);
 SIGNAL	ULTIME_WRITE_ENABLE : STD_LOGIC;
 
+-- VBXE
+SIGNAL	VBXE_SOFT_RESET : STD_LOGIC;
+SIGNAL	VBXE_DO : STD_LOGIC_VECTOR(7 downto 0);
+SIGNAL	VBXE_WRITE_ENABLE : STD_LOGIC;
+
+signal memac_address : std_logic_vector(15 downto 0);
+signal memac_write_enable : std_logic;
+signal memac_cpu_access : std_logic;
+signal memac_antic_access : std_logic;
+signal memac_check : std_logic;
+signal memac_data_write : std_logic_vector(7 downto 0);
+signal memac_data_read : std_logic_vector(7 downto 0);
+signal memac_request : std_logic;
+signal memac_request_complete : std_logic;
+signal memac_dma_enable : std_logic;
+signal dma_fetch_vbxe_adj : std_logic;
+
+signal VBXE_IRQ_N : std_logic;
+
 -- PBI
 SIGNAL PBI_ADDR_INT : std_logic_vector(15 downto 0);
 
@@ -313,6 +370,9 @@ PBI_WIDTH_32bit_ACCESS <= WIDTH_32bit_access;
 PBI_WRITE_DATA <= WRITE_DATA;
 PBI_SNOOP_DATA <= MEMORY_DATA;
 PBI_SNOOP_READY <= MEMORY_READY_CPU or MEMORY_READY_ANTIC;
+
+dma_fetch_vbxe_adj <= 
+	dma_fetch and memac_dma_enable;
 
 enables : entity work.shared_enable
 GENERIC MAP(cycle_length => cycle_length)
@@ -353,16 +413,16 @@ PORT MAP(CLK => CLK,
 		 MEMORY_READY_CPU => MEMORY_READY_CPU,
 		 ANTIC_ENABLE_179 => ANTIC_ENABLE_179,
 		 PAL => PAL,
-		 EXT_ANTIC => EXT_ANTIC,
 		 lightpen => ANTIC_LIGHTPEN,
 		 ADDR => PBI_ADDR_INT(3 DOWNTO 0),
 		 CPU_DATA_IN => WRITE_DATA(7 DOWNTO 0),
 		 MEMORY_DATA_IN => MEMORY_DATA(7 DOWNTO 0),
 		 NMI_N_OUT => NMI_n,
 		 ANTIC_READY => ANTIC_RDY,
-		 COLOUR_CLOCK_ORIGINAL_OUT => ANTIC_ORIGINAL_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK_OUT => ANTIC_COLOUR_CLOCK_OUT,
 		 HIGHRES_COLOUR_CLOCK_OUT => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
+		 VBXE_COLOUR_CLOCK_OUT => VBXE_COLOUR_CLOCK_OUT,
+		 ANTIC_DMA_ENABLED => ANTIC_DMA_ENABLED,
 		 dma_fetch_out => ANTIC_FETCH,
 		 HBLANK => HBLANK,
 		 VBLANK_OUT => VBLANK,
@@ -447,13 +507,72 @@ PORT MAP(
 	RTC_IN => RTC
 );
 
+vbxe_board : entity work.VBXE
+GENERIC MAP ( cycle_length => cycle_length)
+PORT MAP(
+	CLK => CLK,
+	ENABLE => VBXE_SWITCH,
+	NTSC_FIX => VBXE_NTSC_FIX,
+	ENABLE_179 => ANTIC_ENABLE_179, -- ENABLE_179_MEMWAIT,
+	RESET_N => RESET_N,
+	SOFT_RESET => VBXE_SOFT_RESET,
+	PAL => PAL,
+	ADDR => PBI_ADDR_INT(4 DOWNTO 0),
+	DATA_IN => WRITE_DATA(7 DOWNTO 0),
+	WR_EN => VBXE_WRITE_ENABLE,
+	DATA_OUT => VBXE_DO,
+	PALETTE_GET_COLOR => COLOUR,
+	PALETTE_GET_INDEX => GTIA_PALETTE,
+	R_OUT => VIDEO_R_VBXE,
+	G_OUT => VIDEO_G_VBXE,
+	B_OUT => VIDEO_B_VBXE,
+	VBXE_UPLOAD_PALETTE_RGB => VBXE_PALETTE_RGB,
+	VBXE_UPLOAD_PALETTE_INDEX => VBXE_PALETTE_INDEX,
+	VBXE_UPLOAD_PALETTE_COLOR => VBXE_PALETTE_COLOR,
+	memac_address => memac_address,
+	memac_write_enable => memac_write_enable,
+	memac_cpu_access => memac_cpu_access,
+	memac_antic_access => memac_antic_access,
+	memac_check => memac_check,
+	memac_data_in => memac_data_write,
+	memac_data_out => memac_data_read,
+	memac_request => memac_request,
+	memac_request_complete => memac_request_complete,
+	memac_dma_enable => memac_dma_enable,
+	memac_dma_address => dma_addr,
+	irq_n => VBXE_IRQ_N,
+	video_clock_antic_lowres => ANTIC_COLOUR_CLOCK_OUT,
+	video_clock_antic_highres => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
+	video_clock_vbxe => VBXE_COLOUR_CLOCK_OUT,
+	gtia_highres => GTIA_HIGHRES_OUT,
+	gtia_highres_mod => GTIA_HIGHRES_IN,
+	gtia_active_hr => GTIA_ACTIVE_HR_OUT,
+	gtia_active_hr_mod => GTIA_ACTIVE_HR_IN,
+	gtia_prior => GTIA_PRIOR,
+	gtia_prior_raw => GTIA_PRIOR_RAW,
+	gtia_pf0 => GTIA_PF0_OUT,
+	gtia_pf1 => GTIA_PF1_OUT,
+	gtia_pf2 => GTIA_PF2_OUT,
+	gtia_pf3 => GTIA_PF3_OUT,
+	map_pf0 => GTIA_PF0_IN,
+	map_pf1 => GTIA_PF1_IN,
+	map_pf2 => GTIA_PF2_IN,
+	pf_palette => VBXE_PF_PALETTE,
+	ov_palette => VBXE_OV_PALETTE,
+	ov_pixel => VBXE_OV_PIXEL,
+	ov_pixel_active => VBXE_OV_PIXEL_ACTIVE,
+	xcolor => GTIA_XCOLOR,
+	VSYNC => GTIA_VSYNC,
+	GTIA_HPOS => GTIA_HPOS
+);
+
 mmu1 : entity work.address_decoder
 GENERIC MAP(low_memory => low_memory, sdram_start_bank => sdram_start_bank)
 PORT MAP(CLK => CLK,
 		 CPU_FETCH => CPU_FETCH,
 		 CPU_WRITE_N => R_W_N,
 		 ANTIC_FETCH => ANTIC_FETCH,
-		 DMA_FETCH => DMA_FETCH,
+		 DMA_FETCH => dma_fetch_vbxe_adj,
 		 DMA_READ_ENABLE => DMA_READ_ENABLE,
 		 DMA_32BIT_WRITE_ENABLE => DMA_32BIT_WRITE_ENABLE,
 		 DMA_16BIT_WRITE_ENABLE => DMA_16BIT_WRITE_ENABLE,
@@ -487,9 +606,26 @@ PORT MAP(CLK => CLK,
 		 CACHE_POKEY_DATA => CACHE_POKEY_DO,
 		 PORTB => PORTB_OPTIONS,
 		 RAM_DATA => RAM_DO,
+
+		 VBXE_SWITCH => VBXE_SWITCH,
+		 VBXE_REG_BASE => VBXE_REG_BASE,
+		 VBXE_DATA => VBXE_DO,
+		 VBXE_WRITE_ENABLE => VBXE_WRITE_ENABLE,
+		 VBXE_SOFT_RESET => VBXE_SOFT_RESET,
+		 memac_address => memac_address,
+		 memac_write_enable => memac_write_enable,
+		 memac_cpu_access => memac_cpu_access,
+		 memac_antic_access => memac_antic_access,
+		 memac_check => memac_check,
+		 memac_data_write => memac_data_write,
+		 memac_data_read => memac_data_read,
+		 memac_request => memac_request,
+		 memac_request_complete => memac_request_complete,
+
 		 ram_select => RAM_SELECT(2 downto 0),
 		 ATARI800MODE => ATARI800MODE,
 		 PBI_ROM_MODE => PBI_ROM_MODE,
+		 XEX_LOADER_MODE => XEX_LOADER_MODE,
 		 ROM_DATA => ROM_DO,
 		 SDRAM_DATA => SDRAM_DO,
 		 DMA_ADDR => DMA_ADDR,
@@ -574,6 +710,7 @@ PORT MAP(CLK => CLK,
 		 keyboard_scan => KEYBOARD_SCAN);
 
 CONSOL_IN <= '1'&CONSOL_OPTION&CONSOL_SELECT&CONSOL_START;
+
 		 	 
 gtia1 : entity work.gtia
 PORT MAP(CLK => CLK,
@@ -584,9 +721,33 @@ PORT MAP(CLK => CLK,
 		 PAL => PAL,
 		 CLIP_SIDES => CLIP_SIDES,
 		 ENABLE_179 => ANTIC_ENABLE_179,
-		 COLOUR_CLOCK_ORIGINAL => ANTIC_ORIGINAL_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK => ANTIC_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK_HIGHRES => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
+		 COLOUR_CLOCK_VBXE => VBXE_COLOUR_CLOCK_OUT,
+		 ANTIC_DMA_ENABLED => ANTIC_DMA_ENABLED,
+		 VBXE_SWITCH => VBXE_SWITCH,
+		 GTIA_HIGHRES_OUT => GTIA_HIGHRES_OUT,
+		 GTIA_HIGHRES_IN => GTIA_HIGHRES_IN,
+		 GTIA_ACTIVE_HR_OUT => GTIA_ACTIVE_HR_OUT,
+		 GTIA_ACTIVE_HR_IN => GTIA_ACTIVE_HR_IN,
+		 GTIA_PRIOR => GTIA_PRIOR,
+		 GTIA_PRIOR_RAW => GTIA_PRIOR_RAW,
+		 GTIA_PF0_OUT => GTIA_PF0_OUT,
+		 GTIA_PF1_OUT => GTIA_PF1_OUT,
+		 GTIA_PF2_OUT => GTIA_PF2_OUT,
+		 GTIA_PF3_OUT => GTIA_PF3_OUT,
+		 GTIA_PF0_IN => GTIA_PF0_IN,
+		 GTIA_PF1_IN => GTIA_PF1_IN,
+		 GTIA_PF2_IN => GTIA_PF2_IN,
+		 VBXE_PF_PALETTE => VBXE_PF_PALETTE,
+		 VBXE_OV_PALETTE => VBXE_OV_PALETTE,
+		 VBXE_OV_PIXEL => VBXE_OV_PIXEL,
+		 VBXE_OV_PIXEL_ACTIVE => VBXE_OV_PIXEL_ACTIVE,
+		 PALETTE_out => GTIA_PALETTE,
+		 XCOLOR => GTIA_XCOLOR,
+		 GTIA_VSYNC => GTIA_VSYNC,
+		 HPOS_OUT => GTIA_HPOS,
+
 		 CONSOL_OUT => CONSOL_OUT,
 		 CONSOL_IN => CONSOL_IN,
 		 TRIG => GTIA_TRIG_MERGED,
@@ -600,6 +761,9 @@ PORT MAP(CLK => CLK,
 		 BLANK => VIDEO_BLANK,
 		 HBLANK => open,
 		 VBLANK => open,
+		 interlace_enable => interlace_enable,
+		 interlace => interlace,
+		 interlace_field => interlace_field,
 		 BURST => VIDEO_BURST,
 		 START_OF_FIELD => VIDEO_START_OF_FIELD,
 		 ODD_LINE => VIDEO_ODD_LINE,
@@ -612,25 +776,26 @@ GTIA_SOUND <= not(CONSOL_OUT(3));
 	-- colour palette
 
 gen_palette_none : if palette=0 generate
-	VIDEO_B_WIDE <= COLOUR;
-	VIDEO_R_WIDE <= (others => '0');
-	VIDEO_G_WIDE <= (others => '0');
+	VIDEO_B_GTIA <= COLOUR;
+	VIDEO_R_GTIA <= (others => '0');
+	VIDEO_G_GTIA <= (others => '0');
 end generate;
 
 gen_palette_on : if palette=1 generate
 	palette4 : entity work.gtia_palette
-		port map (PAL=>PAL, ATARI_COLOUR=>COLOUR, R_next=>VIDEO_R_WIDE, G_next=>VIDEO_G_WIDE, B_next=>VIDEO_B_WIDE);		
+		port map (PAL=>PAL, ATARI_COLOUR=>COLOUR, R_next=>VIDEO_R_GTIA, G_next=>VIDEO_G_GTIA, B_next=>VIDEO_B_GTIA);		
 end generate;
 
-VIDEO_R(video_bits-1 downto 0) <= VIDEO_R_WIDE(7 downto 8-video_bits);
-VIDEO_G(video_bits-1 downto 0) <= VIDEO_G_WIDE(7 downto 8-video_bits);
-VIDEO_B(video_bits-1 downto 0) <= VIDEO_B_WIDE(7 downto 8-video_bits);
+VIDEO_R(video_bits-1 downto 0) <= VIDEO_R_VBXE(7 downto 8-video_bits) when VBXE_SWITCH = '1' else VIDEO_R_GTIA(7 downto 8-video_bits);
+VIDEO_G(video_bits-1 downto 0) <= VIDEO_G_VBXE(7 downto 8-video_bits) when VBXE_SWITCH = '1' else VIDEO_G_GTIA(7 downto 8-video_bits);
+VIDEO_B(video_bits-1 downto 0) <= VIDEO_B_VBXE(7 downto 8-video_bits) when VBXE_SWITCH = '1' else VIDEO_B_GTIA(7 downto 8-video_bits);
 
 irq_glue1 : entity work.irq_glue
 PORT MAP(pokey_irq => POKEY_IRQ,
 		 pia_irqa => PIA_IRQA,
 		 pia_irqb => PIA_IRQB,
 		 pbi_irq => PBI_IRQ_N,
+		 vbxe_irq => VBXE_IRQ_N,
 		 combined_irq => IRQ_n);
 		 
 -- TODO - generic ram infer?
@@ -702,7 +867,7 @@ PBI_ADDR <= PBI_ADDR_INT;
 ENABLE_179_EARLY <= ANTIC_ENABLE_179;
 PORTB_OUT <= PORTB_OUT_INT;
 ANTIC_REFRESH <= ANTIC_REFRESH_CYCLE;
-VIDEO_PIXCE <= ANTIC_HIGHRES_COLOUR_CLOCK_OUT;
+VIDEO_PIXCE <= VBXE_COLOUR_CLOCK_OUT when VBXE_SWITCH = '1' else ANTIC_HIGHRES_COLOUR_CLOCK_OUT;
 
 
 memory_ready_antic_out <= memory_ready_antic;

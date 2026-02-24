@@ -87,7 +87,8 @@ ENTITY atari5200core_simplesdram is
 
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
-	
+		EMULATED_CARTRIDGE_SELECT : in std_logic_vector(7 downto 0);
+
 		-- JOYSTICK
 		JOY1_X : IN signed(7 downto 0);
 		JOY1_Y : IN signed(7 downto 0);
@@ -435,7 +436,8 @@ PORT MAP
 	-- Special config params
 	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
-	HALT => HALT
+	HALT => HALT,
+	EMULATED_CARTRIDGE_SELECT => EMULATED_CARTRIDGE_SELECT
 );
 
 -- Since we're not exposing PBI, expose a few key parts needed for SDRAM

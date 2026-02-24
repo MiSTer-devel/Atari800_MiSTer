@@ -181,7 +181,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
 
-assign LED_USER  = drive_led | ioctl_download;
+assign LED_USER  = file_download | drive_led;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -189,7 +189,7 @@ assign VGA_SCALER= 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
-assign HDMI_BOB_DEINT = 0;
+assign HDMI_BOB_DEINT = status[62] & interlace;
 
 wire [1:0] ar       = status[23:22];
 wire       vcrop_en = status[24];
@@ -220,84 +220,92 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXX
+// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+//                                      1         1         1
+// 6     7         8         9          0         1         2
+// 45678901234567890123456789012345 67890123456789012345678901234567
+//                                                                  
+
 
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ATARI800;;",
 	"-;",
 	"S6,ATRXEXXDFATX,Boot D1;",
+	"S5,XEXCOMEXE,Load XEX;",
+	"F8,CARROMBIN,Load Cart;",
 	"-;",
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
-	"S2,ATRXEXXFDIMG,Mount D3;",
-	"S3,ATRXEXXFDIMG,Mount D4;",
+	"S2,ATRXEXXFDATX,Mount D3;",
+	"S3,ATRXEXXFDATX,Mount D4;",
+	"S4,IMG,Mount HDD;",
 	"-;",
-	"S5,XEXCOMEXE,Load XEX;",
-	"-;",
-	"S4,CARROMBIN,Load Cart;",
-	"S7,CARROMBIN,Stack Cart;",
+	"F9,CARROMBIN,Second Cart;",
 	"-;",
 	"P1,Drives & Loader;",
 	"P1-;",
-	"P1OG,SIO Connected to,Emu,USER I/O;",
+	"P1O[16],SIO Connected to,Emu,USER I/O;",
 	"P1-;",
-	"d2P1oCD,D1 mode,OS/Stock,PBI,HSIO;",
-	"d2P1oEF,D2 mode,OS/Stock,PBI,HSIO;",
-	"d2P1oGH,D3 mode,OS/Stock,PBI,HSIO;",
-	"d2P1oIJ,D4 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[45:44],D1 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[47:46],D2 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[49:48],D3 mode,OS/Stock,PBI,HSIO;",
+	"d2P1O[51:50],D4 mode,OS/Stock,PBI,HSIO;",
 	"P1-;",
-	"P1OAC,SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
-	"P1o6,ATX drive timing,1050,810;",
+	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
+	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
-	"P1o0,XEX loader,Standard,Stack;",
-	"P1-;",
-	"P1oP,Mount read-only,Disabled,Enabled;",
+	"P1O[57],Mount read-only,Disabled,Enabled;",
 	"P2,Hardware & OS;",
 	"P2-;",
-	"P2O79,CPU speed,1x,2x,4x,8x,16x;",
+	"P2O[9:7],CPU speed,1x,2x,4x,8x,16x;",
 	"P2-;",
-	"P2O12,Machine/BIOS,XL+Basic,XL,800/OS-A,800/OS-B;",
-	"H1P2ODF,RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB(Axlon);",
-	"h1P2o35,RAM 800,8K,16K,32K,48K,52K,4MB(Axlon);",
-	"D1P2oA,PBI BIOS,Disabled,Enabled;",
-	"d2P2oB,PBI splash,Disabled,Enabled;",
-	"d2P2oKM,PBI boot drive,Default,APT,D1:,D2:,D3:,D4:,D5:,D6:;",
+	"P2O[2],Machine,XL/XE,400/800;",
+	"H1P2O[15:13],RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB(Axlon);",
+	"h1P2O[37:35],RAM 800,8K,16K,32K,48K,52K,4MB(Axlon);",
+	"d5P2O[42],PBI BIOS,Disabled,Enabled;",
+	"d2P2O[43],PBI splash,Disabled,Enabled;",
+	"d2P2O[54:52],PBI boot drive,Default,APT,D1:,D2:,D3:,D4:,D5:,D6:;",
 	"P2-;",
-	"P2o9,Use bootX.rom,Enabled,Disabled;",
+	"P2O[41],Use bootX.rom,Enabled,Disabled;",
 	"P2-;",
-	"P2FC4,ROMBIN,Set XL OS;",
-	"P2FC5,ROMBIN,Set Basic;",
-	"P2FC6,ROMBIN,Set OS-A;",
-	"P2FC7,ROMBIN,Set OS-B;",
+	"P2FC4,ROMBIN,XL/XE OS;",
+	"P2FC5,ROMBIN,Basic;",
+	"P2FC6,ROMBIN,OS-A/B;",
+	"P2FC3,ROMBIN,TurboFreezer;",
 	"P3,Video;",
 	"P3-;",
-	"P3O5,Video mode,PAL,NTSC;",
-	"P3o1,Hi-Res ANTIC,Disabled,Enabled;",
+	"P3O[5],Video mode,PAL,NTSC;",
+	"P3O[62:61],Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
-	"P3OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"P3OHJ,Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-	"d3P3OV,NTSC artifacting,No,Yes;",
-	"d4P3oN,Artifacting colors,Set 1,Set 2;",
-	"d4P3oQ,Swap artif. colors,No,Yes;",
-	"P3o2,Clip sides,Disabled,Enabled;",
-	"P3OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
-	"d0P3OO,Vertical Crop,Disabled,216p(5x);",
-	"d0P3OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
+	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
+	"P3O[63],Fix VBXE NTSC bug,Disabled,Enabled;",
+	"P3FC2,ACT,VBXE Palette;",
+	"P3-;",
+	"P3O[23:22],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P3O[19:17],Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"d3P3O[31],NTSC artifacting,No,Yes;",
+	"d4P3O[55],Artifacting colors,Set 1,Set 2;",
+	"d4P3O[58],Swap artif. colors,No,Yes;",
+	"P3O[34],Clip sides,Disabled,Enabled;",
+	"P3O[30:29],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
+	"d0P3O[24],Vertical Crop,Disabled,216p(5x);",
+	"d0P3O[28:25],Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
 	"P4,Audio;",
 	"P4-;",
-	"P4OK,Dual Pokey,Disabled,Enabled;",
-	"P4O34,Stereo mix,None,25%,50%,100%;",
+	"P4O[20],Dual Pokey,Disabled,Enabled;",
+	"P4O[4:3],Stereo mix,None,25%,50%,100%;",
 	"P5,Input;",
 	"P5-;",
-	"P5OL,Swap Joysticks 1&2,No,Yes;",
+	"P5O[21],Swap Joysticks 1&2,No,Yes;",
 	"P5-;",
-	"P5oO,Mouse X,Normal,Inverted;",
-	"P5O6,Mouse Y,Normal,Inverted;",
+	"P5O[56],Mouse X,Normal,Inverted;",
+	"P5O[6],Mouse Y,Normal,Inverted;",
 	"-;",
-	"r7,Warm Reset (F9);",
-	"r8,Cold Reset (F10);",
-	"R0,Core Reset;",
+	"R[39],Warm Reset (F9);",
+	"R[40],Cold Reset (F10);",
+	"R[0],Reset (Detach All);",
 	"J,Fire 1,Fire 2,Fire 3,Paddle LT,Paddle RT,Start,Select,Option,Reset(F9),Reset(F10);",
 	"V,v",`BUILD_DATE
 };
@@ -319,15 +327,7 @@ pll pll
 	.locked(locked)
 );
 
-wire reset = RESET | status[0] | ~initReset_n | buttons[1];
-
-reg initReset_n = 0;
-always @(posedge clk_sys) begin
-	integer timeout = 0;
-	
-	if(timeout < 2500000) timeout <= timeout + 1;
-	else initReset_n <= 1;
-end
+wire reset = RESET;
 
 //////////////////   HPS I/O   ///////////////////
 wire [15:0] joy_0;
@@ -339,30 +339,97 @@ wire [15:0] joya_1;
 wire [15:0] joya_2;
 wire [15:0] joya_3;
 wire  [1:0] buttons;
-wire [63:0] status;
+wire [127:0] status;
 wire [24:0] ps2_mouse;
 wire [10:0] ps2_key;
 wire        forced_scandoubler;
 wire [21:0] gamma_bus;
 
-reg  [31:0] sd_lba;
-reg   [7:0] sd_rd;
-reg   [7:0] sd_wr;
-wire  [7:0] sd_ack;
-wire  [8:0] sd_buff_addr;
-wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din;
-wire        sd_buff_wr;
-wire  [7:0] img_mounted;
-wire        img_readonly;
-wire [63:0] img_size;
-wire [13:0] ioctl_addr;
+wire [26:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
+reg   [7:0] ioctl_din;
 wire        ioctl_wr;
+wire        ioctl_rd;
 wire        ioctl_download;
+wire        ioctl_upload;
 wire  [7:0] ioctl_index;
+reg         ioctl_wait = 1;
+
+wire [35:0] EXT_BUS;
+wire  [7:0] cart1_select;
+wire  [7:0] cart2_select;
+wire        set_reset;
+wire        set_pause;
+wire        set_freezer;
+wire        set_reset_rnmi;
+wire        set_option_force;
+
+wire  [7:0] hps_dma_data_in;
+wire        sdram_ready;
+wire        dma_ready;
+reg         dma_req = 0;
+
+wire  [4:0] uart_addr;
+wire        uart_enable;
+wire        uart_wr;
+wire  [7:0] uart_data_write;
+wire [15:0] uart_data_read;
 
 wire [64:0] rtc;
+
+wire file_download = ioctl_download && (ioctl_index != 99);
+
+always @(posedge clk_sys) begin
+	reg started = 0;
+	if(sdram_ready && sdram_erased) begin
+		if(!started) begin
+			started <= 1;
+			ioctl_wait <= 0;
+		end
+		if(ioctl_index[5:0] != 2 && (ioctl_download | ioctl_upload)) begin
+			if(dma_ready) begin
+				if(ioctl_upload)
+					ioctl_din <= hps_dma_data_in;
+				ioctl_wait <= 0;
+				dma_req <= 0;
+			end
+			if((ioctl_wr & ioctl_download) | (ioctl_rd & ioctl_upload)) begin
+				ioctl_wait <= 1;
+				dma_req <= 1;
+			end
+		end
+		else
+			ioctl_wait <= 0;
+	end
+end
+
+reg [16:0] sdram_erase_addr = 0;
+wire sdram_erased = sdram_erase_addr[16];
+reg sdram_erase_req = 0;
+
+always @(posedge clk_sys) if(!sdram_erased && sdram_ready) begin
+	if(dma_ready) begin
+		sdram_erase_addr <= sdram_erase_addr + 1'd1;
+		sdram_erase_req <= 0;
+	end
+	if(!sdram_erase_req)
+		sdram_erase_req <= 1;
+end
+
+reg[2:0] vbxe_palette_rgb = 3'b001;
+reg[7:0] vbxe_palette_index = 0;
+wire[2:0] vbxe_palette_rgb_out;
+assign vbxe_palette_rgb_out = vbxe_palette_rgb & 
+	{ ioctl_wr & (ioctl_index[5:0] == 2), ioctl_wr & (ioctl_index[5:0] == 2), ioctl_wr & (ioctl_index[5:0] == 2)}; 
+wire[6:0] vbxe_palette_color;
+assign vbxe_palette_color = ioctl_dout[7:1];
+
+// Translate the ACT RGB order into what we need
+always @(posedge clk_sys) if(ioctl_wr & (ioctl_index[5:0] == 2)) begin
+	if(vbxe_palette_rgb[2])
+		vbxe_palette_index <= vbxe_palette_index + 1'd1;
+	vbxe_palette_rgb <= {vbxe_palette_rgb[1:0], vbxe_palette_rgb[2]}; 
+end
 
 hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 (
@@ -380,34 +447,50 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({status[31] & status[5], status[5], ~status[2] & status[42], status[2], en216p}),
+	.status_menumask({~status[2] & pbi_rom_loaded, status[31] & status[5], status[5] & ~status[59] & ~status[60], ~status[2] & status[42] & pbi_rom_loaded, status[2], en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
-	.sd_lba('{sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba,sd_lba}),
-	.sd_rd(sd_rd),
-	.sd_wr(sd_wr),
-	.sd_ack(sd_ack),
-	.sd_buff_addr(sd_buff_addr),
-	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din('{sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din,sd_buff_din}),
-	.sd_buff_wr(sd_buff_wr),
-	.img_mounted(img_mounted),
-	.img_readonly(img_readonly),
-	.img_size(img_size),
-
 	.ioctl_download(ioctl_download),
+	.ioctl_upload(ioctl_upload),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
+	.ioctl_din(ioctl_din),
 	.ioctl_wr(ioctl_wr),
+	.ioctl_rd(ioctl_rd),
 	.ioctl_index(ioctl_index),
+	.ioctl_wait(ioctl_wait),
 
-	.RTC(rtc)
+	.RTC(rtc),
+	.EXT_BUS(EXT_BUS)
 );
 
+hps_ext hps_ext
+(
+	.clk_sys(clk_sys),
+	.EXT_BUS(EXT_BUS),
+
+	.set_reset(set_reset),
+	.set_pause(set_pause),
+	.set_freezer(set_freezer),
+	.set_reset_rnmi(set_reset_rnmi),
+	.set_option_force(set_option_force),
+	.set_drive_led(drive_led),
+	.set_xex_loader_mode(xex_loader_mode),
+	.cart1_select(cart1_select),
+	.cart2_select(cart2_select),
+	.atari_status1(atari_status1),
+	.atari_status2(atari_status2),
+	
+	.uart_addr(uart_addr),
+	.uart_enable(uart_enable),
+	.uart_wr(uart_wr),
+	.uart_data_write(uart_data_write),
+	.uart_data_read(uart_data_read)
+);
 
 wire [7:0] R,G,B, Ro,Go,Bo;
 wire HBlank,VBlank,HBlank_o,VBlank_o;
@@ -420,23 +503,14 @@ assign CLK_VIDEO = clk_vdo;
 wire cpu_halt;
 
 wire [15:0] laudio, raudio;
-assign AUDIO_L = {laudio[15],laudio[15:1]};
-assign AUDIO_R = status[20] ? {raudio[15],raudio[15:1]} : AUDIO_L;
+assign AUDIO_L = (cpu_halt | areset | reset) ? 16'b0000000000000000 : {laudio[15],laudio[15:1]};
+assign AUDIO_R = (cpu_halt | areset | reset) ? 16'b0000000000000000 : (status[20] ? {raudio[15],raudio[15:1]} : AUDIO_L);
 assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
 
-wire  [7:0]	ZPU_IN2;
-wire [31:0]	ZPU_OUT2;
-wire [31:0]	ZPU_IN3;
-wire [31:0]	ZPU_OUT3;
-wire [15:0]	ZPU_RD;
-wire [15:0]	ZPU_WR;
-
 wire areset;
 
-assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
 assign SDRAM_CKE = 1;
-assign SDRAM_nCS = 0;
 
 wire SIO_MODE = status[16];
 wire SIO_IN,SIO_OUT, SIO_CLKOUT, SIO_CLKIN, SIO_CMD, SIO_PROC, SIO_MOTOR, SIO_IRQ;
@@ -456,12 +530,37 @@ atari800top atari800top
 	.SDRAM_nWE(SDRAM_nWE),
 	.SDRAM_A(SDRAM_A),
 	.SDRAM_DQ(SDRAM_DQ),
+	.SDRAM_nCS(SDRAM_nCS),
+	.SDRAM_DQMH(SDRAM_DQMH),
+	.SDRAM_DQML(SDRAM_DQML),
 
-	.ROM_ADDR(rom_addr),
-	.ROM_DO(rom_do),
+	.TURBOFREEZER_ROM_LOADED(turbofreezer_rom_loaded),
+	.SDRAM_READY(sdram_ready),
+	.OSD_PAUSE(file_download),
+	.SET_RESET_IN(set_reset),
+	.SET_PAUSE_IN(set_pause),
+	.SET_FREEZER_IN(set_freezer),
+	.SET_RESET_RNMI_IN(set_reset_rnmi),
+	.SET_OPTION_FORCE_IN(set_option_force),
+	.CART1_SELECT_IN(cart1_select),
+	.CART2_SELECT_IN(cart2_select),
+	.HOT_KEYS(atari_hotkeys),
 
-	.PAL(~status[5]),
-	.EXT_ANTIC(status[33]),
+	.UART_ADDR(uart_addr),
+	.UART_ENABLE(uart_enable),
+	.UART_WR(uart_wr),
+	.UART_DATA_WRITE(uart_data_write),
+	.UART_DATA_READ(uart_data_read),
+
+	// TODO make a nice wire for this contraption?
+	.HPS_DMA_ADDR(sdram_erased ? (ioctl_index == 99 ? ioctl_addr[25:0] : (cart_rom_index ? cart_upload_addr : rom_upload_addr)) : {10'h270, sdram_erase_addr[15:0]}),
+	.HPS_DMA_REQ(sdram_erased ? dma_req : sdram_erase_req),
+	.HPS_DMA_READ_ENABLE(ioctl_upload),
+	.HPS_DMA_DATA_OUT(sdram_erased ? ioctl_dout : 8'hff),
+	.HPS_DMA_DATA_IN(hps_dma_data_in),
+	.HPS_DMA_READY(dma_ready),
+
+	.PAL(pal_video),
 	.CLIP_SIDES(status[34]),
 	.VGA_VS(VSync_o),
 	.VGA_HS(HSync_o),
@@ -469,34 +568,28 @@ atari800top atari800top
 	.VGA_G(Go),
 	.VGA_R(Ro),
 	.VGA_PIXCE(ce_pix_raw),
+	.interlace_enable(status[62] | status[61]),
+	.interlace(interlace),
+	.interlace_field(interlace_field),
 	.HBLANK(HBlank_o),
 	.VBLANK(VBlank_o),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
-	.RAM_SIZE(ram_config), 
-	.DRV_SPEED(status[12:10]),
-	.XEX_LOC(status[32]),
+	.RAM_SIZE(ram_config),
 	.OS_MODE_800(mode800),
 	.PBI_MODE(modepbi),
-	.PBI_SPLASH(splashpbi),
-	.PBI_DRIVES_MODE(drivesmodepbi),
-	.PBI_BOOT(bootpbi),
-	.ATX_MODE(~status[38]),
-	.DRIVE_LED(drive_led),
+	.XEX_LOADER_MODE(xex_loader_mode),
 	.WARM_RESET_MENU(status[39]),
-	.COLD_RESET_MENU(status[40] | load_reset),
+	.COLD_RESET_MENU(status[40] | buttons[1]),
 	.RTC(rtc),
+	.VBXE_MODE({status[63],status[60],status[59]}),
+	.VBXE_PALETTE_RGB(vbxe_palette_rgb_out),
+	.VBXE_PALETTE_INDEX(vbxe_palette_index),
+	.VBXE_PALETTE_COLOR(vbxe_palette_color),
 
 	.STEREO(status[20]),
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
-
-	.ZPU_IN2(ZPU_IN2),
-	.ZPU_OUT2(ZPU_OUT2),
-	.ZPU_IN3(ZPU_IN3),
-	.ZPU_OUT3(ZPU_OUT3),
-	.ZPU_RD(ZPU_RD),
-	.ZPU_WR(ZPU_WR),
 
 	.SIO_MODE(SIO_MODE),
 	.SIO_IN(SIO_IN),
@@ -552,8 +645,11 @@ sdramclk_ddr
 	.sset(1'b0)
 ); 
 
-assign VGA_F1 = 0;
-assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
+wire interlace;
+wire interlace_field;
+
+assign VGA_F1 = interlace & interlace_field;
+assign VGA_SL = (scale ? scale[1:0] - 1'd1 : 2'd0)&{~interlace,~interlace};
 
 wire [2:0] scale = status[19:17];
 
@@ -577,7 +673,7 @@ articolor articolor
 	.clk(CLK_VIDEO),
 	.ce_pix(ce_pix),
 	
-	.enable(status[5] & status[31]),
+	.enable(status[5] & status[31] & ~status[59] & ~status[60]),
 	.colorset(~status[55]),
 	.colorswap(status[58]),
 
@@ -601,7 +697,7 @@ articolor articolor
 video_mixer #(.GAMMA(1)) video_mixer
 (
 	.*,
-	.scandoubler(scale || forced_scandoubler),
+	.scandoubler(~interlace && (scale || forced_scandoubler)),
 	.hq2x(scale==1),
 	.freeze_sync(),
 	.VGA_DE(vga_de)
@@ -609,221 +705,69 @@ video_mixer #(.GAMMA(1)) video_mixer
 
 ////////////////   ROM   ////////////////////
 
-wire [14:0] rom_addr;
-wire  [7:0] xl_do, bas_do, osa_do, osb_do, pbirom_do;
+// boot.rom or menu index 4 file
+wire xl_rom_index = ioctl_index[7:0] == 0 || ioctl_index[5:0] == 4;
+// boot1.rom or menu index 5 file
+wire basic_rom_index = ioctl_index[7:0] == 8'b01000000 || ioctl_index[5:0] == 5;
+// boot2.rom or menu index 6 file
+wire osab_rom_index = ioctl_index[7:0] == 8'b10000000 || ioctl_index[5:0] == 6;
+// boot3.rom (no menu index for this!)
+wire pbi_rom_index = ioctl_index[7:0] == 8'b11000000;
+wire turbofreezer_rom_index = ioctl_index[5:0] == 3;
 
-reg [13:0] osrom_off = 0;
-reg [13:0] osrom2_off = 0;
-reg [13:0] osrom3_off = 0;
-wire xl_rom_index = (~status[41] && ioctl_index[7:0] == 0) || ioctl_index[5:0] == 4;
-wire basic_rom_index = (~status[41] && ioctl_index[7:0] == 8'b01000000) || ioctl_index[5:0] == 5;
-wire osa_rom_index = (~status[41] && ioctl_index[7:0] == 8'b10000000) || ioctl_index[5:0] == 6;
-wire osb_rom_index = (~status[41] && ioctl_index[7:0] == 8'b11000000) || ioctl_index[5:0] == 7;
-wire load_sys_rom = ioctl_index[5:2] == 4'b0001;
-always @(posedge clk_sys) if(ioctl_wr && xl_rom_index) osrom_off <= 14'h3FFF - ioctl_addr;
-always @(posedge clk_sys) if(ioctl_wr && osa_rom_index) osrom2_off <= 14'h3FFF - ioctl_addr;
-always @(posedge clk_sys) if(ioctl_wr && osb_rom_index) osrom3_off <= 14'h3FFF - ioctl_addr;
+wire[25:0] rom_upload_addr;
+assign rom_upload_addr =
+	xl_rom_index ? {10'h270, 2'b01, ioctl_addr[13:0]} :
+	(osab_rom_index ? {10'h270, 2'b10, ioctl_addr[13:0]} + 14'h1800 :
+	(basic_rom_index ? {10'h270, 3'b000, ioctl_addr[12:0]} :
+	(pbi_rom_index ? {10'h270, 3'b001, ioctl_addr[12:0]} : 
+	{10'h24A, ioctl_addr[15:0]}))); // Turbo Freezer
 
-dpram #(14,8, "rtl/rom/ATARIXL.mif") romxl
-(
-	.clock(clk_sys),
+wire cart1_rom_index = ioctl_index[5:0] == 8;
+wire cart2_rom_index = ioctl_index[5:0] == 9;
+wire cart_rom_index = cart1_rom_index | cart2_rom_index;
 
-	.address_a(ioctl_addr[13:0]),
-	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && xl_rom_index),
+wire[25:0] cart_upload_addr;
+wire[25:0] cart1_upload_addr;
+wire[25:0] cart2_upload_addr;
 
-	.address_b(rom_addr[13:0] - osrom_off),
-	.q_b(xl_do)
-);
+assign cart1_upload_addr = {3'b101, ioctl_addr[22:0]};
+assign cart2_upload_addr = {6'b101001, ioctl_addr[19:0]};
 
-dpram #(13,8, "rtl/rom/ATARIBAS.mif") basic
-(
-	.clock(clk_sys),
+assign cart_upload_addr = cart1_rom_index ? cart1_upload_addr : cart2_upload_addr;
 
-	.address_a(ioctl_addr[12:0]),
-	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && basic_rom_index),
-
-	.address_b(rom_addr[12:0]),
-	.q_b(bas_do)
-);
-
-dpram #(14,8, "rtl/rom/ATARIOSA.mif") osa
-(
-	.clock(clk_sys),
-
-	.address_a(ioctl_addr[13:0]),
-	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && osa_rom_index),
-
-	.address_b(rom_addr[13:0] - osrom2_off),
-	.q_b(osa_do)
-);
-
-dpram #(14,8, "rtl/rom/ATARIOSB.mif") osb
-(
-	.clock(clk_sys),
-
-	.address_a(ioctl_addr[13:0]),
-	.data_a(ioctl_dout),
-	.wren_a(ioctl_wr && osb_rom_index),
-
-	.address_b(rom_addr[13:0] - osrom3_off),
-	.q_b(osb_do)
-);
-
-spram #(13,8, "firmware/PBIBIOS.mif") pbirom
-(
-	.clock(clk_sys),
-	.address(rom_addr[12:0]),
-	.q(pbirom_do)
-);
-
-reg [1:0] rom_sel = 0;
 reg mode800 = 0;
 reg modepbi = 0;
+wire xex_loader_mode;
 reg splashpbi = 0;
 reg [7:0] drivesmodepbi = 0;
 reg [2:0] bootpbi = 0;
 reg [2:0] ram_config = 0;
+reg pal_video = 0;
+
+wire [15:0] atari_status1;
+wire [15:0] atari_status2;
+wire [2:0] atari_hotkeys;
+assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], 1'b0, ~status[41], mode800, atari_hotkeys};
+assign atari_status2 = {4'b0000, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
-	rom_sel <= status[2:1];
 	mode800 <= status[2];
-	modepbi <= ~status[2] & status[42];
+	modepbi <= ~status[2] & status[42] & pbi_rom_loaded;
 	splashpbi <= status[43];
 	bootpbi <= status[54:52];
 	drivesmodepbi <= status[51:44];
 	ram_config <= (status[2] ? status[37:35] : status[15:13]);
+	pal_video <= ~status[5];
 end
 
-wire [7:0] xl_pad_do = (rom_addr[13:0] >= osrom_off) ? xl_do : 8'hFF;
-wire [7:0] osa_pad_do = (rom_addr[13:0] >= osrom2_off) ? osa_do : 8'hFF;
-wire [7:0] osb_pad_do = (rom_addr[13:0] >= osrom3_off) ? osb_do : 8'hFF;
+reg pbi_rom_loaded = 0;
+reg turbofreezer_rom_loaded = 0;
 
-wire [7:0] rom_do = (!rom_addr[14:13] && !rom_sel[1:0]) ? bas_do :
-                    (rom_addr[14] && !rom_sel[1]) ? xl_pad_do :
-                     rom_addr[14] ? (rom_sel[0] ? osb_pad_do : osa_pad_do) : 
-                     ((!rom_addr[14] && rom_addr[13]) ? pbirom_do : 8'hFF);
-
-reg load_reset = 0;
-always @(posedge clk_sys) begin
-	integer load_reset_timeout = 0;
-	reg old_download = 0;
-	reg load_reset_required = 0;
-
-	if (old_download && !ioctl_download)
-	begin
-		load_reset <= load_reset_required;
-		load_reset_required <= 0;
-		load_reset_timeout <= 0;
-	end
-	else if(load_reset_timeout < 1000)
-		load_reset_timeout <= load_reset_timeout + 1;
-	else
-		load_reset <= 0;
-
-	if (ioctl_download)
-		load_reset_required <= (ioctl_index[5:0] == 4 && (!status[2] || !rom_sel[1])) || (ioctl_index[5:0] == 5 && (!status[2:1] || !rom_sel[1:0])) || ((status[2] || rom_sel[1]) && ((ioctl_index[5:0] == 6 && (!status[1] || !rom_sel[0])) || (ioctl_index[5:0] == 7 && (status[1] || rom_sel[0]))));
-
-	old_download <= ioctl_download & load_sys_rom;
+always @(posedge clk_sys) if (ioctl_download) begin
+	if(pbi_rom_index) pbi_rom_loaded <= 1;
+	if(turbofreezer_rom_index) turbofreezer_rom_loaded <= 1;
 end
-
-//////////////////   SD   ///////////////////
-
-dpram #(9,8) sdbuf
-(
-	.clock(clk_sys),
-
-	.address_a(sd_buff_addr),
-	.data_a(sd_buff_dout),
-	.wren_a(sd_buff_wr),
-	.q_a(sd_buff_din),
-
-	.address_b(zpu_buff_addr),
-	.data_b(ZPU_OUT3[7:0]),
-	.wren_b(zpu_buf_wr),
-	.q_b(zpu_buf_q)
-);
-
-wire[7:0] zpu_buf_q;
-
-assign ZPU_IN2[0]   = zpu_io_done;
-assign ZPU_IN2[1]   = zpu_mounted;
-assign ZPU_IN2[4:2] = zpu_fileno;
-assign ZPU_IN2[6:5] = zpu_filetype;
-assign ZPU_IN2[7]   = zpu_readonly;
-
-assign ZPU_IN3 = zpu_lba ? zpu_filesize : zpu_buf_q;
-
-reg [8:0] zpu_buff_addr;
-reg       zpu_buf_wr;
-reg       zpu_io_done;
-reg       zpu_mounted = 0;
-reg [2:0] zpu_fileno;
-reg [1:0] zpu_filetype;
-reg       zpu_readonly;
-reg[31:0] zpu_filesize;
-
-wire      zpu_lba      = ZPU_OUT2[0];
-wire      zpu_block_rd = ZPU_OUT2[1];
-wire      zpu_block_wr = ZPU_OUT2[2];
-wire[2:0] zpu_drv_num  = ZPU_OUT2[5:3];
-wire      zpu_io_wr    = ZPU_WR[5];
-wire      zpu_data_wr  = ZPU_WR[6];
-wire      zpu_data_rd  = ZPU_RD[2];
-
-always @(posedge clk_sys) begin
-	reg old_wr, old_wr2, old_rd, old_lba;
-	reg old_blrd, old_blwr, old_ack;
-	reg old_mounted;
-
-	zpu_buf_wr <= 0;
-	if(zpu_buf_wr) zpu_buff_addr <= zpu_buff_addr + 1'd1;
-
-	old_wr <= zpu_data_wr;
-	old_wr2 <= old_wr;
-	if(~old_wr2 & old_wr) begin
-		if(zpu_lba) sd_lba <= ZPU_OUT3;
-		else zpu_buf_wr <= 1;
-	end
-
-	old_rd <= zpu_data_rd;
-	if(old_rd & ~zpu_data_rd) zpu_buff_addr <= zpu_buff_addr + 1'd1;
-
-	if(zpu_io_wr) zpu_buff_addr <= 0;
-
-	old_blrd <= zpu_block_rd;
-	if(~old_blrd & zpu_block_rd) {zpu_io_done,sd_rd[zpu_drv_num[2:0]]} <= 1;
-
-	old_blwr <= zpu_block_wr;
-	if(~old_blwr & zpu_block_wr) {zpu_io_done,sd_wr[zpu_drv_num[2:0]]} <= 1;
-
-	if(|sd_ack) {sd_rd, sd_wr} <= 0;
-
-	old_ack <= |sd_ack;
-	if(old_ack & ~|sd_ack) zpu_io_done <= 1;
-
-	old_mounted <= |img_mounted;
-	if(~old_mounted && |img_mounted) begin
-		if(img_mounted[0]) zpu_fileno <= 0;
-		if(img_mounted[1]) zpu_fileno <= 1;
-		if(img_mounted[2]) zpu_fileno <= 2;
-		if(img_mounted[3]) zpu_fileno <= 3;
-		if(img_mounted[4]) zpu_fileno <= 4;
-		if(img_mounted[5]) zpu_fileno <= 5;
-		if(img_mounted[6]) zpu_fileno <= 6;
-		if(img_mounted == 128) zpu_fileno <= 7;
-
-		zpu_filetype <= ioctl_index[7:6];
-		zpu_readonly <= img_readonly | img_mounted[4] | img_mounted[5] | status[57];
-		zpu_mounted  <= ~zpu_mounted;
-		zpu_filesize <= img_size[31:0];
-	end
-	
-	if(reset) zpu_mounted <= 0;
-end
-
 
 //////////////////   ANALOG AXIS   ///////////////////
 reg        emu = 0;
@@ -878,6 +822,5 @@ assign SIO_IN    = ~SIO_MODE | USER_IN[0];
 assign SIO_CLKIN = ~SIO_MODE | USER_IN[3];
 assign SIO_PROC  = ~SIO_MODE | USER_IN[4];
 assign SIO_IRQ   = ~SIO_MODE | USER_IN[5];
-
 
 endmodule

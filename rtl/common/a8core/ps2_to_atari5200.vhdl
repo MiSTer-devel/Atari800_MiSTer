@@ -34,6 +34,7 @@ PORT
 	JOY4  : IN  STD_LOGIC_VECTOR(20 DOWNTO 0);
 
 	INPUT : IN STD_LOGIC_VECTOR(31 downto 0) := (others=>'0');
+	INPUT2 : IN STD_LOGIC_VECTOR(4 downto 0) := (others=>'0');
 	
 	KEYBOARD_SCAN : IN STD_LOGIC_VECTOR(5 downto 0);
 	KEYBOARD_RESPONSE : OUT STD_LOGIC_VECTOR(1 downto 0);
@@ -141,7 +142,7 @@ end generate;
 	end process;
 
 	-- map to atari key code
-	process(ps2_keys_reg, JOY1, JOY2, JOY3, JOY4, controller_select)
+	process(ps2_keys_reg, JOY1, JOY2, JOY3, JOY4, INPUT2, controller_select)
 	begin
 		atari_keyboard <= (others=>'0');
 
@@ -228,8 +229,8 @@ end generate;
 		fkeys_int(5)<=ps2_keys_reg(16#0B#);
 		fkeys_int(6)<=ps2_keys_reg(16#83#);
 		fkeys_int(7)<=ps2_keys_reg(16#0a#);
-		fkeys_int(8)<=ps2_keys_reg(16#01#);
-		fkeys_int(9)<=ps2_keys_reg(16#09#);
+		fkeys_int(8)<=ps2_keys_reg(16#01#) or INPUT2(0);
+		fkeys_int(9)<=ps2_keys_reg(16#09#) or INPUT2(1);
 		fkeys_int(10)<=ps2_keys_reg(16#78#);
 		fkeys_int(11)<=ps2_keys_reg(16#07#);
 

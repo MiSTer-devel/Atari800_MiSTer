@@ -34,15 +34,4 @@ del *.rpt
 del /s new_rtl_netlist
 del /s old_rtl_netlist
 
-cd firmware
-rmdir /s /q zpu_obj
-del /s *.hex
-del /s *.elf
-del /s *.map
-del /s *.lst
-del /s *.srec
-del /s *.bin
-del /s *.rpt
-cd ..
-
 pause

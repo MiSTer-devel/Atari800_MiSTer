@@ -43,14 +43,7 @@ set_global_assignment -name VHDL_FILE rtl/common/components/sdram_statemachine.v
 set_global_assignment -name VHDL_FILE rtl/common/components/synchronizer.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/latch_delay_line.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/simple_low_pass_filter.vhdl
-set_global_assignment -name VHDL_FILE rtl/common/zpu/zpu_core.vhd
-set_global_assignment -name VHDL_FILE rtl/common/zpu/zpucore.vhd
-set_global_assignment -name VHDL_FILE rtl/common/zpu/zpupkg.vhd
-set_global_assignment -name VHDL_FILE rtl/common/zpu/zpu_config_regs.vhdl
-set_global_assignment -name VHDL_FILE rtl/common/zpu/zpu_glue.vhdl
-set_global_assignment -name VHDL_FILE rtl/common/zpu/sio_handler.vhdl
-set_global_assignment -name VHDL_FILE rtl/common/zpu/fifo_transmit.vhd
-set_global_assignment -name VHDL_FILE rtl/common/zpu/fifo_receive.vhd
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
 set_global_assignment -name VHDL_FILE rtl/atari5200top.vhd
+set_global_assignment -name VERILOG_FILE rtl/hps_ext.v
 set_global_assignment -name SYSTEMVERILOG_FILE Atari5200.sv

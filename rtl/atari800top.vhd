@@ -1,4 +1,5 @@
---------------------------------------------------------------------------- -- (c) 2013 mark watson
+---------------------------------------------------------------------------
+-- (c) 2013 mark watson
 -- I am happy for anyone to use this for non-commercial use.
 -- If my vhdl files are used commercially or otherwise sold,
 -- please contact me for explicit permission at scrameta (gmail).
@@ -20,7 +21,6 @@ PORT
 	ARESET     : OUT STD_LOGIC;
 
 	PAL        : IN  STD_LOGIC;
-	EXT_ANTIC  : IN  STD_LOGIC;
 	CLIP_SIDES : IN  STD_LOGIC;
 	VGA_VS     : OUT STD_LOGIC;
 	VGA_HS     : OUT STD_LOGIC;
@@ -29,6 +29,9 @@ PORT
 	VGA_B      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_G      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	VGA_R      : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
+	interlace_enable : in std_logic;
+	interlace_field : out std_logic;
+	interlace : out std_logic;
 
 	HBLANK     : OUT STD_LOGIC;
 	VBLANK     : OUT STD_LOGIC;
@@ -48,22 +51,46 @@ PORT
 	SDRAM_A    : OUT STD_LOGIC_VECTOR(12 DOWNTO 0);
 	SDRAM_DQ   : INOUT STD_LOGIC_VECTOR(15 DOWNTO 0);
 
+	TURBOFREEZER_ROM_LOADED : in std_logic;
+	OSD_PAUSE : in std_logic;
+	SDRAM_READY : out std_logic;
+	
+	HPS_DMA_ADDR : in std_logic_vector(25 downto 0);
+	HPS_DMA_REQ : in std_logic;
+	HPS_DMA_READ_ENABLE : in std_logic;
+	HPS_DMA_DATA_OUT : in std_logic_vector(7 downto 0);
+	HPS_DMA_DATA_IN : out std_logic_vector(7 downto 0);
+	HPS_DMA_READY : out std_logic;
+
+	SET_RESET_IN : in std_logic;
+	SET_PAUSE_IN : in std_logic;
+	SET_FREEZER_IN : in std_logic;
+	SET_RESET_RNMI_IN : in std_logic;
+	SET_OPTION_FORCE_IN : in std_logic;
+	CART1_SELECT_IN : in std_logic_vector(7 downto 0);
+	CART2_SELECT_IN : in std_logic_vector(7 downto 0);
+	HOT_KEYS : out std_logic_vector(2 downto 0);
+
+	UART_ADDR : in std_logic_vector(4 downto 0);
+	UART_ENABLE : in std_logic;
+	UART_WR : in std_logic;
+	UART_DATA_WRITE : in std_logic_vector(7 downto 0);
+	UART_DATA_READ : out std_logic_vector(15 downto 0);
+
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
 	CPU_SPEED  : IN  STD_LOGIC_VECTOR(5 downto 0);
 	RAM_SIZE   : IN  STD_LOGIC_VECTOR(2 downto 0);
-	DRV_SPEED  : IN  STD_LOGIC_VECTOR(2 downto 0);
-	XEX_LOC    : IN  STD_LOGIC;
 	OS_MODE_800   : IN  STD_LOGIC;
 	PBI_MODE      : IN  STD_LOGIC;
-	PBI_SPLASH    : IN  STD_LOGIC;
-	PBI_DRIVES_MODE : IN STD_LOGIC_VECTOR(7 downto 0);
-	PBI_BOOT      : IN STD_LOGIC_VECTOR(2 downto 0);
-	ATX_MODE   : IN  STD_LOGIC;
-	DRIVE_LED  : OUT STD_LOGIC;
+	XEX_LOADER_MODE : IN  STD_LOGIC;
 	WARM_RESET_MENU : IN STD_LOGIC;
 	COLD_RESET_MENU : IN STD_LOGIC;
 	RTC        : IN STD_LOGIC_VECTOR(64 downto 0);
+	VBXE_MODE  : IN STD_LOGIC_VECTOR(2 downto 0) := "000";
+	VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0);
+	VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0);
+	VBXE_PALETTE_COLOR : IN STD_LOGIC_VECTOR(6 downto 0);
 
 	CPU_HALT   : OUT STD_LOGIC;
 	JOY1X      : IN  STD_LOGIC_VECTOR(7 downto 0);
@@ -80,9 +107,6 @@ PORT
 	JOY3       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 	JOY4       : IN  STD_LOGIC_VECTOR(13 DOWNTO 0);
 
-	ROM_ADDR   : OUT STD_LOGIC_VECTOR(14 DOWNTO 0);
-	ROM_DO     : IN  STD_LOGIC_VECTOR(7 DOWNTO 0);
-
 	SIO_MODE   : IN  STD_LOGIC := '0';
 	SIO_IN     : IN  STD_LOGIC;
 	SIO_OUT    : OUT STD_LOGIC;
@@ -91,14 +115,7 @@ PORT
 	SIO_CMD    : OUT STD_LOGIC;
 	SIO_PROC   : IN  STD_LOGIC;
 	SIO_MOTOR  : OUT STD_LOGIC;
-	SIO_IRQ    : IN  STD_LOGIC;
-
-	ZPU_IN2    : IN  STD_LOGIC_VECTOR(7 downto 0);
-	ZPU_OUT2   : OUT STD_LOGIC_VECTOR(31 downto 0);
-	ZPU_IN3    : IN  STD_LOGIC_VECTOR(31 downto 0);
-	ZPU_OUT3   : OUT STD_LOGIC_VECTOR(31 downto 0);
-	ZPU_RD     : OUT STD_LOGIC_VECTOR(15 downto 0);
-	ZPU_WR     : OUT STD_LOGIC_VECTOR(15 downto 0)
+	SIO_IRQ    : IN  STD_LOGIC
 );
 
 END atari800top;
@@ -157,16 +174,12 @@ signal DMA_READ_ENABLE : std_logic;
 signal DMA_MEMORY_READY : std_logic;
 signal DMA_MEMORY_DATA : std_logic_vector(31 downto 0);
 
-signal ZPU_ADDR_ROM : std_logic_vector(15 downto 0);
-signal ZPU_ROM_DATA :  std_logic_vector(31 downto 0);
+signal emu_pokey_enable : std_logic;
+signal emu_sio_txd : std_logic;
+signal emu_sio_rxd : std_logic;
+signal emu_sio_command : std_logic;
+signal emu_sio_clk : std_logic;
 
-signal ZPU_OUT1 : std_logic_vector(31 downto 0);
-
-signal zpu_pokey_enable : std_logic;
-signal zpu_sio_txd : std_logic;
-signal zpu_sio_rxd : std_logic;
-signal zpu_sio_command : std_logic;
-signal zpu_sio_clk : std_logic;
 signal sio_rxd : std_logic;
 signal sio_txd : std_logic;
 signal sio_command : std_logic;
@@ -179,16 +192,12 @@ signal end_command : std_logic;
 -- system control from zpu
 signal reset_atari : std_logic;
 signal reset_rnmi_atari : std_logic;
-signal option_force : std_logic;
 signal pause_atari : std_logic;
-signal emulated_cartridge_select: std_logic_vector(7 downto 0);
-signal emulated_cartridge2_select: std_logic_vector(7 downto 0);
 
 -- ps2
 signal PS2_KEYS : STD_LOGIC_VECTOR(511 downto 0);
 
 -- turbo freezer!
-signal freezer_enable : std_logic;
 signal freezer_activate: std_logic;
 
 -- paddles
@@ -202,13 +211,11 @@ signal option_tmp : std_logic;
 signal warm_reset_request : std_logic;
 signal cold_reset_request : std_logic;
 
-signal RAM_DATA : std_logic_vector(31 downto 0);
-
-
 BEGIN
 
-areset_n <= RESET_N and SDRAM_RESET_N and not reset_atari;
+areset_n <= (SDRAM_RESET_N and not(reset_atari));
 areset <= not areset_n;
+SDRAM_READY <= SDRAM_RESET_N;
 
 process(clk)
 	variable cnt : integer := 0;
@@ -245,9 +252,9 @@ begin
 			if JOY4(6) = '1'             then paddle_4(2) <= '1';   end if;
 			if JOY4(8 downto 7) /= "00"  then paddle_4    <= "001"; end if;
 
-			if cnt < 75000000 then
+			if cnt < 50000000 then
 				cnt := cnt + 1;
-				option_tmp <= option_tmp or option_force or JOY(5);
+				option_tmp <= option_tmp or SET_OPTION_FORCE_IN or JOY(5);
 			else
 				option_tmp <= '0';
 			end if;
@@ -307,7 +314,7 @@ GENERIC MAP
 	video_bits => 8,
 	palette => 1,
 	internal_rom => 0,
-	internal_ram => 327680
+	internal_ram => 0
 )
 PORT MAP
 (
@@ -322,6 +329,9 @@ PORT MAP
 	VIDEO_B => VGA_B,
 	VIDEO_G => VGA_G,
 	VIDEO_R => VGA_R,
+	interlace_enable => interlace_enable,
+	interlace => interlace,
+	interlace_field => interlace_field,
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
@@ -355,6 +365,7 @@ PORT MAP
 	SIO_PROC => SIO_PROC,
 	SIO_IRQ  => SIO_IRQ,
 	SIO_MOTOR => SIO_MOTOR,
+	ENABLE_179_EARLY => emu_pokey_enable,
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
@@ -365,36 +376,43 @@ PORT MAP
 	SDRAM_READ_ENABLE => SDRAM_READ_ENABLE,
 	SDRAM_WRITE_ENABLE => SDRAM_WRITE_ENABLE,
 	SDRAM_ADDR => SDRAM_ADDR,
-	SDRAM_DO => RAM_DATA,
+	SDRAM_DO => SDRAM_DO,
 	SDRAM_DI => SDRAM_DI,
 	SDRAM_32BIT_WRITE_ENABLE => SDRAM_WIDTH_32bit_ACCESS,
 	SDRAM_16BIT_WRITE_ENABLE => SDRAM_WIDTH_16bit_ACCESS,
 	SDRAM_8BIT_WRITE_ENABLE => SDRAM_WIDTH_8bit_ACCESS,
 	SDRAM_REFRESH => SDRAM_REFRESH,
 
-	DMA_FETCH => dma_fetch,
-	DMA_READ_ENABLE => dma_read_enable,
-	DMA_32BIT_WRITE_ENABLE => dma_32bit_write_enable,
-	DMA_16BIT_WRITE_ENABLE => dma_16bit_write_enable,
-	DMA_8BIT_WRITE_ENABLE => dma_8bit_write_enable,
-	DMA_ADDR => dma_addr_fetch,
-	DMA_WRITE_DATA => dma_write_data,
-	MEMORY_READY_DMA => dma_memory_ready,
-	DMA_MEMORY_DATA => dma_memory_data, 
+	DMA_FETCH => HPS_DMA_REQ,
+	DMA_READ_ENABLE => HPS_DMA_READ_ENABLE,
+	DMA_32BIT_WRITE_ENABLE => '0',
+	DMA_16BIT_WRITE_ENABLE => '0',
+	DMA_8BIT_WRITE_ENABLE => '1',
+	DMA_ADDR => HPS_DMA_ADDR,
+	DMA_WRITE_DATA => x"000000" & HPS_DMA_DATA_OUT,
+	MEMORY_READY_DMA => HPS_DMA_READY,
+	DMA_MEMORY_DATA => dma_memory_data,
 
 	RAM_SELECT => RAM_SIZE,
 	PAL => PAL,
-	EXT_ANTIC => EXT_ANTIC,
 	CLIP_SIDES => CLIP_SIDES,
 	RESET_RNMI => reset_rnmi_atari,
 	ATARI800MODE => OS_MODE_800,
 	PBI_ROM_MODE => PBI_MODE,
+	XEX_LOADER_MODE => XEX_LOADER_MODE,
 	RTC => RTC,
+	VBXE_SWITCH => VBXE_MODE(0) or VBXE_MODE(1),
+	VBXE_REG_BASE => VBXE_MODE(1),
+	VBXE_NTSC_FIX => VBXE_MODE(2),
+	VBXE_PALETTE_RGB => VBXE_PALETTE_RGB,
+	VBXE_PALETTE_INDEX => VBXE_PALETTE_INDEX,
+	VBXE_PALETTE_COLOR => VBXE_PALETTE_COLOR,
+
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
-	emulated_cartridge_select => emulated_cartridge_select,
-	emulated_cartridge2_select => emulated_cartridge2_select,
-	freezer_enable => freezer_enable,
+	emulated_cartridge_select => CART1_SELECT_IN,
+	emulated_cartridge2_select => CART2_SELECT_IN,
+	freezer_enable => SET_FREEZER_IN and TURBOFREEZER_ROM_LOADED,
 	freezer_activate => freezer_activate
 );
 
@@ -402,11 +420,13 @@ SIO_CLKOUT <= sio_clk;
 SIO_OUT    <= sio_txd;
 SIO_CMD    <= sio_command;
 
-zpu_sio_rxd     <= sio_txd     when SIO_MODE = '0' else '1';
-zpu_sio_command <= sio_command when SIO_MODE = '0' else '1';
-zpu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
+emu_sio_rxd     <= sio_txd     when SIO_MODE = '0' else '1';
+emu_sio_command <= sio_command when SIO_MODE = '0' else '1';
+emu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
 
-sio_rxd <= zpu_sio_txd when SIO_MODE = '0' else SIO_IN;
+sio_rxd <= emu_sio_txd when SIO_MODE = '0' else SIO_IN;
+
+HPS_DMA_DATA_IN <= dma_memory_data(7 downto 0);
 
 sdram_adaptor : entity work.sdram_statemachine
 GENERIC MAP
@@ -448,94 +468,32 @@ PORT MAP
 
 joy <= joy1 or joy2 or joy3 or joy4;
 
-ROM_ADDR <= SDRAM_ADDR(14 downto 0);
-RAM_DATA <= x"FFFFFF"&ROM_DO when SDRAM_ADDR(24 downto 15) = "0011100000" else
-            (others=>'1')    when SDRAM_ADDR(24 downto 20) = "00111" else
-            SDRAM_DO;
+HOT_KEYS <= ps2_keys(16#111#) & (FKEYS(9) or cold_reset_request) & (FKEYS(8) or warm_reset_request);
 
-zpu: entity work.zpucore
-GENERIC MAP
-(
-	platform => 1
-)
-PORT MAP
-(
-	-- standard...
-	CLK => CLK,
-	RESET_N => RESET_N and sdram_reset_n,
-
-	-- dma bus master (with many waitstates...)
-	ZPU_ADDR_FETCH => dma_addr_fetch,
-	ZPU_DATA_OUT => dma_write_data,
-	ZPU_FETCH => dma_fetch,
-	ZPU_32BIT_WRITE_ENABLE => dma_32bit_write_enable,
-	ZPU_16BIT_WRITE_ENABLE => dma_16bit_write_enable,
-	ZPU_8BIT_WRITE_ENABLE => dma_8bit_write_enable,
-	ZPU_READ_ENABLE => dma_read_enable,
-	ZPU_MEMORY_READY => dma_memory_ready,
-	ZPU_MEMORY_DATA => dma_memory_data, 
-
-	-- rom bus master
-	-- data on next cycle after addr
-	ZPU_ADDR_ROM => zpu_addr_rom,
-	ZPU_ROM_DATA => zpu_rom_data,
-
-	ZPU_ROM_WREN => open,
-
-	-- SIO
-	-- Ditto for speaking to Atari, we have a built in Pokey
-	ZPU_POKEY_ENABLE => zpu_pokey_enable,
-	ZPU_SIO_TXD => zpu_sio_txd,
-	ZPU_SIO_RXD => zpu_sio_rxd,
-	ZPU_SIO_COMMAND => zpu_sio_command,
-	ZPU_SIO_CLK => zpu_sio_clk,
-
-	-- external control
-	-- switches etc. sector DMA blah blah.
-	-- Originally WinKey Left + Right (#11F + #127) for pausing the core
-	-- Potential alternatives for MiSTer not to conflict with Win+PrintScreen:
-	-- Right Ctrl #114, Home #16C, End #169, Right Alt #111, Scroll Lock #7E
-	-- Right Alt seems to be the only option to account for reduced keyboards
-	ZPU_IN1 => X"000"&
-			--'0'&(ps2_keys(16#11F#) or ps2_keys(16#127#)) &
-			'0'&ps2_keys(16#111#)&
-			((ps2_keys(16#76#)&ps2_keys(16#5A#)&ps2_keys(16#174#)&ps2_keys(16#16B#)&ps2_keys(16#172#)&ps2_keys(16#175#)) or (joy(5)&joy(4)&joy(0)&joy(1)&joy(2)&joy(3)))& -- (esc)FRLDU
-			(FKEYS(10) and (ps2_keys(16#11f#) or ps2_keys(16#127#)))&(FKEYS(10) and (not ps2_keys(16#11f#)) and (not ps2_keys(16#127#)))&(FKEYS(9) or cold_reset_request)&(FKEYS(8) or warm_reset_request)&FKEYS(7 downto 0),
-	ZPU_IN2 => X"0" & '0' & PBI_BOOT & PBI_DRIVES_MODE & ZPU_IN2 & PBI_SPLASH & PBI_MODE & ATX_MODE & XEX_LOC & OS_MODE_800 & DRV_SPEED,
-	ZPU_IN3 => ZPU_IN3,
-	ZPU_IN4 => X"00000000",
-	
-	ZPU_RD => ZPU_RD,
-	ZPU_WR => ZPU_WR,
-
-	-- ouputs - e.g. Atari system control, halt, throttle, rom select
-	ZPU_OUT1 => zpu_out1,
-	ZPU_OUT2 => zpu_out2,
-	ZPU_OUT3 => zpu_out3
-);
-
-pause_atari <= zpu_out1(0);
-reset_atari <= zpu_out1(1);
-emulated_cartridge2_select <= zpu_out1(16 downto 9);
-emulated_cartridge_select <= zpu_out1(24 downto 17);
-freezer_enable <= zpu_out1(25);
-reset_rnmi_atari <= zpu_out1(26);
-DRIVE_LED <= zpu_out1(27);
-option_force <= zpu_out1(28);
+pause_atari <= set_pause_in or OSD_PAUSE;
+reset_atari <= set_reset_in;
+reset_rnmi_atari <= set_reset_rnmi_in;
 
 CPU_HALT <= pause_atari;
 
-zpu_rom1: entity work.spram
-generic map(12,32,"firmware/zpu_rom_800.mif")
-port map
+simple_uart_inst : entity work.sio_handler
+PORT  MAP
 (
-	clock => clk,
-	address => zpu_addr_rom(13 downto 2),
-	q => zpu_rom_data
-);
+	CLK => CLK,
+	ADDR => UART_ADDR,
+	CPU_DATA_IN => UART_DATA_WRITE,
+	EN => UART_ENABLE,
+	WR_EN => UART_WR,
+	DATA_OUT => UART_DATA_READ,
 
-enable_179_clock_div_zpu_pokey : entity work.enable_divider
-	generic map (COUNT=>16) -- cycle_length
-	port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>zpu_pokey_enable);
+	RESET_N => RESET_N and sdram_reset_n,
+
+	POKEY_ENABLE => emu_pokey_enable,
+
+	SIO_DATA_IN  => emu_sio_txd,
+	SIO_COMMAND => emu_sio_command,
+	SIO_DATA_OUT => emu_sio_rxd,
+	SIO_CLK_OUT => emu_sio_clk
+);
 
 END vhdl;

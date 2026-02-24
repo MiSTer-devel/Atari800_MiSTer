@@ -61,6 +61,9 @@ ENTITY atari800core_simple_sdram is
 		VIDEO_BURST : out std_logic;
 		VIDEO_START_OF_FIELD : out std_logic;
 		VIDEO_ODD_LINE : out std_logic;
+		interlace_field : out std_logic;
+		interlace : out std_logic;
+		interlace_enable : in std_logic;
 
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
@@ -99,6 +102,7 @@ ENTITY atari800core_simple_sdram is
 		SIO_PROC : in std_logic := '1';
 		SIO_IRQ  : in std_logic := '1';
 		SIO_MOTOR : out std_logic;
+		ENABLE_179_EARLY : out std_logic;
 
 		-- GTIA consol
 		CONSOL_OPTION : IN STD_LOGIC;
@@ -145,12 +149,19 @@ ENTITY atari800core_simple_sdram is
 		-- Special config params
 		RAM_SELECT : in std_logic_vector(2 downto 0); -- 64K,128K,320KB Compy, 320KB Rambo, 576K Compy, 576K Rambo, 1088K, 4MB
 		PAL :  in STD_LOGIC;
-		EXT_ANTIC : in STD_LOGIC;
 		CLIP_SIDES : in STD_LOGIC;
 		RESET_RNMI : in STD_LOGIC;
 		ATARI800MODE : in STD_LOGIC := '0';
 		PBI_ROM_MODE : in STD_LOGIC := '0';
+		XEX_LOADER_MODE : in STD_LOGIC := '0';
 		RTC : in std_logic_vector(64 downto 0);
+		VBXE_SWITCH : IN STD_LOGIC := '0';
+		VBXE_REG_BASE : IN STD_LOGIC := '0';
+		VBXE_NTSC_FIX : IN STD_LOGIC := '0';
+		VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0) := "000";
+		VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
+		VBXE_PALETTE_COLOR : IN STD_LOGIC_VECTOR(6 downto 0) := (others => '0');
+
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
 		emulated_cartridge_select: in std_logic_vector(7 downto 0);
@@ -415,6 +426,9 @@ PORT MAP
 	VIDEO_BURST => VIDEO_BURST,
 	VIDEO_START_OF_FIELD => VIDEO_START_OF_FIELD,
 	VIDEO_ODD_LINE => VIDEO_ODD_LINE,
+	interlace_enable => interlace_enable,
+	interlace => interlace,
+	interlace_field => interlace_field,
 
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
@@ -446,6 +460,7 @@ PORT MAP
 	POT_RESET => POT_RESET,
 	
 	-- PBI
+	ENABLE_179_EARLY => ENABLE_179_EARLY,
 	PBI_ADDR => open,
 	PBI_WRITE_ENABLE => open,
 	PBI_SNOOP_DATA => DMA_MEMORY_DATA,
@@ -511,11 +526,17 @@ PORT MAP
 	CART_EMULATION_SELECT => emulated_cartridge_select,
 	CART2_EMULATION_SELECT => emulated_cartridge2_select,
 	PAL => PAL,
-	EXT_ANTIC => EXT_ANTIC,
 	CLIP_SIDES => CLIP_SIDES,
 	ATARI800MODE => ATARI800MODE,
 	PBI_ROM_MODE => PBI_ROM_MODE,
+	XEX_LOADER_MODE => XEX_LOADER_MODE,
 	RTC => RTC,
+	VBXE_SWITCH => VBXE_SWITCH,
+	VBXE_REG_BASE => VBXE_REG_BASE,
+	VBXE_NTSC_FIX => VBXE_NTSC_FIX,
+	VBXE_PALETTE_RGB => VBXE_PALETTE_RGB,
+	VBXE_PALETTE_INDEX => VBXE_PALETTE_INDEX,
+	VBXE_PALETTE_COLOR => VBXE_PALETTE_COLOR,
 	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
 	HALT => HALT,

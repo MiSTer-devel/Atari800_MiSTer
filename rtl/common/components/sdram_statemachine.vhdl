@@ -199,7 +199,7 @@ BEGIN
 	begin
 		if (reset_N = '0') then
 			dq_in_reg <= (others=>'0');
-			sdram_state_reg <= sdram_state_init;
+			sdram_state_reg <= sdram_state_powerup;
 			delay_reg <= (others=>'0');
 			refresh_pending_reg <= (others=>'0');
 			cycles_since_refresh_reg <= (others=>'0');
@@ -376,8 +376,10 @@ BEGIN
 		case sdram_state_reg is
 		when sdram_state_powerup =>			
 			-- wait 100us (min)
+			command_next <= sdram_command_inhibit;
 			if (delay_reg(13) = '1') then
-				sdram_state_next <= sdram_state_init_precharge;
+				--sdram_state_next <= sdram_state_init_precharge;
+				sdram_state_next <= sdram_state_init;
 				delay_next <= (others=>'0');
 			end if;			
 		when sdram_state_init =>			
