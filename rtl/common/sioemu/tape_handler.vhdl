@@ -74,29 +74,26 @@ begin
 	pins_out_next <= pins_out_reg;
 	active_next <= active_reg;
 
-	if fifo_req = '1' then
-		if or_reduce(fifo_data(31 downto 2)) = '0' then
-			-- special marker for (a) changing between fsk and pwm output, (b) setting active
-			active_next <= fifo_data(0);
-			pwm_out_next <= fifo_data(1);
-			pins_out_next <= "00"; -- TODO whatever "silence" is for the two
-		else
-			count_next <= unsigned(fifo_data(30 downto 0));
-			if pwm_out_reg = '1' then
-				pins_out_next(1) <= fifo_data(31);
+	if or_reduce(std_logic_vector(count_reg)) = '0' then
+		if fifo_queue_empty = '0' then
+			if or_reduce(fifo_data(31 downto 2)) = '0' then
+				-- special marker for (a) changing between fsk and pwm output, (b) setting active
+				active_next <= fifo_data(0);
+				pwm_out_next <= fifo_data(1);
+				pins_out_next <= "00"; -- TODO whatever "silence" is for the two
 			else
-				pins_out_next(0) <= fifo_data(31);
+				count_next <= unsigned(fifo_data(30 downto 0));
+				if pwm_out_reg = '1' then
+					pins_out_next(1) <= fifo_data(31);
+				else
+					pins_out_next(0) <= fifo_data(31);
+				end if;
 			end if;
+			fifo_req <= '1';
 		end if;
 	else
-		if or_reduce(std_logic_vector(count_reg)) = '0' then
-			if fifo_queue_empty = '0' then
-				fifo_req <= '1';
-			end if;
-		else
-			if motor_on = '1' then
-				count_next <= count_reg - 1;
-			end if;
+		if motor_on = '1' then
+			count_next <= count_reg - 1;
 		end if;
 	end if;
 end process;

@@ -77,6 +77,14 @@ PORT
 	UART_DATA_WRITE : in std_logic_vector(7 downto 0);
 	UART_DATA_READ : out std_logic_vector(15 downto 0);
 
+	TAPE_DATA : in std_logic_vector(31 downto 0);
+	TAPE_DATA_WR : in std_logic;
+	TAPE_FIFO_FULL : out std_logic;
+	TAPE_PWM_CONFIG : in std_logic_vector(3 downto 0); -- from status config 16 available options
+	TAPE_PWM_INVERT : in std_logic; -- from status config
+	TAPE_RESET : in std_logic;
+	TAPE_ACTIVE : out std_logic;
+
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
 	CPU_SPEED  : IN  STD_LOGIC_VECTOR(5 downto 0);
@@ -184,6 +192,7 @@ signal sio_rxd : std_logic;
 signal sio_txd : std_logic;
 signal sio_command : std_logic;
 signal sio_clk : std_logic;
+signal sio_mot : std_logic;
 
 signal OLD_OUT : STD_LOGIC_VECTOR(7 DOWNTO 0);
 signal old_command : std_logic;
@@ -210,6 +219,12 @@ signal areset_n   : std_logic;
 signal option_tmp : std_logic;
 signal warm_reset_request : std_logic;
 signal cold_reset_request : std_logic;
+
+signal tape_fsk_out : std_logic; -- to SIO based on SIO config and active
+signal tape_pwm_out : std_logic; -- to SIO/JOY2_n based on SIO and PWM config and active
+signal tape_fsk_motor : std_logic;
+signal tape_pwm_motor : std_logic; -- from SIO/??? PORTA_OUT ??? based on SIO and PWM config 
+signal tape_act : std_logic;
 
 BEGIN
 
@@ -364,7 +379,7 @@ PORT MAP
 	SIO_CLOCK_IN => SIO_CLKIN,
 	SIO_PROC => SIO_PROC,
 	SIO_IRQ  => SIO_IRQ,
-	SIO_MOTOR => SIO_MOTOR,
+	SIO_MOTOR => sio_mot,
 	ENABLE_179_EARLY => emu_pokey_enable,
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
@@ -419,12 +434,17 @@ PORT MAP
 SIO_CLKOUT <= sio_clk;
 SIO_OUT    <= sio_txd;
 SIO_CMD    <= sio_command;
+SIO_MOTOR  <= sio_mot;
 
 emu_sio_rxd     <= sio_txd     when SIO_MODE = '0' else '1';
 emu_sio_command <= sio_command when SIO_MODE = '0' else '1';
 emu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
+tape_fsk_motor  <= not(sio_mot) when SIO_MODE = '0' else '0';
+tape_pwm_motor  <= '0'; -- TODO
 
-sio_rxd <= emu_sio_txd when SIO_MODE = '0' else SIO_IN;
+sio_rxd <= tape_fsk_out when (SIO_MODE = '0') and (tape_act = '1') else emu_sio_txd when SIO_MODE = '0' else SIO_IN;
+
+TAPE_ACTIVE <= tape_act;
 
 HPS_DMA_DATA_IN <= dma_memory_data(7 downto 0);
 
@@ -494,6 +514,24 @@ PORT  MAP
 	SIO_COMMAND => emu_sio_command,
 	SIO_DATA_OUT => emu_sio_rxd,
 	SIO_CLK_OUT => emu_sio_clk
+);
+
+tape_bridge_inst : entity work.tape_handler
+PORT  MAP
+(
+	clk => CLK,
+	reset_n => RESET_N and sdram_reset_n and not(TAPE_RESET),
+	data_in => TAPE_DATA,
+	wr_en => TAPE_DATA_WR,
+	-- fifo_empty => open,
+	-- fifo_count => open,
+	fifo_full => TAPE_FIFO_FULL,
+	active => tape_act,
+	fsk_out => tape_fsk_out,
+	pwm_out => tape_pwm_out,
+	pwm_invert => TAPE_PWM_INVERT,
+	fsk_motor => tape_fsk_motor,
+	pwm_motor => tape_pwm_motor
 );
 
 END vhdl;
