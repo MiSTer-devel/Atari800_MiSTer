@@ -67,6 +67,8 @@ PORT
 	SET_FREEZER_IN : in std_logic;
 	SET_RESET_RNMI_IN : in std_logic;
 	SET_OPTION_FORCE_IN : in std_logic;
+	SET_START_FORCE_IN : in std_logic;
+	SET_SPACE_FORCE_IN : in std_logic;
 	CART1_SELECT_IN : in std_logic_vector(7 downto 0);
 	CART2_SELECT_IN : in std_logic_vector(7 downto 0);
 	HOT_KEYS : out std_logic_vector(2 downto 0);
@@ -80,6 +82,7 @@ PORT
 	TAPE_DATA : in std_logic_vector(31 downto 0);
 	TAPE_DATA_WR : in std_logic;
 	TAPE_FIFO_FULL : out std_logic;
+	TAPE_FIFO_EMPTY : out std_logic;
 	TAPE_PWM_CONFIG : in std_logic_vector(3 downto 0); -- from status config 16 available options
 	TAPE_PWM_INVERT : in std_logic; -- from status config
 	TAPE_RESET : in std_logic;
@@ -217,8 +220,11 @@ signal paddle_4 : std_logic_vector(2 downto 0);
 
 signal areset_n   : std_logic;
 signal option_tmp : std_logic;
+signal start_tmp : std_logic;
+signal space_tmp : std_logic;
 signal warm_reset_request : std_logic;
 signal cold_reset_request : std_logic;
+signal tape_hold : std_logic;
 
 signal tape_fsk_out : std_logic; -- to SIO based on SIO config and active
 signal tape_pwm_out : std_logic; -- to SIO/JOY2_n based on SIO and PWM config and active
@@ -244,8 +250,11 @@ begin
 			paddle_4 <= "000";
 			cnt := 0;
 			option_tmp <= '0';
+			start_tmp <= '0';
+			space_tmp <= '0';
 			warm_reset_request <= '0';
 			cold_reset_request <= '0';
+			tape_hold <= '1';
 		else
 			if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
 			if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
@@ -270,8 +279,13 @@ begin
 			if cnt < 50000000 then
 				cnt := cnt + 1;
 				option_tmp <= option_tmp or SET_OPTION_FORCE_IN or JOY(5);
+				start_tmp <= start_tmp or SET_START_FORCE_IN;
+				space_tmp <= space_tmp or SET_SPACE_FORCE_IN;
 			else
+				tape_hold <= '0';
 				option_tmp <= '0';
+				start_tmp <= '0';
+				space_tmp <= '0';
 			end if;
 			warm_reset_request <= not(reset_rnmi_atari) and (warm_reset_request or warm_reset_menu);
 			cold_reset_request <= cold_reset_request or cold_reset_menu;
@@ -307,6 +321,7 @@ PORT MAP
 
 	INPUT => x"000"&"000"&ps2_key(9)&"000"&ps2_key(8)&x"0"&ps2_key(7 downto 0),
 	INPUT2 => JOY(13 downto 9),
+	SPACE_FORCE => space_tmp,
 
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
@@ -384,7 +399,7 @@ PORT MAP
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
-	CONSOL_START => CONSOL_START,
+	CONSOL_START => CONSOL_START or start_tmp,
 
 	SDRAM_REQUEST => SDRAM_REQUEST,
 	SDRAM_REQUEST_COMPLETE => SDRAM_REQUEST_COMPLETE,
@@ -444,7 +459,7 @@ tape_pwm_motor  <= '0'; -- TODO
 
 sio_rxd <= tape_fsk_out when (SIO_MODE = '0') and (tape_act = '1') else emu_sio_txd when SIO_MODE = '0' else SIO_IN;
 
-TAPE_ACTIVE <= tape_act;
+TAPE_ACTIVE <= tape_act and not(tape_hold);
 
 HPS_DMA_DATA_IN <= dma_memory_data(7 downto 0);
 
@@ -520,10 +535,11 @@ tape_bridge_inst : entity work.tape_handler
 PORT  MAP
 (
 	clk => CLK,
-	reset_n => RESET_N and sdram_reset_n and not(TAPE_RESET),
+	reset_n => RESET_N and sdram_reset_n,
+	fifo_reset => TAPE_RESET,
 	data_in => TAPE_DATA,
 	wr_en => TAPE_DATA_WR,
-	-- fifo_empty => open,
+	fifo_empty => TAPE_FIFO_EMPTY,
 	-- fifo_count => open,
 	fifo_full => TAPE_FIFO_FULL,
 	active => tape_act,

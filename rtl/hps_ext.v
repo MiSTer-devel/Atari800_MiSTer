@@ -29,6 +29,8 @@ module hps_ext
 	output reg        set_pause,
 	output reg        set_reset_rnmi,
 	output reg        set_option_force,
+	output reg        set_start_force,
+	output reg        set_space_force,
 	output reg        set_drive_led,
 	output reg        set_xex_loader_mode,
 	output reg  [7:0] cart1_select,
@@ -85,6 +87,8 @@ localparam REG_SIO_SETDIV = 11;
 
 // Tape part
 localparam TAPE_RESET = 12;
+localparam REG_START_FORCE = 13;
+localparam REG_SPACE_FORCE = 14;
 
 // General reading for side effect free registers
 localparam REG_ATARI_STATUS1 = 1;
@@ -148,6 +152,8 @@ always@(posedge clk_sys) begin
 									uart_addr <= 5'h0;
 							end
 						TAPE_RESET: tape_reset <= |io_din[7:0];
+						REG_START_FORCE: set_start_force <= |io_din[7:0];
+						REG_SPACE_FORCE: set_space_force <= |io_din[7:0];
 					endcase
 
 				A800_GET_REGISTER:

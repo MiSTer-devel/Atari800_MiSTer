@@ -235,7 +235,7 @@ localparam CONF_STR = {
 	"S6,ATRXEXXDFATX,Boot D1;",
 	"S5,XEXCOMEXE,Load XEX;",
 	"F8,CARROMBIN,Load Cart;",
-	"S7,CAS,Load Tape;",
+	"S8,CAS,Boot Tape;",
 	"-;",
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
@@ -243,9 +243,10 @@ localparam CONF_STR = {
 	"S3,ATRXEXXFDATX,Mount D4;",
 	"S4,IMG,Mount HDD;",
 	"-;",
+	"S7,CAS,Load Tape;",
 	"F9,CARROMBIN,Second Cart;",
 	"-;",
-	"P1,Drives, Loader & Tape;",
+	"P1,Drives Loader & Tape;",
 	"P1-;",
 	"P1O[16],SIO Connected to,Emu,USER I/O;",
 	"P1-;",
@@ -367,6 +368,8 @@ wire        set_pause;
 wire        set_freezer;
 wire        set_reset_rnmi;
 wire        set_option_force;
+wire        set_start_force;
+wire        set_space_force;
 
 wire  [7:0] hps_dma_data_in;
 wire        sdram_ready;
@@ -384,6 +387,7 @@ wire        tape_data_wr;
 wire        tape_reset;
 wire        tape_active;
 wire        tape_fifo_full;
+wire        tape_fifo_empty;
 
 wire [64:0] rtc;
 
@@ -488,6 +492,8 @@ hps_ext hps_ext
 	.set_freezer(set_freezer),
 	.set_reset_rnmi(set_reset_rnmi),
 	.set_option_force(set_option_force),
+	.set_start_force(set_start_force),
+	.set_space_force(set_space_force),
 	.set_drive_led(drive_led),
 	.set_xex_loader_mode(xex_loader_mode),
 	.cart1_select(cart1_select),
@@ -555,6 +561,8 @@ atari800top atari800top
 	.SET_FREEZER_IN(set_freezer),
 	.SET_RESET_RNMI_IN(set_reset_rnmi),
 	.SET_OPTION_FORCE_IN(set_option_force),
+	.SET_START_FORCE_IN(set_start_force),
+	.SET_SPACE_FORCE_IN(set_space_force),
 	.CART1_SELECT_IN(cart1_select),
 	.CART2_SELECT_IN(cart2_select),
 	.HOT_KEYS(atari_hotkeys),
@@ -568,6 +576,7 @@ atari800top atari800top
 	.TAPE_DATA(tape_data),
 	.TAPE_DATA_WR(tape_data_wr),
 	.TAPE_FIFO_FULL(tape_fifo_full),
+	.TAPE_FIFO_EMPTY(tape_fifo_empty),
 	.TAPE_PWM_CONFIG(status[67:64]),
 	.TAPE_PWM_INVERT(status[68]),
 	.TAPE_RESET(tape_reset),
@@ -770,7 +779,7 @@ wire [15:0] atari_status1;
 wire [15:0] atari_status2;
 wire [2:0] atari_hotkeys;
 assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], 1'b0, ~status[41], mode800, atari_hotkeys};
-assign atari_status2 = {tape_fifo_full, 3'b000, splashpbi, bootpbi, drivesmodepbi};
+assign atari_status2 = {tape_fifo_full, tape_fifo_empty, tape_active, 1'b0, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];

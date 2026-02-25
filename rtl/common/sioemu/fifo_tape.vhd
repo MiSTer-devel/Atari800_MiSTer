@@ -9,6 +9,7 @@ ENTITY fifo_tape IS
 	(
 		clock		: IN STD_LOGIC ;
 		data		: IN STD_LOGIC_VECTOR (31 DOWNTO 0);
+		aclr		: IN STD_LOGIC;
 		rdreq		: IN STD_LOGIC ;
 		wrreq		: IN STD_LOGIC ;
 		empty		: OUT STD_LOGIC ;
@@ -41,6 +42,7 @@ ARCHITECTURE SYN OF fifo_tape IS
 	PORT (
 			clock	: IN STD_LOGIC ;
 			data	: IN STD_LOGIC_VECTOR (31 DOWNTO 0);
+			aclr	: IN STD_LOGIC ;
 			rdreq	: IN STD_LOGIC ;
 			wrreq	: IN STD_LOGIC ;
 			empty	: OUT STD_LOGIC ;
@@ -72,6 +74,7 @@ BEGIN
 	PORT MAP (
 		clock => clock,
 		data => data,
+		aclr => aclr,
 		rdreq => rdreq,
 		wrreq => wrreq,
 		empty => sub_wire0,
