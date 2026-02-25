@@ -258,7 +258,7 @@ localparam CONF_STR = {
 	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
-	"P1O[67:64],Tape turbo system,One,Two,Three,Four;",
+	"P1O[67:64],Tape turbo system,Standard,Turbo D,K.S.O.,Blizzard,Rambit,6000;",
 	"P1O[68],Invert turbo PWM,Disabled,Enabled;",
 	"P1-;",
 	"P1O[57],Mount read-only,Disabled,Enabled;",

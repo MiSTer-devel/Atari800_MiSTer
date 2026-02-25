@@ -196,6 +196,8 @@ signal sio_txd : std_logic;
 signal sio_command : std_logic;
 signal sio_clk : std_logic;
 signal sio_mot : std_logic;
+signal sio_proceed : std_logic;
+signal sio_interrupt : std_logic;
 
 signal OLD_OUT : STD_LOGIC_VECTOR(7 DOWNTO 0);
 signal old_command : std_logic;
@@ -230,7 +232,8 @@ signal tape_fsk_out : std_logic; -- to SIO based on SIO config and active
 signal tape_pwm_out : std_logic; -- to SIO/JOY2_n based on SIO and PWM config and active
 signal tape_fsk_motor : std_logic;
 signal tape_pwm_motor : std_logic; -- from SIO/??? PORTA_OUT ??? based on SIO and PWM config 
-signal tape_act : std_logic;
+signal fsk_act : std_logic;
+signal pwm_act : std_logic;
 
 BEGIN
 
@@ -392,8 +395,8 @@ PORT MAP
 	SIO_TXD => sio_txd,
 	SIO_CLOCK => sio_clk,
 	SIO_CLOCK_IN => SIO_CLKIN,
-	SIO_PROC => SIO_PROC,
-	SIO_IRQ  => SIO_IRQ,
+	SIO_PROC => sio_proceed,
+	SIO_IRQ  => sio_interrupt,
 	SIO_MOTOR => sio_mot,
 	ENABLE_179_EARLY => emu_pokey_enable,
 
@@ -455,11 +458,26 @@ emu_sio_rxd     <= sio_txd     when SIO_MODE = '0' else '1';
 emu_sio_command <= sio_command when SIO_MODE = '0' else '1';
 emu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
 tape_fsk_motor  <= not(sio_mot) when SIO_MODE = '0' else '0';
-tape_pwm_motor  <= '0'; -- TODO
 
-sio_rxd <= tape_fsk_out when (SIO_MODE = '0') and (tape_act = '1') else emu_sio_txd when SIO_MODE = '0' else SIO_IN;
+tape_pwm_motor <= '0' when SIO_MODE = '1' else
+	not(sio_command) and not(sio_mot) when (TAPE_PWM_CONFIG = "0000") or (TAPE_PWM_CONFIG = "0100") else
+	not(sio_txd) when (TAPE_PWM_CONFIG = "0011") else
+	not(sio_mot); -- TODO K.S.O.
 
-TAPE_ACTIVE <= tape_act and not(tape_hold);
+sio_rxd <= SIO_IN when (SIO_MODE = '1') else 
+	tape_fsk_out when (fsk_act = '1') else
+	tape_pwm_out when (pwm_act = '1') and ((TAPE_PWM_CONFIG = "0000") or (TAPE_PWM_CONFIG = "0011")) else
+	emu_sio_txd;
+
+sio_interrupt <= SIO_IRQ when (SIO_MODE = '1') else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "0100") else
+	'0';
+
+sio_proceed <= SIO_PROC when (SIO_MODE = '1') else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "0101") else
+	'0';
+
+TAPE_ACTIVE <= (fsk_act or pwm_act) and not(tape_hold);
 
 HPS_DMA_DATA_IN <= dma_memory_data(7 downto 0);
 
@@ -542,7 +560,8 @@ PORT  MAP
 	fifo_empty => TAPE_FIFO_EMPTY,
 	-- fifo_count => open,
 	fifo_full => TAPE_FIFO_FULL,
-	active => tape_act,
+	fsk_active => fsk_act,
+	pwm_active => pwm_act,
 	fsk_out => tape_fsk_out,
 	pwm_out => tape_pwm_out,
 	pwm_invert => TAPE_PWM_INVERT,

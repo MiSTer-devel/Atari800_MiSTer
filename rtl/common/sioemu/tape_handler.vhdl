@@ -22,7 +22,8 @@ PORT
 	fifo_full : out std_logic;
 	fifo_count : out std_logic_vector(7 downto 0);
 
-	active : out std_logic; -- enabled externally and motor running
+	fsk_active : out std_logic;
+	pwm_active : out std_logic;
 	fsk_out : out std_logic; -- fsk bit transmit out
 	pwm_out : out std_logic; -- pwm bit transmit out
 	pwm_invert : in std_logic;
@@ -44,7 +45,6 @@ signal active_reg : std_logic;
 signal active_next : std_logic;
 signal count_reg : unsigned(30 downto 0);
 signal count_next : unsigned(30 downto 0);
-signal motor_on : std_logic;
 
 begin
 
@@ -66,7 +66,7 @@ begin
 	end if;
 end process;
 
-process(count_reg, pwm_out_reg, pins_out_reg, active_reg, fifo_req, fifo_data, fifo_queue_empty, motor_on, fifo_reset)
+process(count_reg, pwm_out_reg, pins_out_reg, active_reg, fifo_req, fifo_data, fifo_queue_empty, fifo_reset)
 begin
 
 	fifo_req <= '0';
@@ -104,12 +104,11 @@ begin
 	end if;
 end process;
 
-motor_on <= (pwm_out_reg and pwm_motor) or (not(pwm_out_reg) and fsk_motor);
-
 -- output
 fsk_out <= pins_out_reg(0);
 pwm_out <= pins_out_reg(1) xor pwm_invert;
-active <= active_reg and motor_on;
+pwm_active <= active_reg and pwm_out_reg and pwm_motor;
+fsk_active <= active_reg and not(pwm_out_reg) and fsk_motor;
 fifo_empty <= fifo_queue_empty;
 
 end vhdl;
