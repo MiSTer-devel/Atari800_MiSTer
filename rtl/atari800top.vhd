@@ -461,7 +461,7 @@ tape_fsk_motor  <= not(sio_mot) when SIO_MODE = '0' else '0';
 
 tape_pwm_motor <= '0' when SIO_MODE = '1' else
 	not(sio_command) and not(sio_mot) when (TAPE_PWM_CONFIG = "0000") or (TAPE_PWM_CONFIG = "0100") else
-	not(sio_txd) when (TAPE_PWM_CONFIG = "0011") else
+	not(sio_txd) and not(sio_mot) when (TAPE_PWM_CONFIG = "0011") else
 	not(sio_mot); -- TODO K.S.O.
 
 sio_rxd <= SIO_IN when (SIO_MODE = '1') else 
@@ -477,7 +477,7 @@ sio_proceed <= SIO_PROC when (SIO_MODE = '1') else
 	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "0101") else
 	'0';
 
-TAPE_ACTIVE <= (fsk_act or pwm_act) and not(tape_hold);
+TAPE_ACTIVE <= ((fsk_act and tape_fsk_motor) or (pwm_act and tape_pwm_motor)) and not(tape_hold);
 
 HPS_DMA_DATA_IN <= dma_memory_data(7 downto 0);
 
@@ -564,9 +564,7 @@ PORT  MAP
 	pwm_active => pwm_act,
 	fsk_out => tape_fsk_out,
 	pwm_out => tape_pwm_out,
-	pwm_invert => TAPE_PWM_INVERT,
-	fsk_motor => tape_fsk_motor,
-	pwm_motor => tape_pwm_motor
+	pwm_invert => TAPE_PWM_INVERT
 );
 
 END vhdl;

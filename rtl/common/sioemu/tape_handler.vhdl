@@ -14,21 +14,18 @@ PORT
 	clk : in std_logic;
 	reset_n : in std_logic;
 
-	data_in : in std_logic_vector(31 downto 0); -- to fifo data
-	wr_en : in std_logic; -- to fifo wrreq
+	data_in : in std_logic_vector(31 downto 0);
+	wr_en : in std_logic;
 
 	fifo_reset : in std_logic;
 	fifo_empty : out std_logic;
 	fifo_full : out std_logic;
-	fifo_count : out std_logic_vector(7 downto 0);
 
 	fsk_active : out std_logic;
 	pwm_active : out std_logic;
-	fsk_out : out std_logic; -- fsk bit transmit out
-	pwm_out : out std_logic; -- pwm bit transmit out
-	pwm_invert : in std_logic;
-	fsk_motor : in std_logic;
-	pwm_motor : in std_logic
+	fsk_out : out std_logic;
+	pwm_out : out std_logic;
+	pwm_invert : in std_logic
 );
 END tape_handler;
 
@@ -49,7 +46,7 @@ signal count_next : unsigned(30 downto 0);
 begin
 
 tape_transmit_fifo : work.fifo_tape
-PORT MAP (clock => clk,data=>data_in(31 downto 0),rdreq=>fifo_req,wrreq=>wr_en,empty=>fifo_queue_empty,full=>fifo_full,q=>fifo_data,usedw=>fifo_count,aclr=>fifo_reset);
+PORT MAP (clock => clk,data=>data_in(31 downto 0),rdreq=>fifo_req,wrreq=>wr_en,empty=>fifo_queue_empty,full=>fifo_full,q=>fifo_data,aclr=>fifo_reset);
 
 process(clk, reset_n)
 begin
@@ -107,8 +104,8 @@ end process;
 -- output
 fsk_out <= pins_out_reg(0);
 pwm_out <= pins_out_reg(1) xor pwm_invert;
-pwm_active <= active_reg and pwm_out_reg and pwm_motor;
-fsk_active <= active_reg and not(pwm_out_reg) and fsk_motor;
+pwm_active <= active_reg and pwm_out_reg;
+fsk_active <= active_reg and not(pwm_out_reg);
 fifo_empty <= fifo_queue_empty;
 
 end vhdl;

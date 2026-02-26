@@ -144,7 +144,7 @@ end generate;
 	end process;
 
 	-- map to atari key code
-	process(ps2_keys_reg, input2)
+	process(ps2_keys_reg, input2, SPACE_FORCE)
 	begin
 		atari_keyboard <= (others=>'0');
 
