@@ -25,7 +25,11 @@ PORT
 	pwm_active : out std_logic;
 	fsk_out : out std_logic;
 	pwm_out : out std_logic;
-	pwm_invert : in std_logic
+	pwm_invert : in std_logic;
+	fsk_motor : in std_logic;
+	pwm_motor : in std_logic;
+	tape_sound_en : in std_logic;
+	audio_out : out std_logic_vector(7 downto 0)
 );
 END tape_handler;
 
@@ -42,6 +46,24 @@ signal active_reg : std_logic;
 signal active_next : std_logic;
 signal count_reg : unsigned(30 downto 0);
 signal count_next : unsigned(30 downto 0);
+signal pwm_bit : std_logic;
+signal fsk_bit : std_logic;
+signal fsk_act : std_logic;
+signal pwm_act : std_logic;
+
+-- These are based on the 28.636364 MHz core clock
+-- 1 frequency 5327 Hz
+-- 0 frequency 3995 Hz
+-- base / carrier frequency 588 Hz
+constant WAVE_LIMIT_0 : integer := 3583;
+constant WAVE_LIMIT_1 : integer := 2687;
+constant WAVE_LIMIT_B : integer := 24350;
+signal wave_counter_0 : integer range 0 to WAVE_LIMIT_0;
+signal wave_counter_1 : integer range 0 to WAVE_LIMIT_1;
+signal wave_counter_b : integer range 0 to WAVE_LIMIT_B;
+signal wave_0 : std_logic;
+signal wave_1 : std_logic;
+signal wave_b : std_logic;
 
 begin
 
@@ -101,11 +123,66 @@ begin
 	end if;
 end process;
 
+process(clk, reset_n)
+begin
+	if (reset_n = '0') then
+		wave_counter_0 <= 0;
+		wave_0 <= '0';
+	elsif rising_edge(clk) then
+		if wave_counter_0 = WAVE_LIMIT_0 then
+			wave_counter_0 <= 0;
+			wave_0 <= not(wave_0);
+		else
+			wave_counter_0 <= wave_counter_0 + 1;
+		end if;
+	end if;
+end process;
+
+process(clk, reset_n)
+begin
+	if (reset_n = '0') then
+		wave_counter_1 <= 0;
+		wave_1 <= '0';
+	elsif rising_edge(clk) then
+		if wave_counter_1 = WAVE_LIMIT_1 then
+			wave_counter_1 <= 0;
+			wave_1 <= not(wave_1);
+		else
+			wave_counter_1 <= wave_counter_1 + 1;
+		end if;
+	end if;
+end process;
+
+process(clk, reset_n)
+begin
+	if (reset_n = '0') then
+		wave_counter_b <= 0;
+		wave_b <= '0';
+	elsif rising_edge(clk) then
+		if wave_counter_b = WAVE_LIMIT_B then
+			wave_counter_b <= 0;
+			wave_b <= not(wave_b);
+		else
+			wave_counter_b <= wave_counter_b + 1;
+		end if;
+	end if;
+end process;
+
+fsk_bit <= pins_out_reg(0);
+pwm_bit <= pins_out_reg(1) xor pwm_invert;
+pwm_act <= active_reg and pwm_out_reg;
+fsk_act <= active_reg and not(pwm_out_reg);
+
 -- output
-fsk_out <= pins_out_reg(0);
-pwm_out <= pins_out_reg(1) xor pwm_invert;
-pwm_active <= active_reg and pwm_out_reg;
-fsk_active <= active_reg and not(pwm_out_reg);
+fsk_out <= fsk_bit;
+pwm_out <= pwm_bit;
+pwm_active <= pwm_act;
+fsk_active <= fsk_act;
 fifo_empty <= fifo_queue_empty;
+
+audio_out <=
+	x"00" when tape_sound_en = '0' else
+	"00"&(wave_b and ((wave_0 and not(fsk_bit)) or (wave_1 and fsk_bit)))&(wave_b xor ((wave_0 and not(fsk_bit)) or (wave_1 and fsk_bit)))&"0000" when (fsk_act and fsk_motor) = '1' else
+	"00"&pwm_bit&"00000" when (pwm_act and pwm_motor) = '1' else x"00";
 
 end vhdl;

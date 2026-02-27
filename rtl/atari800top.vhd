@@ -83,10 +83,11 @@ PORT
 	TAPE_DATA_WR : in std_logic;
 	TAPE_FIFO_FULL : out std_logic;
 	TAPE_FIFO_EMPTY : out std_logic;
-	TAPE_PWM_CONFIG : in std_logic_vector(3 downto 0); -- from status config 16 available options
+	TAPE_PWM_CONFIG : in std_logic_vector(2 downto 0);
 	TAPE_PWM_INVERT : in std_logic; -- from status config
 	TAPE_RESET : in std_logic;
 	TAPE_ACTIVE : out std_logic;
+	TAPE_SOUND_EN : in std_logic;
 
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
@@ -198,6 +199,8 @@ signal sio_clk : std_logic;
 signal sio_mot : std_logic;
 signal sio_proceed : std_logic;
 signal sio_interrupt : std_logic;
+signal porta_out : std_logic_vector(7 downto 0);
+signal tape_audio : std_logic_vector(7 downto 0);
 
 signal OLD_OUT : STD_LOGIC_VECTOR(7 DOWNTO 0);
 signal old_command : std_logic;
@@ -228,10 +231,10 @@ signal warm_reset_request : std_logic;
 signal cold_reset_request : std_logic;
 signal tape_hold : std_logic;
 
-signal tape_fsk_out : std_logic; -- to SIO based on SIO config and active
-signal tape_pwm_out : std_logic; -- to SIO/JOY2_n based on SIO and PWM config and active
+signal tape_fsk_out : std_logic;
+signal tape_pwm_out : std_logic;
 signal tape_fsk_motor : std_logic;
-signal tape_pwm_motor : std_logic; -- from SIO/??? PORTA_OUT ??? based on SIO and PWM config 
+signal tape_pwm_motor : std_logic;
 signal fsk_act : std_logic;
 signal pwm_act : std_logic;
 
@@ -302,7 +305,10 @@ JOY1_n <= '1'&not(JOY1(8)&JOY1(7))&"11" when paddle_1(0) = '1' else not(JOY1(4)&
 JOY1_X <= JOY1X when paddle_1(0) = '1' else X"80" when (paddle_1(1) = '0' or JOY1(5) = '1') else X"70";
 JOY1_Y <= JOY1Y when paddle_1(0) = '1' else X"80" when (paddle_1(2) = '0' or JOY1(6) = '1') else X"70";
 
-JOY2_n <= '1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
+JOY2_n <=
+	"1111"&tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "001") else
+	'1'&tape_pwm_out&"111" when (pwm_act = '1') and (TAPE_PWM_CONFIG = "010") else
+	'1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
 JOY2_X <= JOY2X when paddle_2(0) = '1' else X"80" when (paddle_2(1) = '0' or JOY2(5) = '1') else X"70";
 JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"80" when (paddle_2(2) = '0' or JOY2(6) = '1') else X"70";
 
@@ -398,7 +404,9 @@ PORT MAP
 	SIO_PROC => sio_proceed,
 	SIO_IRQ  => sio_interrupt,
 	SIO_MOTOR => sio_mot,
+	TAPE_AUDIO => tape_audio,
 	ENABLE_179_EARLY => emu_pokey_enable,
+	PORTA_OUT_EXP => porta_out,
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
@@ -459,22 +467,24 @@ emu_sio_command <= sio_command when SIO_MODE = '0' else '1';
 emu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
 tape_fsk_motor  <= not(sio_mot) when SIO_MODE = '0' else '0';
 
-tape_pwm_motor <= '0' when SIO_MODE = '1' else
-	not(sio_command) and not(sio_mot) when (TAPE_PWM_CONFIG = "0000") or (TAPE_PWM_CONFIG = "0100") else
-	not(sio_txd) and not(sio_mot) when (TAPE_PWM_CONFIG = "0011") else
-	not(sio_mot); -- TODO K.S.O.
+tape_pwm_motor <= 
+	not(porta_out(5)) when (TAPE_PWM_CONFIG = "010") else
+	'0' when SIO_MODE = '1' else
+	not(sio_command) and not(sio_mot) when (TAPE_PWM_CONFIG = "000") or (TAPE_PWM_CONFIG = "100") else
+	not(sio_txd) and not(sio_mot) when (TAPE_PWM_CONFIG = "011") else
+	not(sio_mot);
 
 sio_rxd <= SIO_IN when (SIO_MODE = '1') else 
 	tape_fsk_out when (fsk_act = '1') else
-	tape_pwm_out when (pwm_act = '1') and ((TAPE_PWM_CONFIG = "0000") or (TAPE_PWM_CONFIG = "0011")) else
+	tape_pwm_out when (pwm_act = '1') and ((TAPE_PWM_CONFIG = "000") or (TAPE_PWM_CONFIG = "011")) else
 	emu_sio_txd;
 
 sio_interrupt <= SIO_IRQ when (SIO_MODE = '1') else
-	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "0100") else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "100") else
 	'0';
 
 sio_proceed <= SIO_PROC when (SIO_MODE = '1') else
-	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "0101") else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "101") else
 	'0';
 
 TAPE_ACTIVE <= ((fsk_act and tape_fsk_motor) or (pwm_act and tape_pwm_motor)) and not(tape_hold);
@@ -558,13 +568,16 @@ PORT  MAP
 	data_in => TAPE_DATA,
 	wr_en => TAPE_DATA_WR,
 	fifo_empty => TAPE_FIFO_EMPTY,
-	-- fifo_count => open,
 	fifo_full => TAPE_FIFO_FULL,
 	fsk_active => fsk_act,
 	pwm_active => pwm_act,
 	fsk_out => tape_fsk_out,
 	pwm_out => tape_pwm_out,
-	pwm_invert => TAPE_PWM_INVERT
+	pwm_invert => TAPE_PWM_INVERT,
+	fsk_motor => tape_fsk_motor,
+	pwm_motor => tape_pwm_motor,
+	tape_sound_en => TAPE_SOUND_EN,
+	audio_out => tape_audio
 );
 
 END vhdl;
