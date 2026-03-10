@@ -258,7 +258,7 @@ localparam CONF_STR = {
 	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
-	"P1O[66:64],Tape turbo system,Std/2000,TurboD,KSO,Blizzard,Rambit,T6000;",
+	"P1O[66:64],Tape turbo system,Standard,SIO/Cmd,Turbo-D,K.S.O.,K.S.O. 2,Blizzard,Rambit,T6000;",
 	"P1O[67],Invert turbo PWM,Disabled,Enabled;",
 	"P1-;",
 	"P1O[57],Mount read-only,Disabled,Enabled;",
@@ -389,6 +389,7 @@ wire        tape_reset;
 wire        tape_active;
 wire        tape_fifo_full;
 wire        tape_fifo_empty;
+wire        tape_slow = (status[66:64] == 3'b100) ? 1'b1 : 1'b0;
 
 wire [64:0] rtc;
 
@@ -781,7 +782,7 @@ wire [15:0] atari_status1;
 wire [15:0] atari_status2;
 wire [2:0] atari_hotkeys;
 assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], 1'b0, ~status[41], mode800, atari_hotkeys};
-assign atari_status2 = {tape_fifo_full, tape_fifo_empty, tape_active, 1'b0, splashpbi, bootpbi, drivesmodepbi};
+assign atari_status2 = {tape_fifo_full, tape_fifo_empty, tape_active, tape_slow, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];

@@ -9,6 +9,10 @@ USE ieee.numeric_std.all;
 USE IEEE.STD_LOGIC_MISC.all;
 
 ENTITY tape_handler IS
+GENERIC
+(
+	wave_sound: integer := 1
+);
 PORT
 (
 	clk : in std_logic;
@@ -50,20 +54,6 @@ signal pwm_bit : std_logic;
 signal fsk_bit : std_logic;
 signal fsk_act : std_logic;
 signal pwm_act : std_logic;
-
--- These are based on the 28.636364 MHz core clock
--- 1 frequency 5327 Hz
--- 0 frequency 3995 Hz
--- base / carrier frequency 588 Hz
-constant WAVE_LIMIT_0 : integer := 3583;
-constant WAVE_LIMIT_1 : integer := 2687;
-constant WAVE_LIMIT_B : integer := 24350;
-signal wave_counter_0 : integer range 0 to WAVE_LIMIT_0;
-signal wave_counter_1 : integer range 0 to WAVE_LIMIT_1;
-signal wave_counter_b : integer range 0 to WAVE_LIMIT_B;
-signal wave_0 : std_logic;
-signal wave_1 : std_logic;
-signal wave_b : std_logic;
 
 begin
 
@@ -123,6 +113,26 @@ begin
 	end if;
 end process;
 
+gen_square_wave : if wave_sound = 0 generate
+
+-- These are based on the 28.636364 MHz core clock
+-- 1 frequency 5327 Hz
+-- 0 frequency 3995 Hz
+-- base / carrier frequency 588 Hz
+
+constant WAVE_LIMIT_0 : integer := 3583;
+constant WAVE_LIMIT_1 : integer := 2687;
+constant WAVE_LIMIT_B : integer := 24350;
+
+signal wave_counter_0 : integer range 0 to WAVE_LIMIT_0;
+signal wave_counter_1 : integer range 0 to WAVE_LIMIT_1;
+signal wave_counter_b : integer range 0 to WAVE_LIMIT_B;
+signal wave_0 : std_logic;
+signal wave_1 : std_logic;
+signal wave_b : std_logic;
+
+begin
+
 process(clk, reset_n)
 begin
 	if (reset_n = '0') then
@@ -168,6 +178,132 @@ begin
 	end if;
 end process;
 
+audio_out <=
+	x"00" when tape_sound_en = '0' else
+	"00"&(wave_b and ((wave_0 and not(fsk_bit)) or (wave_1 and fsk_bit)))&(wave_b xor ((wave_0 and not(fsk_bit)) or (wave_1 and fsk_bit)))&"0000" when (fsk_act and fsk_motor) = '1' else
+	"00"&pwm_bit&"00000" when (pwm_act and pwm_motor) = '1' else x"00";
+
+end generate;
+
+gen_sine_wave : if wave_sound = 1 generate
+
+function sine_quarter(x: unsigned(3 downto 0)) return unsigned is
+begin
+	case x is
+		when x"0" => return x"0";
+		when x"1" => return x"2";
+		when x"2" => return x"3";
+		when x"3" => return x"4";
+		when x"4" => return x"6";
+		when x"5" => return x"7";
+		when x"6" => return x"8";
+		when x"7" => return x"a";
+		when x"8" => return x"b";
+		when x"9" => return x"c";
+		when x"a" => return x"d";
+		when x"b" => return x"d";
+		when x"c" => return x"e";
+		when x"d" => return x"e";
+		when x"e" => return x"f";
+		when x"f" => return x"f";
+	end case;
+end sine_quarter;
+
+function sine_full(x: unsigned(5 downto 0)) return unsigned is
+begin
+	case x(5 downto 4) is
+		when "00" => return '1' & sine_quarter(x(3 downto 0));
+		when "01" => return '1' & sine_quarter(not(x(3 downto 0)));
+		when "10" => return "10000" - unsigned('0' & sine_quarter(x(3 downto 0)));
+		when "11" => return "10000" - unsigned('0' & sine_quarter(not(x(3 downto 0))));
+	end case;
+end sine_full;
+
+constant WAVE_LIMIT_0 : integer := 112; -- * 64 ~ 2 * 3586
+constant WAVE_LIMIT_1 : integer := 84; -- * 64 ~ 2 * 2687
+constant WAVE_LIMIT_B : integer := 760; -- * 64 ~ 2 * 24350
+signal wave_counter_0 : integer range 0 to WAVE_LIMIT_0;
+signal wave_counter_1 : integer range 0 to WAVE_LIMIT_1;
+signal wave_counter_b : integer range 0 to WAVE_LIMIT_B;
+signal wave_0 : unsigned(5 downto 0);
+signal wave_1 : unsigned(5 downto 0);
+signal wave_b : unsigned(5 downto 0);
+signal wave_out_0 : unsigned(7 downto 0);
+signal wave_out_1 : unsigned(7 downto 0);
+signal wave_out_b : unsigned(7 downto 0);
+signal wave_out_pwm : unsigned(7 downto 0);
+
+begin
+
+process(clk, reset_n)
+begin
+	if (reset_n = '0') then
+		wave_counter_0 <= 0;
+		wave_0 <= (others => '0');
+	elsif rising_edge(clk) then
+		if wave_counter_0 = WAVE_LIMIT_0 then
+			wave_counter_0 <= 0;
+			wave_0 <= wave_0 + "000001";
+		else
+			wave_counter_0 <= wave_counter_0 + 1;
+		end if;
+	end if;
+end process;
+
+process(clk, reset_n)
+begin
+	if (reset_n = '0') then
+		wave_counter_1 <= 0;
+		wave_1 <= (others => '0');
+	elsif rising_edge(clk) then
+		if wave_counter_1 = WAVE_LIMIT_1 then
+			wave_counter_1 <= 0;
+			wave_1 <= wave_1 + "000001";
+		else
+			wave_counter_1 <= wave_counter_1 + 1;
+		end if;
+	end if;
+end process;
+
+process(clk, reset_n)
+begin
+	if (reset_n = '0') then
+		wave_counter_b <= 0;
+		wave_b <= (others => '0');
+	elsif rising_edge(clk) then
+		if wave_counter_b = WAVE_LIMIT_B then
+			wave_counter_b <= 0;
+			wave_b <= wave_b + "000001";
+		else
+			wave_counter_b <= wave_counter_b + 1;
+		end if;
+	end if;
+end process;
+
+wave_out_0 <= "00" & (sine_full(wave_0) and not(fsk_bit&fsk_bit&fsk_bit&fsk_bit&fsk_bit)) & '0';
+wave_out_1 <= "000" & (sine_full(wave_1) and (fsk_bit&fsk_bit&fsk_bit&fsk_bit&fsk_bit));
+wave_out_b <= "000" & sine_full(wave_b);
+
+process(clk, reset_n)
+begin
+	if (reset_n = '0') then
+		wave_out_pwm <= (others => '0');
+	elsif rising_edge(clk) then
+		if pwm_bit = '1' and wave_out_pwm /= "00010000" then
+			wave_out_pwm <= wave_out_pwm + 1;
+		elsif pwm_bit = '0' and wave_out_pwm /= "00000000" then
+			wave_out_pwm <= wave_out_pwm - 1;
+		end if;
+	end if;
+end process;
+
+audio_out <=
+	x"00" when tape_sound_en = '0' else
+	std_logic_vector(wave_out_0 + wave_out_1 + wave_out_b) when (fsk_act and fsk_motor) = '1' else
+	std_logic_vector(wave_out_pwm) when (pwm_act and pwm_motor) = '1' else x"00";
+
+end generate;
+
 fsk_bit <= pins_out_reg(0);
 pwm_bit <= pins_out_reg(1) xor pwm_invert;
 pwm_act <= active_reg and pwm_out_reg;
@@ -180,9 +316,5 @@ pwm_active <= pwm_act;
 fsk_active <= fsk_act;
 fifo_empty <= fifo_queue_empty;
 
-audio_out <=
-	x"00" when tape_sound_en = '0' else
-	"00"&(wave_b and ((wave_0 and not(fsk_bit)) or (wave_1 and fsk_bit)))&(wave_b xor ((wave_0 and not(fsk_bit)) or (wave_1 and fsk_bit)))&"0000" when (fsk_act and fsk_motor) = '1' else
-	"00"&pwm_bit&"00000" when (pwm_act and pwm_motor) = '1' else x"00";
 
 end vhdl;

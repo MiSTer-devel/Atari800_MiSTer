@@ -238,6 +238,15 @@ signal tape_pwm_motor : std_logic;
 signal fsk_act : std_logic;
 signal pwm_act : std_logic;
 
+constant tape_pwm_config_none : std_logic_vector(2 downto 0) := "000";
+constant tape_pwm_config_2000 : std_logic_vector(2 downto 0) := "001";
+constant tape_pwm_config_turbod : std_logic_vector(2 downto 0) := "010";
+constant tape_pwm_config_kso : std_logic_vector(2 downto 0) := "011";
+constant tape_pwm_config_kso2 : std_logic_vector(2 downto 0) := "100";
+constant tape_pwm_config_blizzard : std_logic_vector(2 downto 0) := "101";
+constant tape_pwm_config_rambit : std_logic_vector(2 downto 0) := "110";
+constant tape_pwm_config_6000 : std_logic_vector(2 downto 0) := "111";
+
 BEGIN
 
 areset_n <= (SDRAM_RESET_N and not(reset_atari));
@@ -306,8 +315,8 @@ JOY1_X <= JOY1X when paddle_1(0) = '1' else X"80" when (paddle_1(1) = '0' or JOY
 JOY1_Y <= JOY1Y when paddle_1(0) = '1' else X"80" when (paddle_1(2) = '0' or JOY1(6) = '1') else X"70";
 
 JOY2_n <=
-	"1111"&tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "001") else
-	'1'&tape_pwm_out&"111" when (pwm_act = '1') and (TAPE_PWM_CONFIG = "010") else
+	"1111"&tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = tape_pwm_config_turbod) else
+	'1'&tape_pwm_out&"111" when (pwm_act = '1') and ((TAPE_PWM_CONFIG = tape_pwm_config_kso) or (TAPE_PWM_CONFIG = tape_pwm_config_kso2)) else
 	'1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
 JOY2_X <= JOY2X when paddle_2(0) = '1' else X"80" when (paddle_2(1) = '0' or JOY2(5) = '1') else X"70";
 JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"80" when (paddle_2(2) = '0' or JOY2(6) = '1') else X"70";
@@ -468,23 +477,23 @@ emu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
 tape_fsk_motor  <= not(sio_mot) when SIO_MODE = '0' else '0';
 
 tape_pwm_motor <= 
-	not(porta_out(5)) when (TAPE_PWM_CONFIG = "010") else
+	not(porta_out(5)) when (TAPE_PWM_CONFIG = tape_pwm_config_kso) else
 	'0' when SIO_MODE = '1' else
-	not(sio_command) and not(sio_mot) when (TAPE_PWM_CONFIG = "000") or (TAPE_PWM_CONFIG = "100") else
-	not(sio_txd) and not(sio_mot) when (TAPE_PWM_CONFIG = "011") else
+	not(sio_command) and not(sio_mot) when (TAPE_PWM_CONFIG = tape_pwm_config_2000) or (TAPE_PWM_CONFIG = tape_pwm_config_rambit) else
+	not(sio_txd) and not(sio_mot) when (TAPE_PWM_CONFIG = tape_pwm_config_blizzard) else
 	not(sio_mot);
 
 sio_rxd <= SIO_IN when (SIO_MODE = '1') else 
 	tape_fsk_out when (fsk_act = '1') else
-	tape_pwm_out when (pwm_act = '1') and ((TAPE_PWM_CONFIG = "000") or (TAPE_PWM_CONFIG = "011")) else
+	tape_pwm_out when (pwm_act = '1') and ((TAPE_PWM_CONFIG = tape_pwm_config_none) or (TAPE_PWM_CONFIG = tape_pwm_config_2000) or (TAPE_PWM_CONFIG = tape_pwm_config_blizzard)) else
 	emu_sio_txd;
 
 sio_interrupt <= SIO_IRQ when (SIO_MODE = '1') else
-	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "100") else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = tape_pwm_config_rambit) else
 	'0';
 
 sio_proceed <= SIO_PROC when (SIO_MODE = '1') else
-	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = "101") else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = tape_pwm_config_6000) else
 	'0';
 
 TAPE_ACTIVE <= ((fsk_act and tape_fsk_motor) or (pwm_act and tape_pwm_motor)) and not(tape_hold);
@@ -540,7 +549,7 @@ reset_rnmi_atari <= set_reset_rnmi_in;
 CPU_HALT <= pause_atari;
 
 simple_uart_inst : entity work.sio_handler
-PORT  MAP
+PORT MAP
 (
 	CLK => CLK,
 	ADDR => UART_ADDR,
@@ -560,7 +569,8 @@ PORT  MAP
 );
 
 tape_bridge_inst : entity work.tape_handler
-PORT  MAP
+GENERIC MAP (wave_sound => 1)
+PORT MAP
 (
 	clk => CLK,
 	reset_n => RESET_N and sdram_reset_n,
