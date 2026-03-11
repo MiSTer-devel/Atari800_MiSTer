@@ -397,6 +397,8 @@ wire file_download = ioctl_download && (ioctl_index != 99);
 
 always @(posedge clk_sys) begin
 	reg started = 0;
+	reg upload_prev = 0;
+
 	if(sdram_ready && sdram_erased) begin
 		if(!started) begin
 			started <= 1;
@@ -409,7 +411,7 @@ always @(posedge clk_sys) begin
 				ioctl_wait <= 0;
 				dma_req <= 0;
 			end
-			if((ioctl_wr & ioctl_download) | (ioctl_rd & ioctl_upload)) begin
+			if((ioctl_wr & ioctl_download) | ((ioctl_rd | ~upload_prev) & ioctl_upload)) begin
 				ioctl_wait <= 1;
 				dma_req <= 1;
 			end
@@ -417,6 +419,7 @@ always @(posedge clk_sys) begin
 		else
 			ioctl_wait <= 0;
 	end
+	upload_prev <= ioctl_upload;
 end
 
 reg [16:0] sdram_erase_addr = 0;
