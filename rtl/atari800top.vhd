@@ -484,8 +484,8 @@ tape_pwm_motor <=
 	not(sio_mot);
 
 sio_rxd <= SIO_IN when (SIO_MODE = '1') else 
-	tape_fsk_out when (fsk_act = '1') else
-	tape_pwm_out when (pwm_act = '1') and ((TAPE_PWM_CONFIG = tape_pwm_config_none) or (TAPE_PWM_CONFIG = tape_pwm_config_2000) or (TAPE_PWM_CONFIG = tape_pwm_config_blizzard)) else
+	tape_fsk_out when ((fsk_act and tape_fsk_motor) = '1') else
+	tape_pwm_out when ((pwm_act and tape_pwm_motor) = '1') and ((TAPE_PWM_CONFIG = tape_pwm_config_none) or (TAPE_PWM_CONFIG = tape_pwm_config_2000) or (TAPE_PWM_CONFIG = tape_pwm_config_blizzard)) else
 	emu_sio_txd;
 
 sio_interrupt <= SIO_IRQ when (SIO_MODE = '1') else
