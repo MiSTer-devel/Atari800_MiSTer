@@ -67,6 +67,8 @@ PORT
 	SET_FREEZER_IN : in std_logic;
 	SET_RESET_RNMI_IN : in std_logic;
 	SET_OPTION_FORCE_IN : in std_logic;
+	SET_START_FORCE_IN : in std_logic;
+	SET_SPACE_FORCE_IN : in std_logic;
 	CART1_SELECT_IN : in std_logic_vector(7 downto 0);
 	CART2_SELECT_IN : in std_logic_vector(7 downto 0);
 	HOT_KEYS : out std_logic_vector(2 downto 0);
@@ -76,6 +78,16 @@ PORT
 	UART_WR : in std_logic;
 	UART_DATA_WRITE : in std_logic_vector(7 downto 0);
 	UART_DATA_READ : out std_logic_vector(15 downto 0);
+
+	TAPE_DATA : in std_logic_vector(31 downto 0);
+	TAPE_DATA_WR : in std_logic;
+	TAPE_FIFO_FULL : out std_logic;
+	TAPE_FIFO_EMPTY : out std_logic;
+	TAPE_PWM_CONFIG : in std_logic_vector(2 downto 0);
+	TAPE_PWM_INVERT : in std_logic; -- from status config
+	TAPE_RESET : in std_logic;
+	TAPE_ACTIVE : out std_logic;
+	TAPE_SOUND_EN : in std_logic;
 
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
@@ -184,6 +196,11 @@ signal sio_rxd : std_logic;
 signal sio_txd : std_logic;
 signal sio_command : std_logic;
 signal sio_clk : std_logic;
+signal sio_mot : std_logic;
+signal sio_proceed : std_logic;
+signal sio_interrupt : std_logic;
+signal porta_out : std_logic_vector(7 downto 0);
+signal tape_audio : std_logic_vector(7 downto 0);
 
 signal OLD_OUT : STD_LOGIC_VECTOR(7 DOWNTO 0);
 signal old_command : std_logic;
@@ -208,8 +225,27 @@ signal paddle_4 : std_logic_vector(2 downto 0);
 
 signal areset_n   : std_logic;
 signal option_tmp : std_logic;
+signal start_tmp : std_logic;
+signal space_tmp : std_logic;
 signal warm_reset_request : std_logic;
 signal cold_reset_request : std_logic;
+signal tape_hold : std_logic;
+
+signal tape_fsk_out : std_logic;
+signal tape_pwm_out : std_logic;
+signal tape_fsk_motor : std_logic;
+signal tape_pwm_motor : std_logic;
+signal fsk_act : std_logic;
+signal pwm_act : std_logic;
+
+constant tape_pwm_config_none : std_logic_vector(2 downto 0) := "000";
+constant tape_pwm_config_2000 : std_logic_vector(2 downto 0) := "001";
+constant tape_pwm_config_turbod : std_logic_vector(2 downto 0) := "010";
+constant tape_pwm_config_kso : std_logic_vector(2 downto 0) := "011";
+constant tape_pwm_config_kso2 : std_logic_vector(2 downto 0) := "100";
+constant tape_pwm_config_blizzard : std_logic_vector(2 downto 0) := "101";
+constant tape_pwm_config_rambit : std_logic_vector(2 downto 0) := "110";
+constant tape_pwm_config_6000 : std_logic_vector(2 downto 0) := "111";
 
 BEGIN
 
@@ -229,8 +265,11 @@ begin
 			paddle_4 <= "000";
 			cnt := 0;
 			option_tmp <= '0';
+			start_tmp <= '0';
+			space_tmp <= '0';
 			warm_reset_request <= '0';
 			cold_reset_request <= '0';
+			tape_hold <= '1';
 		else
 			if JOY1(6 downto 4) /= "000" then paddle_1(0) <= '0';   end if;
 			if JOY1(5) = '1'             then paddle_1(1) <= '1';   end if;
@@ -255,8 +294,13 @@ begin
 			if cnt < 50000000 then
 				cnt := cnt + 1;
 				option_tmp <= option_tmp or SET_OPTION_FORCE_IN or JOY(5);
+				start_tmp <= start_tmp or SET_START_FORCE_IN;
+				space_tmp <= space_tmp or SET_SPACE_FORCE_IN;
 			else
+				tape_hold <= '0';
 				option_tmp <= '0';
+				start_tmp <= '0';
+				space_tmp <= '0';
 			end if;
 			warm_reset_request <= not(reset_rnmi_atari) and (warm_reset_request or warm_reset_menu);
 			cold_reset_request <= cold_reset_request or cold_reset_menu;
@@ -270,7 +314,10 @@ JOY1_n <= '1'&not(JOY1(8)&JOY1(7))&"11" when paddle_1(0) = '1' else not(JOY1(4)&
 JOY1_X <= JOY1X when paddle_1(0) = '1' else X"80" when (paddle_1(1) = '0' or JOY1(5) = '1') else X"70";
 JOY1_Y <= JOY1Y when paddle_1(0) = '1' else X"80" when (paddle_1(2) = '0' or JOY1(6) = '1') else X"70";
 
-JOY2_n <= '1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
+JOY2_n <=
+	"1111"&tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = tape_pwm_config_turbod) else
+	'1'&tape_pwm_out&"111" when (pwm_act = '1') and ((TAPE_PWM_CONFIG = tape_pwm_config_kso) or (TAPE_PWM_CONFIG = tape_pwm_config_kso2)) else
+	'1'&not(JOY2(8)&JOY2(7))&"11" when paddle_2(0) = '1' else not(JOY2(4)&JOY2(0)&JOY2(1)&JOY2(2)&JOY2(3)); --FRLDU
 JOY2_X <= JOY2X when paddle_2(0) = '1' else X"80" when (paddle_2(1) = '0' or JOY2(5) = '1') else X"70";
 JOY2_Y <= JOY2Y when paddle_2(0) = '1' else X"80" when (paddle_2(2) = '0' or JOY2(6) = '1') else X"70";
 
@@ -292,6 +339,7 @@ PORT MAP
 
 	INPUT => x"000"&"000"&ps2_key(9)&"000"&ps2_key(8)&x"0"&ps2_key(7 downto 0),
 	INPUT2 => JOY(13 downto 9),
+	SPACE_FORCE => space_tmp,
 
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
@@ -362,14 +410,16 @@ PORT MAP
 	SIO_TXD => sio_txd,
 	SIO_CLOCK => sio_clk,
 	SIO_CLOCK_IN => SIO_CLKIN,
-	SIO_PROC => SIO_PROC,
-	SIO_IRQ  => SIO_IRQ,
-	SIO_MOTOR => SIO_MOTOR,
+	SIO_PROC => sio_proceed,
+	SIO_IRQ  => sio_interrupt,
+	SIO_MOTOR => sio_mot,
+	TAPE_AUDIO => tape_audio,
 	ENABLE_179_EARLY => emu_pokey_enable,
+	PORTA_OUT_EXP => porta_out,
 
 	CONSOL_OPTION => CONSOL_OPTION or option_tmp,
 	CONSOL_SELECT => CONSOL_SELECT,
-	CONSOL_START => CONSOL_START,
+	CONSOL_START => CONSOL_START or start_tmp,
 
 	SDRAM_REQUEST => SDRAM_REQUEST,
 	SDRAM_REQUEST_COMPLETE => SDRAM_REQUEST_COMPLETE,
@@ -419,12 +469,34 @@ PORT MAP
 SIO_CLKOUT <= sio_clk;
 SIO_OUT    <= sio_txd;
 SIO_CMD    <= sio_command;
+SIO_MOTOR  <= sio_mot;
 
 emu_sio_rxd     <= sio_txd     when SIO_MODE = '0' else '1';
 emu_sio_command <= sio_command when SIO_MODE = '0' else '1';
 emu_sio_clk     <= sio_clk     when SIO_MODE = '0' else '1';
+tape_fsk_motor  <= not(sio_mot) when SIO_MODE = '0' else '0';
 
-sio_rxd <= emu_sio_txd when SIO_MODE = '0' else SIO_IN;
+tape_pwm_motor <= 
+	not(porta_out(5)) when (TAPE_PWM_CONFIG = tape_pwm_config_kso) else
+	'0' when SIO_MODE = '1' else
+	not(sio_command) and not(sio_mot) when (TAPE_PWM_CONFIG = tape_pwm_config_2000) or (TAPE_PWM_CONFIG = tape_pwm_config_rambit) else
+	not(sio_txd) and not(sio_mot) when (TAPE_PWM_CONFIG = tape_pwm_config_blizzard) else
+	not(sio_mot);
+
+sio_rxd <= SIO_IN when (SIO_MODE = '1') else 
+	tape_fsk_out when ((fsk_act and tape_fsk_motor) = '1') else
+	tape_pwm_out when ((pwm_act and tape_pwm_motor) = '1') and ((TAPE_PWM_CONFIG = tape_pwm_config_none) or (TAPE_PWM_CONFIG = tape_pwm_config_2000) or (TAPE_PWM_CONFIG = tape_pwm_config_blizzard)) else
+	emu_sio_txd;
+
+sio_interrupt <= SIO_IRQ when (SIO_MODE = '1') else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = tape_pwm_config_rambit) else
+	'0';
+
+sio_proceed <= SIO_PROC when (SIO_MODE = '1') else
+	tape_pwm_out when (pwm_act = '1') and (TAPE_PWM_CONFIG = tape_pwm_config_6000) else
+	'0';
+
+TAPE_ACTIVE <= ((fsk_act and tape_fsk_motor) or (pwm_act and tape_pwm_motor)) and not(tape_hold);
 
 HPS_DMA_DATA_IN <= dma_memory_data(7 downto 0);
 
@@ -477,7 +549,7 @@ reset_rnmi_atari <= set_reset_rnmi_in;
 CPU_HALT <= pause_atari;
 
 simple_uart_inst : entity work.sio_handler
-PORT  MAP
+PORT MAP
 (
 	CLK => CLK,
 	ADDR => UART_ADDR,
@@ -494,6 +566,28 @@ PORT  MAP
 	SIO_COMMAND => emu_sio_command,
 	SIO_DATA_OUT => emu_sio_rxd,
 	SIO_CLK_OUT => emu_sio_clk
+);
+
+tape_bridge_inst : entity work.tape_handler
+GENERIC MAP (wave_sound => 1)
+PORT MAP
+(
+	clk => CLK,
+	reset_n => RESET_N and sdram_reset_n,
+	fifo_reset => TAPE_RESET,
+	data_in => TAPE_DATA,
+	wr_en => TAPE_DATA_WR,
+	fifo_empty => TAPE_FIFO_EMPTY,
+	fifo_full => TAPE_FIFO_FULL,
+	fsk_active => fsk_act,
+	pwm_active => pwm_act,
+	fsk_out => tape_fsk_out,
+	pwm_out => tape_pwm_out,
+	pwm_invert => TAPE_PWM_INVERT,
+	fsk_motor => tape_fsk_motor,
+	pwm_motor => tape_pwm_motor,
+	tape_sound_en => TAPE_SOUND_EN,
+	audio_out => tape_audio
 );
 
 END vhdl;

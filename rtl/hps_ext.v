@@ -29,6 +29,8 @@ module hps_ext
 	output reg        set_pause,
 	output reg        set_reset_rnmi,
 	output reg        set_option_force,
+	output reg        set_start_force,
+	output reg        set_space_force,
 	output reg        set_drive_led,
 	output reg        set_xex_loader_mode,
 	output reg  [7:0] cart1_select,
@@ -41,7 +43,12 @@ module hps_ext
 	output reg        uart_enable,
 	output reg        uart_wr,
 	output reg  [7:0] uart_data_write,
-	input      [15:0] uart_data_read
+	input      [15:0] uart_data_read,
+	
+	// Tape / CAS bridge
+	output reg [31:0] tape_data,
+	output reg        tape_data_wr,
+	output reg        tape_reset
 );
 
 assign EXT_BUS[15:0] = io_dout;
@@ -51,7 +58,7 @@ wire io_strobe = EXT_BUS[33];
 wire io_enable = EXT_BUS[34];
 
 localparam EXT_CMD_MIN     = A800_SIO_TX_STATUS;
-localparam EXT_CMD_MAX     = A800_SET_REGISTER;
+localparam EXT_CMD_MAX     = A800_TAPE_ENQUEUE;
 
 localparam A800_SIO_TX_STATUS = 3;
 localparam A800_SIO_RX = 4;
@@ -61,6 +68,7 @@ localparam A800_SIO_ERROR = 7;
 
 localparam A800_GET_REGISTER = 8;
 localparam A800_SET_REGISTER = 9;
+localparam A800_TAPE_ENQUEUE = 10;
 
 // Writing
 localparam REG_CART1_SELECT = 1;
@@ -77,6 +85,11 @@ localparam REG_XEX_LOADER_MODE = 9;
 localparam REG_SIO_TX = 10;
 localparam REG_SIO_SETDIV = 11;
 
+// Tape part
+localparam TAPE_RESET = 12;
+localparam REG_START_FORCE = 13;
+localparam REG_SPACE_FORCE = 14;
+
 // General reading for side effect free registers
 localparam REG_ATARI_STATUS1 = 1;
 localparam REG_ATARI_STATUS2 = 2;
@@ -90,6 +103,7 @@ always@(posedge clk_sys) begin
 
 	uart_enable <= 0;
 	uart_wr <= 0;
+	tape_data_wr <= 0;
 
 	if(~io_enable) begin
 		dout_en <= 0;
@@ -137,12 +151,25 @@ always@(posedge clk_sys) begin
 								else
 									uart_addr <= 5'h0;
 							end
+						TAPE_RESET: tape_reset <= |io_din[7:0];
+						REG_START_FORCE: set_start_force <= |io_din[7:0];
+						REG_SPACE_FORCE: set_space_force <= |io_din[7:0];
 					endcase
 
 				A800_GET_REGISTER:
 					case(io_din[15:8])
 						REG_ATARI_STATUS1: io_dout <= atari_status1;
 						REG_ATARI_STATUS2: io_dout <= atari_status2;
+					endcase
+
+				A800_TAPE_ENQUEUE:
+					case(byte_cnt)
+						1: tape_data[15:0] <= io_din[15:0];
+						2:
+							begin
+								tape_data[31:16] <= io_din[15:0];
+								tape_data_wr <= 1;
+							end
 					endcase
 
 				A800_SIO_TX_STATUS, A800_SIO_RX, A800_SIO_RX_STATUS, A800_SIO_GETDIV, A800_SIO_ERROR:

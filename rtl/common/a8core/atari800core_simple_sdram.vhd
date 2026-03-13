@@ -102,7 +102,11 @@ ENTITY atari800core_simple_sdram is
 		SIO_PROC : in std_logic := '1';
 		SIO_IRQ  : in std_logic := '1';
 		SIO_MOTOR : out std_logic;
+		TAPE_AUDIO : in std_logic_vector(7 downto 0);
 		ENABLE_179_EARLY : out std_logic;
+
+		-- Port A out for Tape Turbo systems
+		PORTA_OUT_EXP : OUT STD_LOGIC_VECTOR(7 downto 0);
 
 		-- GTIA consol
 		CONSOL_OPTION : IN STD_LOGIC;
@@ -227,6 +231,8 @@ CA2_IN <= CA2_OUT when CA2_DIR_OUT='1' else '1';
 CB2_IN <= CB2_OUT when CB2_DIR_OUT='1' else '1';
 SIO_COMMAND <= CB2_OUT;
 SIO_MOTOR <= CA2_OUT;
+
+PORTA_OUT_EXP <= not(PORTA_DIR_OUT) or PORTA_OUT;
 
 PORTA_IN <= (not(PORTA_DIR_OUT) or PORTA_OUT) and (JOY2_n(3)&JOY2_n(2)&JOY2_n(1)&JOY2_n(0)&JOY1_n(3)&JOY1_n(2)&JOY1_n(1)&JOY1_n(0));
 PORTB_IN <= PORTB_OUT when atari800mode = '0' else (not(PORTB_DIR_OUT) or PORTB_OUT) and (JOY4_n(3)&JOY4_n(2)&JOY4_n(1)&JOY4_n(0)&JOY3_n(3)&JOY3_n(2)&JOY3_n(1)&JOY3_n(0));
@@ -436,7 +442,7 @@ PORT MAP
 	STEREO => STEREO,
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
-	SIO_AUDIO => "00000000",
+	SIO_AUDIO => TAPE_AUDIO,
 
 	CA1_IN => CA1_IN,
 	CB1_IN => CB1_IN,
