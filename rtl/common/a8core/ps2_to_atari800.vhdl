@@ -29,7 +29,8 @@ PORT
 	PS2_DAT : IN STD_LOGIC := '1';
 	INPUT  : IN STD_LOGIC_VECTOR(31 downto 0) := (others=>'0');
 	INPUT2 : IN STD_LOGIC_VECTOR(4 downto 0) := (others=>'0');
-	
+	SPACE_FORCE : IN STD_LOGIC := '0';
+
 	KEYBOARD_SCAN : IN STD_LOGIC_VECTOR(5 downto 0);
 	KEYBOARD_RESPONSE : OUT STD_LOGIC_VECTOR(1 downto 0);
 
@@ -143,7 +144,7 @@ end generate;
 	end process;
 
 	-- map to atari key code
-	process(ps2_keys_reg, input2)
+	process(ps2_keys_reg, input2, SPACE_FORCE)
 	begin
 		atari_keyboard <= (others=>'0');
 
@@ -200,7 +201,7 @@ end generate;
 		atari_keyboard(60)<=ps2_keys_reg(16#58#);
 		atari_keyboard(44)<=ps2_keys_reg(16#0D#);
 		atari_keyboard(12)<=ps2_keys_reg(16#5A#);
-		atari_keyboard(33)<=ps2_keys_reg(16#29#);
+		atari_keyboard(33)<=ps2_keys_reg(16#29#) or SPACE_FORCE;
 		atari_keyboard(54)<=ps2_keys_reg(16#4E#);
 		atari_keyboard(55)<=ps2_keys_reg(16#55#);
 		atari_keyboard(15)<=ps2_keys_reg(16#5B#) or ps2_keys_reg(16#172#); -- ] -> DN

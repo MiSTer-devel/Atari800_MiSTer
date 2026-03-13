@@ -181,7 +181,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
 
-assign LED_USER  = file_download | drive_led;
+assign LED_USER  = file_download | tape_active | drive_led;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -225,7 +225,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-//                                                                  
+// XXXXX                                                            
 
 
 `include "build_id.v" 
@@ -235,6 +235,7 @@ localparam CONF_STR = {
 	"S6,ATRXEXXDFATX,Boot D1;",
 	"S5,XEXCOMEXE,Load XEX;",
 	"F8,CARROMBIN,Load Cart;",
+	"S8,CAS,Boot Tape;",
 	"-;",
 	"S0,ATRXEXXFDATX,Mount D1;",
 	"S1,ATRXEXXFDATX,Mount D2;",
@@ -242,9 +243,10 @@ localparam CONF_STR = {
 	"S3,ATRXEXXFDATX,Mount D4;",
 	"S4,IMG,Mount HDD;",
 	"-;",
+	"S7,CAS,Load Tape;",
 	"F9,CARROMBIN,Second Cart;",
 	"-;",
-	"P1,Drives & Loader;",
+	"P1,Drives Loader & Tape;",
 	"P1-;",
 	"P1O[16],SIO Connected to,Emu,USER I/O;",
 	"P1-;",
@@ -255,6 +257,9 @@ localparam CONF_STR = {
 	"P1-;",
 	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1O[38],ATX drive timing,1050,810;",
+	"P1-;",
+	"P1O[66:64],Tape turbo system,Standard,SIO/Cmd,Turbo-D,K.S.O.,K.S.O. 2,Blizzard,Rambit,T6000;",
+	"P1O[67],Invert turbo PWM,Disabled,Enabled;",
 	"P1-;",
 	"P1O[57],Mount read-only,Disabled,Enabled;",
 	"P2,Hardware & OS;",
@@ -296,6 +301,7 @@ localparam CONF_STR = {
 	"P4-;",
 	"P4O[20],Dual Pokey,Disabled,Enabled;",
 	"P4O[4:3],Stereo mix,None,25%,50%,100%;",
+	"P4O[68],Tape sounds,Enabled,Disabled;",
 	"P5,Input;",
 	"P5-;",
 	"P5O[21],Swap Joysticks 1&2,No,Yes;",
@@ -363,6 +369,8 @@ wire        set_pause;
 wire        set_freezer;
 wire        set_reset_rnmi;
 wire        set_option_force;
+wire        set_start_force;
+wire        set_space_force;
 
 wire  [7:0] hps_dma_data_in;
 wire        sdram_ready;
@@ -375,12 +383,22 @@ wire        uart_wr;
 wire  [7:0] uart_data_write;
 wire [15:0] uart_data_read;
 
+wire [31:0] tape_data;
+wire        tape_data_wr;
+wire        tape_reset;
+wire        tape_active;
+wire        tape_fifo_full;
+wire        tape_fifo_empty;
+wire        tape_slow = (status[66:64] == 3'b100) ? 1'b1 : 1'b0;
+
 wire [64:0] rtc;
 
 wire file_download = ioctl_download && (ioctl_index != 99);
 
 always @(posedge clk_sys) begin
 	reg started = 0;
+	reg upload_prev = 0;
+
 	if(sdram_ready && sdram_erased) begin
 		if(!started) begin
 			started <= 1;
@@ -393,7 +411,7 @@ always @(posedge clk_sys) begin
 				ioctl_wait <= 0;
 				dma_req <= 0;
 			end
-			if((ioctl_wr & ioctl_download) | (ioctl_rd & ioctl_upload)) begin
+			if((ioctl_wr & ioctl_download) | ((ioctl_rd | ~upload_prev) & ioctl_upload)) begin
 				ioctl_wait <= 1;
 				dma_req <= 1;
 			end
@@ -401,6 +419,7 @@ always @(posedge clk_sys) begin
 		else
 			ioctl_wait <= 0;
 	end
+	upload_prev <= ioctl_upload;
 end
 
 reg [16:0] sdram_erase_addr = 0;
@@ -478,6 +497,8 @@ hps_ext hps_ext
 	.set_freezer(set_freezer),
 	.set_reset_rnmi(set_reset_rnmi),
 	.set_option_force(set_option_force),
+	.set_start_force(set_start_force),
+	.set_space_force(set_space_force),
 	.set_drive_led(drive_led),
 	.set_xex_loader_mode(xex_loader_mode),
 	.cart1_select(cart1_select),
@@ -489,7 +510,10 @@ hps_ext hps_ext
 	.uart_enable(uart_enable),
 	.uart_wr(uart_wr),
 	.uart_data_write(uart_data_write),
-	.uart_data_read(uart_data_read)
+	.uart_data_read(uart_data_read),
+	.tape_data(tape_data),
+	.tape_data_wr(tape_data_wr),
+	.tape_reset(tape_reset)
 );
 
 wire [7:0] R,G,B, Ro,Go,Bo;
@@ -542,6 +566,8 @@ atari800top atari800top
 	.SET_FREEZER_IN(set_freezer),
 	.SET_RESET_RNMI_IN(set_reset_rnmi),
 	.SET_OPTION_FORCE_IN(set_option_force),
+	.SET_START_FORCE_IN(set_start_force),
+	.SET_SPACE_FORCE_IN(set_space_force),
 	.CART1_SELECT_IN(cart1_select),
 	.CART2_SELECT_IN(cart2_select),
 	.HOT_KEYS(atari_hotkeys),
@@ -551,6 +577,16 @@ atari800top atari800top
 	.UART_WR(uart_wr),
 	.UART_DATA_WRITE(uart_data_write),
 	.UART_DATA_READ(uart_data_read),
+
+	.TAPE_DATA(tape_data),
+	.TAPE_DATA_WR(tape_data_wr),
+	.TAPE_FIFO_FULL(tape_fifo_full),
+	.TAPE_FIFO_EMPTY(tape_fifo_empty),
+	.TAPE_PWM_CONFIG(status[66:64]),
+	.TAPE_PWM_INVERT(status[67]),
+	.TAPE_SOUND_EN(~status[68]),
+	.TAPE_RESET(tape_reset),
+	.TAPE_ACTIVE(tape_active),
 
 	// TODO make a nice wire for this contraption?
 	.HPS_DMA_ADDR(sdram_erased ? (ioctl_index == 99 ? ioctl_addr[25:0] : (cart_rom_index ? cart_upload_addr : rom_upload_addr)) : {10'h270, sdram_erase_addr[15:0]}),
@@ -749,7 +785,7 @@ wire [15:0] atari_status1;
 wire [15:0] atari_status2;
 wire [2:0] atari_hotkeys;
 assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], 1'b0, ~status[41], mode800, atari_hotkeys};
-assign atari_status2 = {4'b0000, splashpbi, bootpbi, drivesmodepbi};
+assign atari_status2 = {tape_fifo_full, tape_fifo_empty, tape_active, tape_slow, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= status[2];

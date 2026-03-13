@@ -49,6 +49,8 @@ set_global_assignment -name VHDL_FILE rtl/common/components/simple_low_pass_filt
 set_global_assignment -name VHDL_FILE rtl/common/sioemu/sio_handler.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/sioemu/fifo_transmit.vhd
 set_global_assignment -name VHDL_FILE rtl/common/sioemu/fifo_receive.vhd
+set_global_assignment -name VHDL_FILE rtl/common/sioemu/tape_handler.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/sioemu/fifo_tape.vhd
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
 set_global_assignment -name VERILOG_FILE rtl/hps_ext.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/articolor.sv
