@@ -170,6 +170,11 @@ ENTITY atari800core_simple_sdram is
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
 		emulated_cartridge_select: in std_logic_vector(7 downto 0);
 		emulated_cartridge2_select: in std_logic_vector(7 downto 0);
+		EMU_FLASH_OPERATION : out std_logic_vector(1 downto 0);
+		EMU_FLASH_REQUEST : out std_logic;
+		EMU_FLASH_ADDRESS : out std_logic_vector(21 downto 0);
+		EMU_FLASH_DATA : out std_logic_vector(7 downto 0);
+		EMU_FLASH_REPLY : in std_logic;
 		freezer_enable: in std_logic := '0';
 		freezer_activate: in std_logic := '0'
 	);
@@ -531,6 +536,11 @@ PORT MAP
 	RAM_SELECT => RAM_SELECT,
 	CART_EMULATION_SELECT => emulated_cartridge_select,
 	CART2_EMULATION_SELECT => emulated_cartridge2_select,
+	EMU_FLASH_OPERATION => EMU_FLASH_OPERATION,
+	EMU_FLASH_REQUEST => EMU_FLASH_REQUEST,
+	EMU_FLASH_ADDRESS => EMU_FLASH_ADDRESS,
+	EMU_FLASH_DATA => EMU_FLASH_DATA,
+	EMU_FLASH_REPLY => EMU_FLASH_REPLY,
 	PAL => PAL,
 	CLIP_SIDES => CLIP_SIDES,
 	ATARI800MODE => ATARI800MODE,

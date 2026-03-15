@@ -71,6 +71,11 @@ PORT
 	SET_SPACE_FORCE_IN : in std_logic;
 	CART1_SELECT_IN : in std_logic_vector(7 downto 0);
 	CART2_SELECT_IN : in std_logic_vector(7 downto 0);
+	EMU_FLASH_OPERATION : out std_logic_vector(1 downto 0);
+	EMU_FLASH_REQUEST : out std_logic;
+	EMU_FLASH_ADDRESS : out std_logic_vector(21 downto 0);
+	EMU_FLASH_DATA : out std_logic_vector(7 downto 0);
+	EMU_FLASH_REPLY : in std_logic;
 	HOT_KEYS : out std_logic_vector(2 downto 0);
 
 	UART_ADDR : in std_logic_vector(4 downto 0);
@@ -462,6 +467,11 @@ PORT MAP
 	THROTTLE_COUNT_6502 => CPU_SPEED,
 	emulated_cartridge_select => CART1_SELECT_IN,
 	emulated_cartridge2_select => CART2_SELECT_IN,
+	EMU_FLASH_OPERATION => EMU_FLASH_OPERATION,
+	EMU_FLASH_REQUEST => EMU_FLASH_REQUEST,
+	EMU_FLASH_ADDRESS => EMU_FLASH_ADDRESS,
+	EMU_FLASH_DATA => EMU_FLASH_DATA,
+	EMU_FLASH_REPLY => EMU_FLASH_REPLY,
 	freezer_enable => SET_FREEZER_IN and TURBOFREEZER_ROM_LOADED,
 	freezer_activate => freezer_activate
 );

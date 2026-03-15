@@ -570,6 +570,11 @@ atari800top atari800top
 	.SET_SPACE_FORCE_IN(set_space_force),
 	.CART1_SELECT_IN(cart1_select),
 	.CART2_SELECT_IN(cart2_select),
+	//.EMU_FLASH_OPERATION(emu_flash_operation),
+	//.EMU_FLASH_REQUEST(emu_flash_request),
+	//.EMU_FLASH_ADDRESS(emu_flash_address),
+	//.EMU_FLASH_DATA(emu_flash_data),
+	.EMU_FLASH_REPLY(0),
 	.HOT_KEYS(atari_hotkeys),
 
 	.UART_ADDR(uart_addr),

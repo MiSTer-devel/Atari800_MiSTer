@@ -97,6 +97,11 @@ PORT
 
 	cart_select : in std_logic_vector(7 downto 0);
 	cart2_select : in std_logic_vector(7 downto 0);
+	emu_flash_operation : out std_logic_vector(1 downto 0);
+	emu_flash_request : out std_logic;
+	emu_flash_address : out std_logic_vector(21 downto 0);
+	emu_flash_data : out std_logic_vector(7 downto 0);
+	emu_flash_reply : in std_logic := '0';
 	
 	ram_select : in std_logic_vector(2 downto 0);
 	
@@ -268,6 +273,10 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart1_cctl_dout_enable: std_logic_vector(2 downto 0);
 	signal emu_cart1_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart1_int_d_out: std_logic_vector(7 downto 0);
+	signal cart1_flash_operation : std_logic_vector(1 downto 0);
+	signal cart1_flash_request : std_logic;
+	signal cart1_flash_address : std_logic_vector(21 downto 0);
+	signal cart1_flash_data : std_logic_vector(7 downto 0);
 
 	signal emu_cart2_s4_n: std_logic;
 	signal emu_cart2_s5_n: std_logic;
@@ -279,6 +288,10 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart2_cctl_dout_enable: std_logic_vector(2 downto 0);
 	signal emu_cart2_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart2_int_d_out: std_logic_vector(7 downto 0);
+	signal cart2_flash_operation : std_logic_vector(1 downto 0);
+	signal cart2_flash_request : std_logic;
+	signal cart2_flash_address : std_logic_vector(21 downto 0);
+	signal cart2_flash_data : std_logic_vector(7 downto 0);
 
 	signal emu_pbi_enable : std_logic;
 	signal emu_pbi_d1xx : std_logic;
@@ -415,7 +428,12 @@ BEGIN
 		int_d_out => emu_cart1_int_d_out,
 		master => '1',
 		passthru => emu_cart_passthru,
-		rtc_mode => emu_cart_rtc_mode
+		rtc_mode => emu_cart_rtc_mode,
+		flash_operation => cart1_flash_operation,
+		flash_request => cart1_flash_request,
+		flash_address => cart1_flash_address,
+		flash_data => cart1_flash_data,
+		flash_reply => emu_flash_reply
 	);
 
 	-- emulated cart #2, slave / stacked
@@ -437,7 +455,12 @@ BEGIN
 		cctl_dout_enable => emu_cart2_cctl_dout_enable,
 		int_d_in => emu_cart2_int_d_in,
 		int_d_out => emu_cart2_int_d_out,
-		master => '0'
+		master => '0',
+		flash_operation => cart2_flash_operation,
+		flash_request => cart2_flash_request,
+		flash_address => cart2_flash_address,
+		flash_data => cart2_flash_data,
+		flash_reply => emu_flash_reply
 	);
 
 	emu_pbi_rom: entity work.PBIROM
@@ -457,7 +480,8 @@ BEGIN
 	);	
 
 	process(emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
-		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
+		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out,
+		cart1_flash_operation,cart1_flash_request,cart1_flash_data,cart1_flash_address,cart2_flash_operation,cart2_flash_request,cart2_flash_data,cart2_flash_address)
 	begin
 		emu_cart1_int_d_in <= (others => '0');
 		emu_cart2_int_d_in <= (others => '0');
@@ -476,6 +500,10 @@ BEGIN
 		    emu_cart_address_enable <= emu_cart1_address_enable;
 		    emu_cart1_int_d_in <= emu_cart_int_d_in;
 		    emu_cart_int_d_out <= emu_cart1_int_d_out;
+		    emu_flash_operation <= cart1_flash_operation;
+		    emu_flash_request <= cart1_flash_request;
+		    emu_flash_address <= cart1_flash_address;
+		    emu_flash_data <= cart1_flash_data;
 		    -- if the second/right cart is mounted line 4 reqests are its responsibility
 		    if (cart2_select(7 downto 0) /= "00000000") then
 			emu_cart_rd4 <= emu_cart2_rd4;
@@ -500,6 +528,10 @@ BEGIN
 			emu_cart_cctl_dout_enable <= emu_cart2_cctl_dout_enable;
 			emu_cart2_int_d_in <= emu_cart_int_d_in;
 			emu_cart_int_d_out <= emu_cart2_int_d_out;
+			emu_flash_operation <= cart2_flash_operation;
+			emu_flash_request <= cart2_flash_request;
+			emu_flash_address <= cart2_flash_address;
+			emu_flash_data <= cart2_flash_data;
 		    else
 			emu_cart1_s4_n <= emu_cart_s4_n;
 			emu_cart1_s5_n <= emu_cart_s5_n;
@@ -511,6 +543,10 @@ BEGIN
 			emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
 			emu_cart1_int_d_in <= emu_cart_int_d_in;
 			emu_cart_int_d_out <= emu_cart1_int_d_out;
+			emu_flash_operation <= cart1_flash_operation;
+			emu_flash_request <= cart1_flash_request;
+			emu_flash_address <= cart1_flash_address;
+			emu_flash_data <= cart1_flash_data;
 		    end if;
 		end if;
 	end process;
