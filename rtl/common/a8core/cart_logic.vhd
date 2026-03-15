@@ -237,7 +237,9 @@ flash_op_reply <= flash_reply;
 cart_type_flash <= (cart_mode = cart_mode_atarimax1);
 flash_id_byte0 <= X"01" when cart_mode = cart_mode_atarimax1 else X"FF";
 flash_id_byte1 <= X"20" when cart_mode = cart_mode_atarimax1 else X"FF";
-flash_id_byte <= flash_id_byte0 when cart_addr(0) = '0' else flash_id_byte1;
+flash_id_byte <= flash_id_byte0 when (cart_addr(1 downto 0) = "00") and (cart_addr(6) = '0') else 
+                 flash_id_byte1 when (cart_addr(1 downto 0) = "01") and (cart_addr(6) = '0') else
+                 X"00";
 
 int_d_out <= flash_id_byte when flash_read_sig else
 	     not(flash_op_data(7))&flash_toggle_bit&"000"&flash_toggle_bit&"00" when flash_write_op else
