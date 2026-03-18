@@ -391,6 +391,9 @@ wire        tape_fifo_full;
 wire        tape_fifo_empty;
 wire        tape_slow = (status[66:64] == 3'b100) ? 1'b1 : 1'b0;
 
+wire        emu_flash_request;
+wire        emu_flash_slave;
+
 wire [64:0] rtc;
 
 wire file_download = ioctl_download && (ioctl_index != 99);
@@ -513,7 +516,10 @@ hps_ext hps_ext
 	.uart_data_read(uart_data_read),
 	.tape_data(tape_data),
 	.tape_data_wr(tape_data_wr),
-	.tape_reset(tape_reset)
+	.tape_reset(tape_reset),
+
+	.emu_flash_request(emu_flash_request),
+	.emu_flash_slave(emu_flash_slave)
 );
 
 wire [7:0] R,G,B, Ro,Go,Bo;
@@ -570,11 +576,8 @@ atari800top atari800top
 	.SET_SPACE_FORCE_IN(set_space_force),
 	.CART1_SELECT_IN(cart1_select),
 	.CART2_SELECT_IN(cart2_select),
-	//.EMU_FLASH_OPERATION(emu_flash_operation),
-	//.EMU_FLASH_REQUEST(emu_flash_request),
-	//.EMU_FLASH_ADDRESS(emu_flash_address),
-	//.EMU_FLASH_DATA(emu_flash_data),
-	.EMU_FLASH_REPLY(0),
+	.EMU_FLASH_REQUEST(emu_flash_request),
+	.EMU_FLASH_SLAVE(emu_flash_slave),
 	.HOT_KEYS(atari_hotkeys),
 
 	.UART_ADDR(uart_addr),

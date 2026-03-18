@@ -46,10 +46,12 @@ entity CartLogic is
 		master : in std_logic;
 		passthru : out std_logic;
 		rtc_mode : out std_logic_vector(1 downto 0);
-		flash_operation : out std_logic_vector(1 downto 0);
 		flash_request : out std_logic;
+		flash_wr : out std_logic;
+		flash_status : out std_logic;
 		flash_address : out std_logic_vector(21 downto 0);
 		flash_data : out std_logic_vector(7 downto 0);
+		flash_data_in : in std_logic_vector(7 downto 0) := (others => '0');
 		flash_reply : in std_logic
 	);
 
@@ -189,20 +191,40 @@ signal cart_addr: std_logic_vector(21 downto 0);
 signal cart_addr_enable : boolean;
 
 signal cart_type_flash : boolean;
-signal flash_read_sig : boolean; -- true when in autoselect mode for reading signature bytes
-signal flash_write_op : boolean; -- true when writing operation in progress
-signal flash_op_type : std_logic_vector(1 downto 0); -- "00" erase block, "01" erase chip, "10" program
-signal flash_op_request : std_logic; -- toggle on new request
-signal flash_op_address : std_logic_vector(21 downto 0);
-signal flash_op_data : std_logic_vector(7 downto 0);
+signal flash_read_sig_reg : boolean; -- true when in autoselect mode for reading signature bytes
+signal flash_read_sig_next : boolean;
+signal flash_write_op_reg : boolean; -- true when writing operation in progress
+signal flash_write_op_next : boolean;
+signal flash_op_type_reg : std_logic_vector(1 downto 0); -- "10" erase block, "11" erase chip, "01" program
+signal flash_op_type_next : std_logic_vector(1 downto 0);
+signal flash_op_request_reg : std_logic; -- toggle on new request
+signal flash_op_request_next : std_logic; -- toggle on new request
+signal flash_op_wr_reg : std_logic; -- toggle on new request
+signal flash_op_wr_next : std_logic; -- toggle on new request
+signal flash_op_address_reg : std_logic_vector(21 downto 0);
+signal flash_op_address_next : std_logic_vector(21 downto 0);
+signal flash_op_data_reg : std_logic_vector(7 downto 0);
+signal flash_op_data_next : std_logic_vector(7 downto 0);
 signal flash_op_reply : std_logic;
-signal flash_op_reply_prev : std_logic;
-signal flash_toggle_bit : std_logic;
+signal flash_toggle_bit_reg : std_logic;
+signal flash_toggle_bit_next : std_logic;
+signal flash_count_reg : integer range 0 to 131071 := 0;
+signal flash_count_next : integer range 0 to 131071 := 0;
+signal flash_mode_state_reg : integer range 0 to 7 := 0;
+signal flash_mode_state_next : integer range 0 to 7 := 0;
+
+constant flash_mode_init : integer := 0;
+constant flash_mode_unlock1 : integer := 1;
+constant flash_mode_unlock2 : integer := 2;
+constant flash_mode_write : integer := 3;
+constant flash_mode_erase : integer := 4;
+constant flash_mode_erase_pre1 : integer := 5;
+constant flash_mode_erase_pre2 : integer := 6;
+constant flash_mode_op_pending : integer := 7;
 
 signal flash_id_byte0 : std_logic_vector(7 downto 0);
 signal flash_id_byte1 : std_logic_vector(7 downto 0);
 signal flash_id_byte : std_logic_vector(7 downto 0);
-
 
 begin
 
@@ -228,11 +250,12 @@ cart_address_enable <= cart_addr_enable;
 --	end if;
 --end process set_passthrough;
 
-flash_operation <= flash_op_type;
-flash_request <= flash_op_request;
-flash_address <= flash_op_address;
-flash_data <= flash_op_data;
+flash_request <= flash_op_request_reg;
+flash_address <= flash_op_address_reg;
+flash_data <= flash_op_data_reg;
 flash_op_reply <= flash_reply;
+flash_status <= '1' when flash_read_sig_reg or flash_write_op_reg else '0';
+flash_wr <= flash_op_wr_reg;
 
 cart_type_flash <= (cart_mode = cart_mode_atarimax1);
 flash_id_byte0 <= X"01" when cart_mode = cart_mode_atarimax1 else X"FF";
@@ -241,8 +264,8 @@ flash_id_byte <= flash_id_byte0 when (cart_addr(1 downto 0) = "00") and (cart_ad
                  flash_id_byte1 when (cart_addr(1 downto 0) = "01") and (cart_addr(6) = '0') else
                  X"00";
 
-int_d_out <= flash_id_byte when flash_read_sig else
-	     not(flash_op_data(7))&flash_toggle_bit&"000"&flash_toggle_bit&"00" when flash_write_op else
+int_d_out <= flash_id_byte when flash_read_sig_reg else
+	     not(flash_op_data_reg(7))&flash_toggle_bit_reg&"000"&flash_toggle_bit_reg&"00" when flash_write_op_reg else
 	     int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5) when cart_mode = cart_mode_atrax_int_128 else
 	     int_d_in(2) & int_d_in(3) & int_d_in(6) & int_d_in(7) & int_d_in(1) & int_d_in(5) & int_d_in(0) & int_d_in(4) when (cart_mode = cart_mode_atrax_sdx_64) or (cart_mode = cart_mode_atrax_sdx_128) else
 	     int_d_in;
@@ -830,86 +853,150 @@ end process access_cart_data;
 --	((cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"AA")) or ((cart_addr(18 downto 0) = "000" & X"2AAA") and (d_in = X"55"))
 --	else cart_flash_write;
 
-set_write_mode: process(clk)
-	variable flash_mode_state : integer range 0 to 8 := 0;
-	constant flash_mode_init : integer := 0;
-	constant flash_mode_unlock1 : integer := 1;
-	constant flash_mode_unlock2 : integer := 2;
-	constant flash_mode_write : integer := 3;
-	constant flash_mode_erase : integer := 4;
-	constant flash_mode_erase_pre1 : integer := 5;
-	constant flash_mode_erase_pre2 : integer := 6;
-	constant flash_mode_op_pending : integer := 7;
-	constant flash_mode_autoselect : integer := 8;
-	variable flash_chip_select : std_logic_vector(2 downto 0);
+flash_regs: process(clk, reset_n)
 begin
 	if rising_edge(clk) then
 		if reset_n = '0' then
-			flash_mode_state := flash_mode_init;
-			flash_read_sig <= false;
-			flash_write_op <= false;
-			flash_op_request <= '0';
-			flash_toggle_bit <= '0';
-		elsif (clk_enable = '1') then
-			flash_op_reply_prev <= flash_op_reply;
-			if cart_type_flash and cart_addr_enable then
-				if (flash_mode_state = flash_mode_op_pending) then
-					if (flash_op_reply /= flash_op_reply_prev) then
-						flash_mode_state := flash_mode_init;
-						flash_write_op <= false;
-						flash_toggle_bit <= '0';
-					elsif (rw = '1') then
-						flash_toggle_bit <= not(flash_toggle_bit);
-					end if;
-				end if;
-				if (rw = '0') then
-					if (flash_mode_state = flash_mode_autoselect) then
-						flash_mode_state := flash_mode_init;
-						flash_read_sig <= false;
-					end if;
-					if (flash_mode_state = flash_mode_init) and (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"AA") then
-						flash_mode_state := flash_mode_unlock1;
-						flash_chip_select := cart_addr(21 downto 19);
-					elsif (flash_mode_state = flash_mode_unlock1) and (flash_chip_select = cart_addr(21 downto 19)) and (cart_addr(18 downto 0) = "000" & X"2AAA") and (d_in = X"55") then
-						flash_mode_state := flash_mode_unlock2;
-					elsif (flash_mode_state = flash_mode_unlock2) and (flash_chip_select = cart_addr(21 downto 19)) and (cart_addr(18 downto 0) = "000" & X"5555") then
-						if (d_in = X"90") then
-							flash_mode_state := flash_mode_autoselect;
-							flash_read_sig <= true;
-						elsif (d_in = X"A0") then
-							flash_mode_state := flash_mode_write;
-						elsif (d_in = X"80") then
-							flash_mode_state := flash_mode_erase_pre1;
-						end if;
-					elsif (flash_mode_state = flash_mode_write) and (flash_chip_select = cart_addr(21 downto 19)) then
-						flash_mode_state := flash_mode_op_pending;
-						flash_write_op <= true;
-						flash_op_type <= "10";
-						flash_op_request <= not(flash_op_request);
-						flash_op_address <= cart_addr;
-						flash_op_data <= d_in;
-					elsif (flash_mode_state = flash_mode_erase_pre1) and (flash_chip_select = cart_addr(21 downto 19)) and (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"AA") then
-						flash_mode_state := flash_mode_erase_pre2;
-					elsif (flash_mode_state = flash_mode_erase_pre2) and (flash_chip_select = cart_addr(21 downto 19)) and (cart_addr(18 downto 0) = "000" & X"2AAA") and (d_in = X"55") then
-						flash_mode_state := flash_mode_erase;
-					elsif (flash_mode_state = flash_mode_erase) and (flash_chip_select = cart_addr(21 downto 19)) and (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"10") then
-						flash_mode_state := flash_mode_op_pending;
-						flash_write_op <= true;
-						flash_op_type <= "01";
-						flash_op_request <= not(flash_op_request);
-						flash_op_address <= cart_addr;
-						flash_op_data <= X"FF";
-					elsif (flash_mode_state = flash_mode_erase) and (flash_chip_select = cart_addr(21 downto 19)) and (d_in = X"30") then
-						flash_mode_state := flash_mode_op_pending;
-						flash_write_op <= true;
-						flash_op_type <= "00";
-						flash_op_request <= not(flash_op_request);
-						flash_op_address <= cart_addr;
-						flash_op_data <= X"FF";
-					end if;
+			flash_mode_state_reg <= flash_mode_init;
+			flash_read_sig_reg <= false;
+			flash_write_op_reg <= false;
+			flash_toggle_bit_reg <= '0';
+			flash_count_reg <= 0;
+			flash_op_data_reg <= (others => '0');
+			flash_op_address_reg <= (others => '0');
+			flash_op_type_reg <= "00";
+			flash_op_request_reg <= '0';
+			flash_op_wr_reg <= '0';
+	else
+			flash_mode_state_reg <= flash_mode_state_next;
+			flash_read_sig_reg <= flash_read_sig_next;
+			flash_write_op_reg <= flash_write_op_next;
+			flash_toggle_bit_reg <= flash_toggle_bit_next;
+			flash_count_reg <= flash_count_next;
+			flash_op_data_reg <= flash_op_data_next;
+			flash_op_address_reg <= flash_op_address_next;
+			flash_op_type_reg <= flash_op_type_next;
+			flash_op_request_reg <= flash_op_request_next;
+			flash_op_wr_reg <= flash_op_wr_next;
+		end if;
+	end if;
+end process flash_regs;
+
+set_write_mode: process(flash_mode_state_reg)
+begin
+	flash_mode_state_next <= flash_mode_state_reg;
+	flash_read_sig_next <= flash_read_sig_reg;
+	flash_write_op_next <= flash_write_op_reg;
+	flash_toggle_bit_next <= flash_toggle_bit_reg;
+	flash_count_next <= flash_count_reg;
+	flash_op_data_next <= flash_op_data_reg;
+	flash_op_address_next <= flash_op_address_reg;
+	flash_op_type_next <= flash_op_type_reg;
+	flash_op_request_next <= flash_op_request_reg;
+	flash_op_wr_next <= flash_op_wr_reg;
+
+	if flash_write_op_reg then
+		if (clk_enable = '1') and cart_type_flash and cart_addr_enable and (rw = '1') then
+			flash_toggle_bit_next <= not(flash_toggle_bit_reg);
+		end if;
+		-- Because the Flash rom interface is last on the priority list
+		-- in the address decoder we can keep the request signal high,
+		-- if anything gets added to the request queue, the low ping with
+		-- every request is necessary not to starve the requests with lower
+		-- priority.
+		--if (flash_op_request_reg = '0') then flash_op_request_next <= '1'; end if;
+		if (flash_op_reply = '1') then
+			--flash_op_request_next <= '0';
+			if flash_count_reg = 0 then
+				flash_op_request_next <= '0';
+				flash_write_op_next <= false;
+				flash_toggle_bit_next <= '0';
+				-- flash_mode_state_next <= flash_mode_init;
+			else
+				flash_count_next <= flash_count_reg - 1;
+				if flash_op_type_reg = "01" then -- flash_count should be 1!
+					flash_op_wr_next <= '1';
+					flash_op_data_next <= flash_op_data_reg and flash_data_in;
+				else
+					flash_op_address_next <= std_logic_vector(unsigned(flash_op_address_reg) + 1);
 				end if;
 			end if;
 		end if;
+	end if;
+	if (clk_enable = '1') and cart_type_flash and cart_addr_enable and (rw = '0') then
+		case flash_mode_state_reg is
+		when flash_mode_init =>
+			if d_in = X"F0" then
+				flash_read_sig_next <= false;
+			elsif (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"AA") then
+				flash_mode_state_next <= flash_mode_unlock1;
+			end if;
+		when flash_mode_unlock1 =>
+			flash_mode_state_next <= flash_mode_init;
+			if (cart_addr(18 downto 0) = "000" & X"2AAA") and (d_in = X"55") then
+				flash_mode_state_next <= flash_mode_unlock2;
+			end if;
+		when flash_mode_unlock2 =>
+			flash_mode_state_next <= flash_mode_init;
+			if (cart_addr(18 downto 0) = "000" & X"5555") then
+				if (d_in = X"F0") then
+					flash_mode_state_next <= flash_mode_init;
+					flash_read_sig_next <= false;
+				elsif (d_in = X"90") then
+					flash_mode_state_next <= flash_mode_init;
+					flash_read_sig_next <= true;
+				elsif (d_in = X"A0") then
+					flash_mode_state_next <= flash_mode_write;
+				elsif (d_in = X"80") then
+					flash_mode_state_next <= flash_mode_erase_pre1;
+				end if;
+			end if;
+		when flash_mode_erase_pre1 =>
+			flash_mode_state_next <= flash_mode_init;
+			if (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"AA") then
+				flash_mode_state_next <= flash_mode_erase_pre2;
+			end if;
+		when flash_mode_erase_pre2 =>
+			flash_mode_state_next <= flash_mode_init;
+			if (cart_addr(18 downto 0) = "000" & X"2AAA") and (d_in = X"55") then
+				flash_mode_state_next <= flash_mode_erase;
+			end if;
+		when flash_mode_erase =>
+			flash_read_sig_next <= false;
+			flash_mode_state_next <= flash_mode_init;
+			if (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"10") then
+				-- flash_mode_state := flash_mode_op_pending;
+				flash_write_op_next <= true;
+				flash_op_type_next <= "11";
+				flash_op_request_next <= '1';
+				flash_op_wr_next <= '1';
+				flash_op_address_next <= cart_addr(21 downto 19) & "0000000000000000000";
+				flash_count_next <= 131071;
+				flash_op_data_next <= X"FF";
+			elsif (d_in = X"30") then
+				-- flash_mode_state := flash_mode_op_pending;
+				flash_write_op_next <= true;
+				flash_op_type_next <= "10";
+				flash_op_request_next <= '1';
+				flash_op_wr_next <= '1';
+				flash_op_address_next <= cart_addr(21 downto 14) & "00000000000000";
+				flash_count_next <= 16383;
+				flash_op_data_next <= X"FF";
+			end if;
+		when flash_mode_write =>
+			-- flash_mode_state := flash_mode_op_pending;
+			flash_mode_state_next <= flash_mode_init;
+			flash_read_sig_next <= false;
+			flash_write_op_next <= true;
+			flash_op_request_next <= '1';
+			flash_op_wr_next <= '0';
+			flash_op_type_next <= "01";
+			flash_op_address_next <= cart_addr;
+			flash_count_next <= 1;
+			flash_op_data_next <= d_in;
+		when others =>
+			flash_read_sig_next <= false;
+		end case;
 	end if;
 end process set_write_mode;
 
