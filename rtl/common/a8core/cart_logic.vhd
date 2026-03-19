@@ -18,7 +18,6 @@
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
---use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 library work;
@@ -191,6 +190,7 @@ signal cart_addr: std_logic_vector(21 downto 0);
 signal cart_addr_enable : boolean;
 
 signal cart_type_flash : boolean;
+signal flash_unlock_mask : std_logic_vector(15 downto 0);
 signal flash_op_reply : std_logic; -- Flash operation ready
 signal flash_read_sig : boolean; -- true when in autoselect mode for reading signature bytes
 signal flash_write_op : boolean; -- true when writing operation in progress
@@ -200,12 +200,15 @@ signal flash_op_wr : std_logic; -- (pre-)read or write flash
 signal flash_op_address : std_logic_vector(21 downto 0);
 signal flash_op_data : std_logic_vector(7 downto 0);
 signal flash_toggle_bit : std_logic;
-signal flash_count : integer range 0 to 131071 := 0;
+signal flash_count : unsigned(21 downto 0);
 signal flash_mode_state : integer range 0 to 7 := 0;
 
 signal flash_id_byte0 : std_logic_vector(7 downto 0);
 signal flash_id_byte1 : std_logic_vector(7 downto 0);
 signal flash_id_byte : std_logic_vector(7 downto 0);
+
+signal flash_chip_size : unsigned(21 downto 0);
+signal flash_sector_size : unsigned(21 downto 0);
 
 begin
 
@@ -238,16 +241,41 @@ flash_op_reply <= flash_reply;
 flash_status <= '1' when flash_read_sig or flash_write_op else '0';
 flash_wr <= flash_op_wr;
 
-cart_type_flash <= (cart_mode = cart_mode_atarimax1);
+cart_type_flash <= (flash_id_byte0 & flash_id_byte1) /= "0000";
 
-flash_id_byte0 <= X"01" when cart_mode = cart_mode_atarimax1 else X"FF";
-flash_id_byte1 <= X"20" when cart_mode = cart_mode_atarimax1 else X"FF";
-flash_id_byte <= flash_id_byte0 when (cart_addr(1 downto 0) = "00") and (cart_addr(6) = '0') else 
-                 flash_id_byte1 when (cart_addr(1 downto 0) = "01") and (cart_addr(6) = '0') else
-                 X"00";
+flash_id_byte0 <= X"01" when cart_mode = cart_mode_atarimax1 or cart_mode = cart_mode_atarimax8 or cart_mode = cart_mode_mega_4096 else
+		X"BF" when cart_mode = cart_mode_atarimax8n or cart_mode = cart_mode_dcart or cart_mode = cart_mode_jatari_128 or
+			cart_mode = cart_mode_jatari_256 or cart_mode = cart_mode_jatari_512 or cart_mode = cart_mode_jatari_1024 or
+			cart_mode = cart_mode_sic_128 or cart_mode = cart_mode_sic_256 or cart_mode = cart_mode_sic_512 or
+			cart_mode = cart_mode_sic_1024 else
+		X"00";
+
+flash_id_byte1 <= X"20" when cart_mode = cart_mode_atarimax1 else
+		X"A4" when cart_mode = cart_mode_atarimax8 else
+		X"41" when cart_mode = cart_mode_mega_4096 else
+		X"B5" when cart_mode = cart_mode_sic_128 or cart_mode = cart_mode_jatari_128 else
+		X"B6" when cart_mode = cart_mode_sic_256 or cart_mode = cart_mode_jatari_256 else
+		X"B7" when cart_mode = cart_mode_sic_512 or cart_mode = cart_mode_jatari_512 or cart_mode = cart_mode_sic_1024 or
+			cart_mode = cart_mode_jatari_1024 or cart_mode = cart_mode_atarimax8n or cart_mode = cart_mode_dcart else
+		X"00";
+
+flash_id_byte <= flash_id_byte0 when (cart_addr(1 downto 0) = "00") and (cart_addr(6) = '0') else
+		flash_id_byte1 when (cart_addr(1 downto 0) = "01") and (cart_addr(6) = '0') else
+		X"00";
+
+flash_unlock_mask <= X"07FF" when flash_id_byte0 = X"01" and (flash_id_byte1 = X"A4" or flash_id_byte1 = X"41") else X"7FFF";
+
+flash_chip_size <= to_unsigned(131071, 22) when flash_id_byte1 = X"B5" or flash_id_byte1 = X"20" else
+		to_unsigned(262143,22) when flash_id_byte1 = X"B6" else
+		to_unsigned(4194303,22) when flash_id_byte1 = X"41" else
+		to_unsigned(524287,22);
+
+flash_sector_size <= to_unsigned(4095,22) when flash_id_byte0 = X"BF" else
+		to_unsigned(16383,22) when flash_id_byte1 = X"20" else
+		to_unsigned(65535,22);
 
 int_d_out <= flash_id_byte when flash_read_sig else
-	     not(flash_op_data(7))&flash_toggle_bit&"000"&flash_toggle_bit&"00" when flash_write_op else
+	     not(flash_op_data(7))&flash_toggle_bit&"001000" when flash_write_op else
 	     int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5) when cart_mode = cart_mode_atrax_int_128 else
 	     int_d_in(2) & int_d_in(3) & int_d_in(6) & int_d_in(7) & int_d_in(1) & int_d_in(5) & int_d_in(0) & int_d_in(4) when (cart_mode = cart_mode_atrax_sdx_64) or (cart_mode = cart_mode_atrax_sdx_128) else
 	     int_d_in;
@@ -414,7 +442,7 @@ begin
 						cfg_enable <= not d_in(7);
 						if (cart_mode = cart_mode_jrc_int_64) then
 							cfg_bank(15 downto 13) <= not(d_in(4)) & not(d_in(5)) & not(d_in(6));
-						else 
+						else
 							cfg_bank(15 downto 13) <= d_in(6 downto 4);
 						end if;
 					end if;
@@ -847,7 +875,7 @@ begin
 			flash_read_sig <= false;
 			flash_write_op <= false;
 			flash_toggle_bit <= '0';
-			flash_count <= 0;
+			flash_count <= (others => '0');
 			flash_op_data <= (others => '0');
 			flash_op_address <= (others => '0');
 			flash_op_type <= "00";
@@ -866,7 +894,7 @@ begin
 				--if (flash_op_request = '0') then flash_op_request <= '1'; end if;
 				if (flash_op_reply = '1') then
 					--flash_op_request <= '0';
-					if flash_count = 0 then
+					if flash_count = to_unsigned(0, 22) then
 						flash_op_request <= '0';
 						flash_write_op <= false;
 						flash_toggle_bit <= '0';
@@ -887,17 +915,17 @@ begin
 				when flash_mode_init =>
 					if d_in = X"F0" then
 						flash_read_sig <= false;
-					elsif (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"AA") then
+					elsif ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" and (d_in = X"AA") then
 						flash_mode_state <= flash_mode_unlock1;
 					end if;
 				when flash_mode_unlock1 =>
 					flash_mode_state <= flash_mode_init;
-					if (cart_addr(18 downto 0) = "000" & X"2AAA") and (d_in = X"55") then
+					if ((cart_addr(15 downto 0) xor X"2AAA") and flash_unlock_mask) = X"0000" and (d_in = X"55") then
 						flash_mode_state <= flash_mode_unlock2;
 					end if;
 				when flash_mode_unlock2 =>
 					flash_mode_state <= flash_mode_init;
-					if (cart_addr(18 downto 0) = "000" & X"5555") then
+					if ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" then
 						if (d_in = X"F0") then
 							flash_mode_state <= flash_mode_init;
 							flash_read_sig <= false;
@@ -912,32 +940,32 @@ begin
 					end if;
 				when flash_mode_erase_unlock1 =>
 					flash_mode_state <= flash_mode_init;
-					if (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"AA") then
+					if ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" and (d_in = X"AA") then
 						flash_mode_state <= flash_mode_erase_unlock2;
 					end if;
 				when flash_mode_erase_unlock2 =>
 					flash_mode_state <= flash_mode_init;
-					if (cart_addr(18 downto 0) = "000" & X"2AAA") and (d_in = X"55") then
+					if ((cart_addr(15 downto 0) xor X"2AAA") and flash_unlock_mask) = X"0000" and (d_in = X"55") then
 						flash_mode_state <= flash_mode_erase;
 					end if;
 				when flash_mode_erase =>
 					flash_read_sig <= false;
 					flash_mode_state <= flash_mode_init;
-					if (cart_addr(18 downto 0) = "000" & X"5555") and (d_in = X"10") then
+					if ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" and (d_in = X"10") then
 						flash_write_op <= true;
 						flash_op_type <= "11";
 						flash_op_request <= '1';
 						flash_op_wr <= '1';
-						flash_op_address <= cart_addr(21 downto 19) & "0000000000000000000";
-						flash_count <= 131071;
+						flash_op_address <= cart_addr and not(std_logic_vector(flash_chip_size));
+						flash_count <= flash_chip_size;
 						flash_op_data <= X"FF";
 					elsif (d_in = X"30") then
 						flash_write_op <= true;
 						flash_op_type <= "10";
 						flash_op_request <= '1';
 						flash_op_wr <= '1';
-						flash_op_address <= cart_addr(21 downto 14) & "00000000000000";
-						flash_count <= 16383;
+						flash_op_address <= cart_addr and not(std_logic_vector(flash_sector_size));
+						flash_count <= flash_sector_size;
 						flash_op_data <= X"FF";
 					end if;
 				when flash_mode_write =>
@@ -948,7 +976,7 @@ begin
 					flash_op_wr <= '0';
 					flash_op_type <= "01";
 					flash_op_address <= cart_addr;
-					flash_count <= 1;
+					flash_count <= to_unsigned(1, 22);
 					flash_op_data <= d_in;
 				when others =>
 					flash_read_sig <= false;
