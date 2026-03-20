@@ -493,7 +493,7 @@ BEGIN
 
 	process(emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
 		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out,
-		cart1_flash_wr,cart1_flash_request,cart1_flash_data,cart1_flash_address,cart2_flash_wr,cart2_flash_request,cart2_flash_data,cart2_flash_address)
+		cart1_flash_wr,cart1_flash_request,cart1_flash_data,cart1_flash_address,cart1_flash_status,cart2_flash_wr,cart2_flash_request,cart2_flash_data,cart2_flash_address,cart2_flash_status)
 	begin
 		emu_cart1_int_d_in <= (others => '0');
 		emu_cart2_int_d_in <= (others => '0');
@@ -991,7 +991,7 @@ end generate;
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
 
-		cart_select,bank0reg,bank1reg,bank0next,bank1next,
+		cart_select,bank0reg,bank1reg,bank0next,bank1next,cart_flash_status,
 
 		STEREO,
 

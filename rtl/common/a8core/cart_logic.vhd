@@ -241,7 +241,7 @@ flash_op_reply <= flash_reply;
 flash_status <= '1' when flash_read_sig or flash_write_op else '0';
 flash_wr <= flash_op_wr;
 
-cart_type_flash <= (flash_id_byte0 & flash_id_byte1) /= "0000";
+cart_type_flash <= (flash_id_byte0 & flash_id_byte1) /= X"0000";
 
 flash_id_byte0 <= X"01" when cart_mode = cart_mode_atarimax1 or cart_mode = cart_mode_atarimax8 or cart_mode = cart_mode_mega_4096 else
 		X"BF" when cart_mode = cart_mode_atarimax8n or cart_mode = cart_mode_dcart or cart_mode = cart_mode_jatari_128 or
