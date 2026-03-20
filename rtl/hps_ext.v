@@ -53,7 +53,10 @@ module hps_ext
 	// Emulated cart Flash ping to save
 	// TODO also config bit for auto saving to pass on to Main
 	input             emu_flash_request,
-	input             emu_flash_slave
+	input             emu_flash_slave,
+	input             emu_flash_autosave,
+	input             emu_flash_save,
+	input       [1:0] emu_cart_trigger
 );
 
 assign EXT_BUS[15:0] = io_dout;
@@ -110,6 +113,8 @@ always@(posedge clk_sys) begin
 	reg old_flash_request = 0;
 	reg flash_request = 0;
 	reg flash_slave = 0;
+	reg old_flash_save = 0;
+	reg flash_save = 0;
 	
 	if(~old_flash_request & emu_flash_request)
 	begin
@@ -118,6 +123,9 @@ always@(posedge clk_sys) begin
 	end
 	old_flash_request <= emu_flash_request;
 	
+	if(~old_flash_save & emu_flash_save) flash_save <= 1;
+	old_flash_save <= emu_flash_save;
+
 	uart_enable <= 0;
 	uart_wr <= 0;
 	tape_data_wr <= 0;
@@ -178,9 +186,10 @@ always@(posedge clk_sys) begin
 						REG_ATARI_STATUS1: io_dout <= atari_status1;
 						REG_ATARI_STATUS2: io_dout <= atari_status2;
 						REG_ATARI_FLASH: begin
-							io_dout <= {14'b0, flash_slave, flash_request};
+							io_dout <= {10'b0, emu_cart_trigger, flash_save, emu_flash_autosave, flash_slave, flash_request};
 							flash_request <= 0;
 							flash_slave <= 0;
+							flash_save <= 0;
 						end
 					endcase
 

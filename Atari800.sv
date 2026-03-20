@@ -225,7 +225,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXX                                                            
+// XXXXXXXXX                                                        
 
 
 `include "build_id.v" 
@@ -246,9 +246,10 @@ localparam CONF_STR = {
 	"S7,CAS,Load Tape;",
 	"F9,CARROMBIN,Second Cart;",
 	"-;",
-	"P1,Drives Loader & Tape;",
+	"P1,Drives Carts & Tape;",
 	"P1-;",
-	"P1O[16],SIO Connected to,Emu,USER I/O;",
+	"P1O[16],SIO Connected to,Emu,User I/O;",
+	"P1O[57],Mount images R/O,Disabled,Enabled;",
 	"P1-;",
 	"d2P1O[45:44],D1 mode,OS/Stock,PBI,HSIO;",
 	"d2P1O[47:46],D2 mode,OS/Stock,PBI,HSIO;",
@@ -258,10 +259,12 @@ localparam CONF_STR = {
 	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
+	"P1O[70:69],On cart mount,PwrReset,Activate,Nothing;",
+	"P1O[71],Cart auto-save,Disabled,Enabled;",
+	"P1R[72],Save cart(s);",
+	"P1-;",
 	"P1O[66:64],Tape turbo system,Standard,SIO/Cmd,Turbo-D,K.S.O.,K.S.O. 2,Blizzard,Rambit,T6000;",
 	"P1O[67],Invert turbo PWM,Disabled,Enabled;",
-	"P1-;",
-	"P1O[57],Mount read-only,Disabled,Enabled;",
 	"P2,Hardware & OS;",
 	"P2-;",
 	"P2O[9:7],CPU speed,1x,2x,4x,8x,16x;",
@@ -519,7 +522,10 @@ hps_ext hps_ext
 	.tape_reset(tape_reset),
 
 	.emu_flash_request(emu_flash_request),
-	.emu_flash_slave(emu_flash_slave)
+	.emu_flash_slave(emu_flash_slave),
+	.emu_flash_autosave(status[71] & ~status[57]),
+	.emu_flash_save(status[72]),
+	.emu_cart_trigger(status[70:69])
 );
 
 wire [7:0] R,G,B, Ro,Go,Bo;

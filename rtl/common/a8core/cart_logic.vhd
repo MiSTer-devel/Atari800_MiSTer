@@ -194,7 +194,7 @@ signal flash_unlock_mask : std_logic_vector(15 downto 0);
 signal flash_op_reply : std_logic; -- Flash operation ready
 signal flash_read_sig : boolean; -- true when in autoselect mode for reading signature bytes
 signal flash_write_op : boolean; -- true when writing operation in progress
-signal flash_op_type : std_logic_vector(1 downto 0); -- "10" erase block, "11" erase chip, "01" program
+signal flash_op_type : std_logic; -- '0' erase, '1' program
 signal flash_op_request : std_logic; -- set high to write / read flash through adddress decoder
 signal flash_op_wr : std_logic; -- (pre-)read or write flash
 signal flash_op_address : std_logic_vector(21 downto 0);
@@ -878,7 +878,7 @@ begin
 			flash_count <= (others => '0');
 			flash_op_data <= (others => '0');
 			flash_op_address <= (others => '0');
-			flash_op_type <= "00";
+			flash_op_type <= '0';
 			flash_op_request <= '0';
 			flash_op_wr <= '0';
 		else
@@ -901,7 +901,7 @@ begin
 						-- flash_mode_state <= flash_mode_init;
 					else
 						flash_count <= flash_count - 1;
-						if flash_op_type = "01" then -- flash_count should be 1!
+						if flash_op_type = '1' then -- flash_count should be 1!
 							flash_op_wr <= '1';
 							flash_op_data <= flash_op_data and flash_data_in;
 						else
@@ -953,7 +953,7 @@ begin
 					flash_mode_state <= flash_mode_init;
 					if ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" and (d_in = X"10") then
 						flash_write_op <= true;
-						flash_op_type <= "11";
+						flash_op_type <= '0';
 						flash_op_request <= '1';
 						flash_op_wr <= '1';
 						flash_op_address <= cart_addr and not(std_logic_vector(flash_chip_size));
@@ -961,7 +961,7 @@ begin
 						flash_op_data <= X"FF";
 					elsif (d_in = X"30") then
 						flash_write_op <= true;
-						flash_op_type <= "10";
+						flash_op_type <= '0';
 						flash_op_request <= '1';
 						flash_op_wr <= '1';
 						flash_op_address <= cart_addr and not(std_logic_vector(flash_sector_size));
@@ -974,7 +974,7 @@ begin
 					flash_write_op <= true;
 					flash_op_request <= '1';
 					flash_op_wr <= '0';
-					flash_op_type <= "01";
+					flash_op_type <= '1';
 					flash_op_address <= cart_addr;
 					flash_count <= to_unsigned(1, 22);
 					flash_op_data <= d_in;
