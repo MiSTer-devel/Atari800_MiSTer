@@ -686,6 +686,23 @@ BEGIN
 					end if;
 					antic_fetch_real_next <= '1';
 					cpu_fetch_real_next <= '0';
+				elsif cpu_fetch = '1' then
+					start_request <= not(pbi_takeover_adj);
+					pbi_request <= pbi_takeover_adj;
+					pbi_cycle_next <= pbi_takeover_adj;
+					addr_next <= "0000000000"&cpu_ADDR;
+					data_WRITE_next(7 downto 0) <= cpu_WRITE_DATA;
+					width_8bit_next <= '1';
+					write_enable_next <= not(cpu_WRITE_N) and not(pbi_takeover_adj);
+					write_enable_freezer_next <= not(cpu_WRITE_N);
+					pbi_wr_enable <= not(cpu_WRITE_N) and pbi_takeover_adj;
+					if (pbi_takeover_adj='0' and request_complete = '1') then
+						notify_cpu <= '1';
+					else
+						state_next <= state_waiting_cpu;
+					end if;
+					cpu_fetch_real_next <= '1';
+					antic_fetch_real_next <= '0';
 				elsif dma_fetch = '1' then
 					-- It seems it does not matter which priority DMA has
 					-- the important one is that ANTIC comes before CPU
@@ -711,23 +728,6 @@ BEGIN
 					-- we need to be explict that when DMA/ZPU is accessing Atari
 					-- directly, then this is the same as if CPU is accessing it
 					cpu_fetch_real_next <= atari_dma_access;
-				elsif cpu_fetch = '1' then
-					start_request <= not(pbi_takeover_adj);
-					pbi_request <= pbi_takeover_adj;
-					pbi_cycle_next <= pbi_takeover_adj;
-					addr_next <= "0000000000"&cpu_ADDR;
-					data_WRITE_next(7 downto 0) <= cpu_WRITE_DATA;
-					width_8bit_next <= '1';
-					write_enable_next <= not(cpu_WRITE_N) and not(pbi_takeover_adj);
-					write_enable_freezer_next <= not(cpu_WRITE_N);
-					pbi_wr_enable <= not(cpu_WRITE_N) and pbi_takeover_adj;
-					if (pbi_takeover_adj='0' and request_complete = '1') then
-						notify_cpu <= '1';
-					else
-						state_next <= state_waiting_cpu;
-					end if;
-					cpu_fetch_real_next <= '1';
-					antic_fetch_real_next <= '0';
 				elsif cart_flash_request = '1' then
 					start_request <= '1';
 					addr_next <= "1010" & cart_flash_address;

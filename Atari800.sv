@@ -225,7 +225,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXXXXXX                                                        
+// XXXXXXXX                                                         
 
 
 `include "build_id.v" 
@@ -259,9 +259,9 @@ localparam CONF_STR = {
 	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
-	"P1O[70:69],On cart mount,PwrReset,Activate,Nothing;",
-	"P1O[71],Cart auto-save,Disabled,Enabled;",
-	"P1R[72],Save cart(s);",
+	"P1O[69],On cart (u)mount,PwrReset,Nothing;",
+	"P1O[70],Cart auto-save,Disabled,Enabled;",
+	"P1R[71],Save cart(s);",
 	"P1-;",
 	"P1O[66:64],Tape turbo system,Standard,SIO/Cmd,Turbo-D,K.S.O.,K.S.O. 2,Blizzard,Rambit,T6000;",
 	"P1O[67],Invert turbo PWM,Disabled,Enabled;",
@@ -523,9 +523,9 @@ hps_ext hps_ext
 
 	.emu_flash_request(emu_flash_request),
 	.emu_flash_slave(emu_flash_slave),
-	.emu_flash_autosave(status[71] & ~status[57]),
-	.emu_flash_save(status[72]),
-	.emu_cart_trigger(status[70:69])
+	.emu_flash_autosave(status[70] & ~status[57]),
+	.emu_flash_save(status[71]),
+	.emu_cart_trigger(~status[69])
 );
 
 wire [7:0] R,G,B, Ro,Go,Bo;
@@ -572,7 +572,8 @@ atari800top atari800top
 
 	.TURBOFREEZER_ROM_LOADED(turbofreezer_rom_loaded),
 	.SDRAM_READY(sdram_ready),
-	.OSD_PAUSE(file_download),
+	//.OSD_PAUSE(file_download),
+	.OSD_PAUSE(0),
 	.SET_RESET_IN(set_reset),
 	.SET_PAUSE_IN(set_pause),
 	.SET_FREEZER_IN(set_freezer),

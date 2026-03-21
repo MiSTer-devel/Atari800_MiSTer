@@ -56,7 +56,7 @@ module hps_ext
 	input             emu_flash_slave,
 	input             emu_flash_autosave,
 	input             emu_flash_save,
-	input       [1:0] emu_cart_trigger
+	input             emu_cart_trigger
 );
 
 assign EXT_BUS[15:0] = io_dout;
@@ -186,7 +186,7 @@ always@(posedge clk_sys) begin
 						REG_ATARI_STATUS1: io_dout <= atari_status1;
 						REG_ATARI_STATUS2: io_dout <= atari_status2;
 						REG_ATARI_FLASH: begin
-							io_dout <= {10'b0, emu_cart_trigger, flash_save, emu_flash_autosave, flash_slave, flash_request};
+							io_dout <= {11'b0, emu_cart_trigger, flash_save, emu_flash_autosave, flash_slave, flash_request};
 							flash_request <= 0;
 							flash_slave <= 0;
 							flash_save <= 0;
