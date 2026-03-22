@@ -51,7 +51,8 @@ entity CartLogic is
 		flash_address : out std_logic_vector(21 downto 0);
 		flash_data : out std_logic_vector(7 downto 0);
 		flash_data_in : in std_logic_vector(7 downto 0) := (others => '0');
-		flash_reply : in std_logic
+		flash_reply : in std_logic;
+		cart_write_enable : out std_logic
 	);
 
 end CartLogic;
@@ -161,8 +162,8 @@ constant cart_mode_sdx_side2:			cart_mode_type := "01001100";
 constant cart_mode_sdx_u1mb:			cart_mode_type := "01001101";
 
 constant cart_mode_db_32:			cart_mode_type := "01110000";
---constant cart_mode_corina_512:		cart_mode_type := "01110001";
---constant cart_mode_corina_1024:		cart_mode_type := "01110010";
+constant cart_mode_corina_512:		cart_mode_type := "01110001";
+constant cart_mode_corina_1024:		cart_mode_type := "01110010";
 constant cart_mode_bounty_bob:		cart_mode_type := "01110011";
 
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
@@ -174,9 +175,7 @@ signal oss_bank: std_logic_vector(2 downto 0) := "000";
 signal cart_8xxx_enable: std_logic := '0';
 signal cart_axxx_enable: std_logic := '1';
 signal disable_rom: std_logic := '0'; -- for XEGS 8-15 bank cart
--- Corina carts do not work anyhow ATM!
---signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
---signal cart_write_enable: std_logic := '0'; -- let's try making the SRAM part of the Corina cart work
+signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
 signal cart_passthru: std_logic := '0';
 
 signal access_8xxx: boolean;
@@ -347,8 +346,8 @@ begin
 			cart_8xxx_enable <= '0';
 			cart_axxx_enable <= '1';
 			disable_rom <= '0';
-			--mirror_8a <= '0';
-			--cart_write_enable <= '0';
+			mirror_8a <= '0';
+			cart_write_enable <= '0';
 			bb_bank_8x <= "00";
 			bb_bank_9x <= "00";
 			cart_passthru <= '0';
@@ -449,23 +448,23 @@ begin
 						end if;
 					end if;
 
-					---- Corina
-					--if ((cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024)) and (a(7 downto 0) = x"00") then
-					--	if d_in(7) = '1' then
-					--		cfg_enable <= '0';
-					--	else
-					--		if d_in(6 downto 5) /= "11" then
-					--			cart_write_enable <= '0';
-					--			cfg_enable <= '1';
-					--			cfg_bank(20 downto 14) <= d_in(6 downto 0);
-					--			mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
-					--			-- try to imitate the SRAM
-					--			if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
-					--				cart_write_enable <= '1';
-					--			end if;
-					--		end if;
-					--	end if;
-					--end if;
+					-- Corina
+					if ((cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024)) and (a(7 downto 0) = x"00") then
+						if d_in(7) = '1' then
+							cfg_enable <= '0';
+						else
+							if d_in(6 downto 5) /= "11" then
+								cart_write_enable <= '0';
+								cfg_enable <= '1';
+								cfg_bank(20 downto 14) <= d_in(6 downto 0);
+								mirror_8a <= d_in(6); -- EEPROM access in the last 8K block is mirrored across the 16K area.
+								-- The SRAM part for the 512K Corina
+								if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
+									cart_write_enable <= '1';
+								end if;
+							end if;
+						end if;
+					end if;
 					
 					-- sic
 					if (cart_mode(7 downto 2) = "001001") and ((a(7 downto 5) = "000")  or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
@@ -696,7 +695,7 @@ end process set_config;
 
 access_cart_data: process(a, rw, access_8xxx, access_axxx,cfg_bank, cfg_enable,cart_mode,oss_bank,
 	cart_8xxx_enable, cart_axxx_enable,disable_rom,
-	--mirror_8a,cart_write_enable,
+	mirror_8a,
 	bb_bank_8x,bb_bank_9x,master)
 
 variable bool_rd4: boolean;
@@ -804,11 +803,11 @@ begin
 		else
 			cart_addr(13) <= '1';
 		end if;
-	--when cart_mode_corina_512 | cart_mode_corina_1024 =>
-	--	cart_addr(13) <= '0';
-	--	if(mirror_8a = '0' and access_axxx) then
-	--		cart_addr(13) <= '1';
-	--	end if;
+	when cart_mode_corina_512 | cart_mode_corina_1024 =>
+		cart_addr(13) <= '0';
+		if(mirror_8a = '0' and access_axxx) then
+			cart_addr(13) <= '1';
+		end if;
 	when cart_mode_sic_128 | cart_mode_sic_256 | cart_mode_sic_512 | cart_mode_sic_1024 |
 	     cart_mode_xemulti_16 | cart_mode_xemulti_32 | cart_mode_xemulti_64 | cart_mode_xemulti_128 |
 	     cart_mode_xemulti_256 | cart_mode_xemulti_512 | cart_mode_xemulti_1024 =>
