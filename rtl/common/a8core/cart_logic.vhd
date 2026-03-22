@@ -265,14 +265,16 @@ flash_id_byte <= flash_id_byte0 when (cart_addr(1 downto 0) = "00") and (cart_ad
 
 flash_unlock_mask <= X"07FF" when flash_id_byte0 = X"01" and (flash_id_byte1 = X"A4" or flash_id_byte1 = X"41") else X"7FFF";
 
-flash_chip_size <= to_unsigned(131071, 22) when flash_id_byte1 = X"B5" or flash_id_byte1 = X"20" else
-		to_unsigned(262143,22) when flash_id_byte1 = X"B6" else
-		to_unsigned(4194303,22) when flash_id_byte1 = X"41" else
-		to_unsigned(524287,22);
+with flash_id_byte1 select
+	flash_chip_size <=
+		to_unsigned(16#1FFFF#, 22) when X"B5" | X"20",
+		to_unsigned(16#3FFFF#,22)  when X"B6",
+		to_unsigned(16#3FFFFF#,22) when X"41",
+		to_unsigned(16#7FFFF#,22)  when others;
 
-flash_sector_size <= to_unsigned(4095,22) when flash_id_byte0 = X"BF" else
-		to_unsigned(16383,22) when flash_id_byte1 = X"20" else
-		to_unsigned(65535,22);
+flash_sector_size <= to_unsigned(16#FFF#,22) when flash_id_byte0 = X"BF" else
+		to_unsigned(16#3FFF#,22) when flash_id_byte1 = X"20" else
+		to_unsigned(16#FFFF#,22);
 
 int_d_out <= flash_id_byte when flash_read_sig else
 	     not(flash_op_data(7))&flash_toggle_bit&"001000" when flash_write_op else
@@ -455,7 +457,7 @@ begin
 					--		if d_in(6 downto 5) /= "11" then
 					--			cart_write_enable <= '0';
 					--			cfg_enable <= '1';
-					--			cfg_bank(19 downto 14) <= d_in(5 downto 0);
+					--			cfg_bank(20 downto 14) <= d_in(6 downto 0);
 					--			mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
 					--			-- try to imitate the SRAM
 					--			if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
