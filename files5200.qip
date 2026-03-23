@@ -46,4 +46,5 @@ set_global_assignment -name VHDL_FILE rtl/common/components/simple_low_pass_filt
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
 set_global_assignment -name VHDL_FILE rtl/atari5200top.vhd
 set_global_assignment -name VERILOG_FILE rtl/hps_ext.v
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/articolor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE Atari5200.sv
