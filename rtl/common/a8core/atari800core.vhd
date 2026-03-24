@@ -178,6 +178,8 @@ ENTITY atari800core IS
 			-- 400/800 mode: 16K,32K,48K,52K,...? 
 		CART_EMULATION_SELECT : in std_logic_vector(7 downto 0);
 		CART2_EMULATION_SELECT : in std_logic_vector(7 downto 0);
+		EMU_FLASH_REQUEST : out std_logic;
+		EMU_FLASH_SLAVE : out std_logic;
 		PAL :  in STD_LOGIC;
 		CLIP_SIDES : in STD_LOGIC;
 		ROM_IN_RAM : in std_logic;
@@ -662,6 +664,8 @@ PORT MAP(CLK => CLK,
 		 d6_wr_enable => covox_write_enable,
 		 cart_select => CART_EMULATION_SELECT,
 		 cart2_select => CART2_EMULATION_SELECT,
+		 emu_flash_request => EMU_FLASH_REQUEST,
+		 emu_flash_slave => EMU_FLASH_SLAVE,
 		 rom_in_ram => ROM_IN_RAM,
 		 freezer_enable => freezer_enable,
 		 freezer_activate => freezer_activate,

@@ -225,7 +225,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXX                                                            
+// XXXXXXXX                                                         
 
 
 `include "build_id.v" 
@@ -246,9 +246,10 @@ localparam CONF_STR = {
 	"S7,CAS,Load Tape;",
 	"F9,CARROMBIN,Second Cart;",
 	"-;",
-	"P1,Drives Loader & Tape;",
+	"P1,Drives Carts & Tape;",
 	"P1-;",
-	"P1O[16],SIO Connected to,Emu,USER I/O;",
+	"P1O[16],SIO Connected to,Emu,User I/O;",
+	"P1O[57],Mount images R/O,Disabled,Enabled;",
 	"P1-;",
 	"d2P1O[45:44],D1 mode,OS/Stock,PBI,HSIO;",
 	"d2P1O[47:46],D2 mode,OS/Stock,PBI,HSIO;",
@@ -258,10 +259,12 @@ localparam CONF_STR = {
 	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
+	"P1O[69],On cart (u)mount,PwrReset,Nothing;",
+	"P1O[70],Cart auto-save,Disabled,Enabled;",
+	"P1R[71],Save cart(s);",
+	"P1-;",
 	"P1O[66:64],Tape turbo system,Standard,SIO/Cmd,Turbo-D,K.S.O.,K.S.O. 2,Blizzard,Rambit,T6000;",
 	"P1O[67],Invert turbo PWM,Disabled,Enabled;",
-	"P1-;",
-	"P1O[57],Mount read-only,Disabled,Enabled;",
 	"P2,Hardware & OS;",
 	"P2-;",
 	"P2O[9:7],CPU speed,1x,2x,4x,8x,16x;",
@@ -391,6 +394,9 @@ wire        tape_fifo_full;
 wire        tape_fifo_empty;
 wire        tape_slow = (status[66:64] == 3'b100) ? 1'b1 : 1'b0;
 
+wire        emu_flash_request;
+wire        emu_flash_slave;
+
 wire [64:0] rtc;
 
 wire file_download = ioctl_download && (ioctl_index != 99);
@@ -513,7 +519,13 @@ hps_ext hps_ext
 	.uart_data_read(uart_data_read),
 	.tape_data(tape_data),
 	.tape_data_wr(tape_data_wr),
-	.tape_reset(tape_reset)
+	.tape_reset(tape_reset),
+
+	.emu_flash_request(emu_flash_request),
+	.emu_flash_slave(emu_flash_slave),
+	.emu_flash_autosave(status[70] & ~status[57]),
+	.emu_flash_save(status[71]),
+	.emu_cart_trigger(~status[69])
 );
 
 wire [7:0] R,G,B, Ro,Go,Bo;
@@ -560,7 +572,8 @@ atari800top atari800top
 
 	.TURBOFREEZER_ROM_LOADED(turbofreezer_rom_loaded),
 	.SDRAM_READY(sdram_ready),
-	.OSD_PAUSE(file_download),
+	//.OSD_PAUSE(file_download),
+	.OSD_PAUSE(0),
 	.SET_RESET_IN(set_reset),
 	.SET_PAUSE_IN(set_pause),
 	.SET_FREEZER_IN(set_freezer),
@@ -570,6 +583,8 @@ atari800top atari800top
 	.SET_SPACE_FORCE_IN(set_space_force),
 	.CART1_SELECT_IN(cart1_select),
 	.CART2_SELECT_IN(cart2_select),
+	.EMU_FLASH_REQUEST(emu_flash_request),
+	.EMU_FLASH_SLAVE(emu_flash_slave),
 	.HOT_KEYS(atari_hotkeys),
 
 	.UART_ADDR(uart_addr),

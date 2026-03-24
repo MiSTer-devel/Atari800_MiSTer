@@ -18,7 +18,6 @@
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
---use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 library work;
@@ -45,9 +44,17 @@ entity CartLogic is
 		int_d_out : out std_logic_vector(7 downto 0);
 		master : in std_logic;
 		passthru : out std_logic;
-		rtc_mode : out std_logic_vector(1 downto 0)
+		rtc_mode : out std_logic_vector(1 downto 0);
+		flash_request : out std_logic;
+		flash_wr : out std_logic;
+		flash_status : out std_logic;
+		flash_address : out std_logic_vector(21 downto 0);
+		flash_data : out std_logic_vector(7 downto 0);
+		flash_data_in : in std_logic_vector(7 downto 0) := (others => '0');
+		flash_reply : in std_logic;
+		cart_write_enable : out std_logic
 	);
-		
+
 end CartLogic;
 
 architecture vhdl of CartLogic is
@@ -130,7 +137,6 @@ constant cart_mode_sxegs_256:	cart_mode_type := "00111011";
 constant cart_mode_sxegs_512:	cart_mode_type := "00111100";
 constant cart_mode_sxegs_1024:	cart_mode_type := "00111101";
 
-
 constant cart_mode_xemulti_8:		cart_mode_type := "01101000";
 constant cart_mode_xemulti_16:	cart_mode_type := "01101001";
 constant cart_mode_xemulti_32:	cart_mode_type := "01101010";
@@ -156,8 +162,8 @@ constant cart_mode_sdx_side2:			cart_mode_type := "01001100";
 constant cart_mode_sdx_u1mb:			cart_mode_type := "01001101";
 
 constant cart_mode_db_32:			cart_mode_type := "01110000";
---constant cart_mode_corina_512:		cart_mode_type := "01110001";
---constant cart_mode_corina_1024:		cart_mode_type := "01110010";
+constant cart_mode_corina_512:		cart_mode_type := "01110001";
+constant cart_mode_corina_1024:		cart_mode_type := "01110010";
 constant cart_mode_bounty_bob:		cart_mode_type := "01110011";
 
 signal cart_mode_prev: cart_mode_type := cart_mode_off;
@@ -169,9 +175,7 @@ signal oss_bank: std_logic_vector(2 downto 0) := "000";
 signal cart_8xxx_enable: std_logic := '0';
 signal cart_axxx_enable: std_logic := '1';
 signal disable_rom: std_logic := '0'; -- for XEGS 8-15 bank cart
--- Corina carts do not work anyhow ATM!
---signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
---signal cart_write_enable: std_logic := '0'; -- let's try making the SRAM part of the Corina cart work
+signal mirror_8a: std_logic := '0'; -- for the last EEPROM bank on Corina carts
 signal cart_passthru: std_logic := '0';
 
 signal access_8xxx: boolean;
@@ -181,6 +185,29 @@ signal bb_bank_8x: std_logic_vector(1 downto 0) := "00";
 signal bb_bank_9x: std_logic_vector(1 downto 0) := "00";
 
 signal reset_n: std_logic := '1';
+signal cart_addr: std_logic_vector(21 downto 0);
+signal cart_addr_enable : boolean;
+
+signal cart_type_flash : boolean;
+signal flash_unlock_mask : std_logic_vector(15 downto 0);
+signal flash_op_reply : std_logic; -- Flash operation ready
+signal flash_read_sig : boolean; -- true when in autoselect mode for reading signature bytes
+signal flash_write_op : boolean; -- true when writing operation in progress
+signal flash_op_type : std_logic; -- '0' erase, '1' program
+signal flash_op_request : std_logic; -- set high to write / read flash through adddress decoder
+signal flash_op_wr : std_logic; -- (pre-)read or write flash
+signal flash_op_address : std_logic_vector(21 downto 0);
+signal flash_op_data : std_logic_vector(7 downto 0);
+signal flash_toggle_bit : std_logic;
+signal flash_count : unsigned(21 downto 0);
+signal flash_mode_state : integer range 0 to 7 := 0;
+
+signal flash_id_byte0 : std_logic_vector(7 downto 0);
+signal flash_id_byte1 : std_logic_vector(7 downto 0);
+signal flash_id_byte : std_logic_vector(7 downto 0);
+
+signal flash_chip_size : unsigned(21 downto 0);
+signal flash_sector_size : unsigned(21 downto 0);
 
 begin
 
@@ -191,6 +218,8 @@ rtc_mode(0) <= '1' when cart_mode = cart_mode_sdx_u1mb else '0';
 rtc_mode(1) <= '1' when cart_mode = cart_mode_sdx_side2 else '0';
 
 passthru <= cart_passthru;
+cart_address <= cart_addr;
+cart_address_enable <= cart_addr_enable;
 
 -- pass through s4/s5 if cart mode is off
 --set_passthrough: process(s4_n, s5_n, cart_mode)
@@ -204,7 +233,51 @@ passthru <= cart_passthru;
 --	end if;
 --end process set_passthrough;
 
-int_d_out <= int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5) when cart_mode = cart_mode_atrax_int_128 else
+flash_request <= flash_op_request;
+flash_address <= flash_op_address;
+flash_data <= flash_op_data;
+flash_op_reply <= flash_reply;
+flash_status <= '1' when flash_read_sig or flash_write_op else '0';
+flash_wr <= flash_op_wr;
+
+cart_type_flash <= (flash_id_byte0 & flash_id_byte1) /= X"0000";
+
+flash_id_byte0 <= X"01" when cart_mode = cart_mode_atarimax1 or cart_mode = cart_mode_atarimax8 or cart_mode = cart_mode_mega_4096 else
+		X"BF" when cart_mode = cart_mode_atarimax8n or cart_mode = cart_mode_dcart or cart_mode = cart_mode_jatari_128 or
+			cart_mode = cart_mode_jatari_256 or cart_mode = cart_mode_jatari_512 or cart_mode = cart_mode_jatari_1024 or
+			cart_mode = cart_mode_sic_128 or cart_mode = cart_mode_sic_256 or cart_mode = cart_mode_sic_512 or
+			cart_mode = cart_mode_sic_1024 else
+		X"00";
+
+flash_id_byte1 <= X"20" when cart_mode = cart_mode_atarimax1 else
+		X"A4" when cart_mode = cart_mode_atarimax8 else
+		X"41" when cart_mode = cart_mode_mega_4096 else
+		X"B5" when cart_mode = cart_mode_sic_128 or cart_mode = cart_mode_jatari_128 else
+		X"B6" when cart_mode = cart_mode_sic_256 or cart_mode = cart_mode_jatari_256 else
+		X"B7" when cart_mode = cart_mode_sic_512 or cart_mode = cart_mode_jatari_512 or cart_mode = cart_mode_sic_1024 or
+			cart_mode = cart_mode_jatari_1024 or cart_mode = cart_mode_atarimax8n or cart_mode = cart_mode_dcart else
+		X"00";
+
+flash_id_byte <= flash_id_byte0 when (cart_addr(1 downto 0) = "00") and (cart_addr(6) = '0') else
+		flash_id_byte1 when (cart_addr(1 downto 0) = "01") and (cart_addr(6) = '0') else
+		X"00";
+
+flash_unlock_mask <= X"07FF" when flash_id_byte0 = X"01" and (flash_id_byte1 = X"A4" or flash_id_byte1 = X"41") else X"7FFF";
+
+with flash_id_byte1 select
+	flash_chip_size <=
+		to_unsigned(16#1FFFF#, 22) when X"B5" | X"20",
+		to_unsigned(16#3FFFF#,22)  when X"B6",
+		to_unsigned(16#3FFFFF#,22) when X"41",
+		to_unsigned(16#7FFFF#,22)  when others;
+
+flash_sector_size <= to_unsigned(16#FFF#,22) when flash_id_byte0 = X"BF" else
+		to_unsigned(16#3FFF#,22) when flash_id_byte1 = X"20" else
+		to_unsigned(16#FFFF#,22);
+
+int_d_out <= flash_id_byte when flash_read_sig else
+	     not(flash_op_data(7))&flash_toggle_bit&"001000" when flash_write_op else
+	     int_d_in(3) & int_d_in(7) & int_d_in(1) & int_d_in(0) & int_d_in(4) & int_d_in(2) & int_d_in(6) & int_d_in(5) when cart_mode = cart_mode_atrax_int_128 else
 	     int_d_in(2) & int_d_in(3) & int_d_in(6) & int_d_in(7) & int_d_in(1) & int_d_in(5) & int_d_in(0) & int_d_in(4) when (cart_mode = cart_mode_atrax_sdx_64) or (cart_mode = cart_mode_atrax_sdx_128) else
 	     int_d_in;
 
@@ -273,8 +346,8 @@ begin
 			cart_8xxx_enable <= '0';
 			cart_axxx_enable <= '1';
 			disable_rom <= '0';
-			--mirror_8a <= '0';
-			--cart_write_enable <= '0';
+			mirror_8a <= '0';
+			cart_write_enable <= '0';
 			bb_bank_8x <= "00";
 			bb_bank_9x <= "00";
 			cart_passthru <= '0';
@@ -370,28 +443,28 @@ begin
 						cfg_enable <= not d_in(7);
 						if (cart_mode = cart_mode_jrc_int_64) then
 							cfg_bank(15 downto 13) <= not(d_in(4)) & not(d_in(5)) & not(d_in(6));
-						else 
+						else
 							cfg_bank(15 downto 13) <= d_in(6 downto 4);
 						end if;
 					end if;
 
-					---- Corina
-					--if ((cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024)) and (a(7 downto 0) = x"00") then
-					--	if d_in(7) = '1' then
-					--		cfg_enable <= '0';
-					--	else
-					--		if d_in(6 downto 5) /= "11" then
-					--			cart_write_enable <= '0';
-					--			cfg_enable <= '1';
-					--			cfg_bank(19 downto 14) <= d_in(5 downto 0);
-					--			mirror_8a <= d_in(6); -- EEPROM access in the last 8K block
-					--			-- try to imitate the SRAM
-					--			if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
-					--				cart_write_enable <= '1';
-					--			end if;
-					--		end if;
-					--	end if;
-					--end if;
+					-- Corina
+					if ((cart_mode = cart_mode_corina_512) or (cart_mode = cart_mode_corina_1024)) and (a(7 downto 0) = x"00") then
+						if d_in(7) = '1' then
+							cfg_enable <= '0';
+						else
+							if d_in(6 downto 5) /= "11" then
+								cart_write_enable <= '0';
+								cfg_enable <= '1';
+								cfg_bank(20 downto 14) <= d_in(6 downto 0);
+								mirror_8a <= d_in(6); -- EEPROM access in the last 8K block is mirrored across the 16K area.
+								-- The SRAM part for the 512K Corina
+								if (d_in(6) = '1') or ((d_in(5) = '1') and (cart_mode = cart_mode_corina_512)) then
+									cart_write_enable <= '1';
+								end if;
+							end if;
+						end if;
+					end if;
 					
 					-- sic
 					if (cart_mode(7 downto 2) = "001001") and ((a(7 downto 5) = "000")  or ((cart_mode = cart_mode_sic_1024) and (a(7 downto 6) = "00"))) then
@@ -622,155 +695,155 @@ end process set_config;
 
 access_cart_data: process(a, rw, access_8xxx, access_axxx,cfg_bank, cfg_enable,cart_mode,oss_bank,
 	cart_8xxx_enable, cart_axxx_enable,disable_rom,
-	--mirror_8a,cart_write_enable,
+	mirror_8a,
 	bb_bank_8x,bb_bank_9x,master)
 
 variable bool_rd4: boolean;
 variable bool_rd5: boolean;
 begin
-	cart_address <= cfg_bank & a(12 downto 0);
+	cart_addr <= cfg_bank & a(12 downto 0);
 	
 	if (cart_mode = cart_mode_atrax_int_128) then
-		cart_address <= cfg_bank & a(3) & a(11) & a(10) & a(12) & a(9) & a(2) & a(1) & a(0) & a(8) & a(7) & a(6) & a(5) & a(4);
+		cart_addr <= cfg_bank & a(3) & a(11) & a(10) & a(12) & a(9) & a(2) & a(1) & a(0) & a(8) & a(7) & a(6) & a(5) & a(4);
 	end if;
 	if (cart_mode = cart_mode_atrax_sdx_64) or (cart_mode = cart_mode_atrax_sdx_128) then
-		cart_address(15 downto 0) <= a(3) & a(4) & a(5) & a(2) & cfg_bank(14) & cfg_bank(15) & cfg_bank(13) & a(6) & a(1) & a(0) & a(7) & a(8) & a(9) & a(12) & a(11) & a(10);
+		cart_addr(15 downto 0) <= a(3) & a(4) & a(5) & a(2) & cfg_bank(14) & cfg_bank(15) & cfg_bank(13) & a(6) & a(1) & a(0) & a(7) & a(8) & a(9) & a(12) & a(11) & a(10);
 	end if;
 	bool_rd4 := false;
 	bool_rd5 := (cfg_enable = '1');
-	cart_address_enable <= (cfg_enable = '1') and access_axxx;
+	cart_addr_enable <= (cfg_enable = '1') and access_axxx;
 
 	if (cart_mode(5) = '1') then	-- default for 16k carts
 		bool_rd4 := (cfg_enable = '1');
-		cart_address_enable <= (cfg_enable = '1') and (access_8xxx or access_axxx) and (disable_rom = '0');
+		cart_addr_enable <= (cfg_enable = '1') and (access_8xxx or access_axxx) and (disable_rom = '0');
 	end if;
 
 	case cart_mode is
 	when cart_mode_2k =>
-		cart_address(12 downto 11) <= "00";
-		cart_address_enable <= (a(12 downto 11) = "11");
+		cart_addr(12 downto 11) <= "00";
+		cart_addr_enable <= (a(12 downto 11) = "11");
 	when cart_mode_4k =>
-		cart_address(12) <= '0';
-		cart_address_enable <= (a(12) = '1');
+		cart_addr(12) <= '0';
+		cart_addr_enable <= (a(12) = '1');
 	when cart_mode_blizzard_4 =>
-		cart_address(12) <= '0';
+		cart_addr(12) <= '0';
 	when cart_mode_right_4k =>
 		bool_rd5 := false;
 		bool_rd4 := true;
-		cart_address(12) <= '0';
-		cart_address_enable <= access_8xxx and (a(12) = '1');
+		cart_addr(12) <= '0';
+		cart_addr_enable <= access_8xxx and (a(12) = '1');
 	when cart_mode_right_8k =>
 		bool_rd5 := false;
 		bool_rd4 := true;
-		cart_address_enable <= access_8xxx;
+		cart_addr_enable <= access_8xxx;
 	when cart_mode_ast_32 =>
-		cart_address <= "0000000" & cfg_bank(19 downto 13) & a(7 downto 0);
+		cart_addr <= "0000000" & cfg_bank(19 downto 13) & a(7 downto 0);
 	when cart_mode_16k | cart_mode_megamax16 | cart_mode_blizzard_16 =>
 		if (access_8xxx) then
-			cart_address(13) <= '0';
+			cart_addr(13) <= '0';
 		else
-			cart_address(13) <= '1';
+			cart_addr(13) <= '1';
 		end if;
 	when cart_mode_oss_043M =>
 		if (oss_bank = "111") then
 			bool_rd5 := false;
-			cart_address_enable <= false;
+			cart_addr_enable <= false;
 		else
 			if (a(12) = '1') then
 				-- always bank 3
-				cart_address(13 downto 12) <= "11";
+				cart_addr(13 downto 12) <= "11";
 			else
 				if (oss_bank(2 downto 1) = "11") then
 					-- ROM disconnected
-					cart_address_enable <= false;
+					cart_addr_enable <= false;
 				else
-					cart_address(14 downto 12) <= oss_bank;
+					cart_addr(14 downto 12) <= oss_bank;
 				end if;
 			end if;
 		end if;
 	when cart_mode_oss_16k | cart_mode_oss_8k =>
 		if (oss_bank(1 downto 0) = "00") then
 			bool_rd5 := false;
-			cart_address_enable <= false;
+			cart_addr_enable <= false;
 		else
 			if (cart_mode = cart_mode_oss_16k) then
-				cart_address(13) <= oss_bank(1) and (not a(12));
+				cart_addr(13) <= oss_bank(1) and (not a(12));
 			end if;
-			cart_address(12) <= oss_bank(0) and (not a(12));
+			cart_addr(12) <= oss_bank(0) and (not a(12));
 		end if;
 	when cart_mode_xegs_32 | cart_mode_sxegs_32 | cart_mode_db_32 =>
 		if (access_axxx) then
-			cart_address(14 downto 13) <= (others => '1');
+			cart_addr(14 downto 13) <= (others => '1');
 		end if;
 	when cart_mode_xegs_64 | cart_mode_sxegs_64 | cart_mode_xegs_64_2 =>
 		if (access_axxx) then
-			cart_address(15 downto 13) <= (others => '1');
+			cart_addr(15 downto 13) <= (others => '1');
 		end if;
 	when cart_mode_xegs_128 | cart_mode_sxegs_128 =>
 		if (access_axxx) then
-			cart_address(16 downto 13) <= (others => '1');
+			cart_addr(16 downto 13) <= (others => '1');
 		end if;
 	when cart_mode_xegs_256 | cart_mode_sxegs_256 =>
 		if (access_axxx) then
-			cart_address(17 downto 13) <= (others => '1');
+			cart_addr(17 downto 13) <= (others => '1');
 		end if;
 	when cart_mode_xegs_512 | cart_mode_sxegs_512 =>
 		if (access_axxx) then
-			cart_address(18 downto 13) <= (others => '1');
+			cart_addr(18 downto 13) <= (others => '1');
 		end if;
 	when cart_mode_xegs_1024 | cart_mode_sxegs_1024 =>
 		if (access_axxx) then
-			cart_address(19 downto 13) <= (others => '1');
+			cart_addr(19 downto 13) <= (others => '1');
 		end if;
 	when cart_mode_mega_16 | cart_mode_mega_32 | cart_mode_mega_64 | cart_mode_mega_128 |
 	     cart_mode_mega_256 | cart_mode_mega_512 | cart_mode_mega_1024 | cart_mode_mega_2048 |
 	     cart_mode_mega_4096 =>
 		if (access_8xxx) then
-			cart_address(13) <= '0';
+			cart_addr(13) <= '0';
 		else
-			cart_address(13) <= '1';
+			cart_addr(13) <= '1';
 		end if;
-	--when cart_mode_corina_512 | cart_mode_corina_1024 =>
-	--	cart_address(13) <= '0';
-	--	if(mirror_8a = '0' and access_axxx) then
-	--		cart_address(13) <= '1';
-	--	end if;
+	when cart_mode_corina_512 | cart_mode_corina_1024 =>
+		cart_addr(13) <= '0';
+		if(mirror_8a = '0' and access_axxx) then
+			cart_addr(13) <= '1';
+		end if;
 	when cart_mode_sic_128 | cart_mode_sic_256 | cart_mode_sic_512 | cart_mode_sic_1024 |
 	     cart_mode_xemulti_16 | cart_mode_xemulti_32 | cart_mode_xemulti_64 | cart_mode_xemulti_128 |
 	     cart_mode_xemulti_256 | cart_mode_xemulti_512 | cart_mode_xemulti_1024 =>
 		bool_rd4 := (cfg_enable = '1') and (cart_8xxx_enable = '1');
 		bool_rd5 := (cfg_enable = '1') and (cart_axxx_enable = '1');
-		cart_address_enable <= (access_8xxx and (cfg_enable = '1') and (cart_8xxx_enable = '1'))
+		cart_addr_enable <= (access_8xxx and (cfg_enable = '1') and (cart_8xxx_enable = '1'))
 				or
 			     (access_axxx and (cfg_enable = '1') and (cart_axxx_enable = '1'));
 		if (access_8xxx) then
-			cart_address(13) <= '0';
+			cart_addr(13) <= '0';
 		else
 			-- either on sic! or xe multicart and cart_8xxx_enable
 			if (cart_mode(7 downto 3) /= "01101") or (cart_8xxx_enable = '1') then
-				cart_address(13) <= '1';
+				cart_addr(13) <= '1';
 			end if;
 		end if;
 	when cart_mode_bounty_bob =>
 		if access_axxx then
-			cart_address(15 downto 13) <= "100";
+			cart_addr(15 downto 13) <= "100";
 		else
 			if a(12) = '1' then
-				cart_address(14 downto 12) <= '1' & bb_bank_9x;
+				cart_addr(14 downto 12) <= '1' & bb_bank_9x;
 			else
-				cart_address(14 downto 12) <= '0' & bb_bank_8x;
+				cart_addr(14 downto 12) <= '0' & bb_bank_8x;
 			end if;
 		end if;
 	when cart_mode_off =>
 		bool_rd4 := false;
 		bool_rd5 := false;
-		cart_address_enable <= false;
+		cart_addr_enable <= false;
 	when others =>
 		null;
 	end case;
 
 	if (master = '0') then
-		cart_address(20) <= '1';
+		cart_addr(20) <= '1';
 	end if;
 	
 	if (bool_rd4) then
@@ -786,5 +859,132 @@ begin
 	end if;
 
 end process access_cart_data;
+
+set_write_mode: process(clk)
+	constant flash_mode_init : integer := 0;
+	constant flash_mode_unlock1 : integer := 1;
+	constant flash_mode_unlock2 : integer := 2;
+	constant flash_mode_write : integer := 3;
+	constant flash_mode_erase : integer := 4;
+	constant flash_mode_erase_unlock1 : integer := 5;
+	constant flash_mode_erase_unlock2 : integer := 6;
+	-- constant flash_mode_op_pending : integer := 7;
+begin
+	if rising_edge(clk) then
+		if reset_n = '0' then
+			flash_mode_state <= flash_mode_init;
+			flash_read_sig <= false;
+			flash_write_op <= false;
+			flash_toggle_bit <= '0';
+			flash_count <= (others => '0');
+			flash_op_data <= (others => '0');
+			flash_op_address <= (others => '0');
+			flash_op_type <= '0';
+			flash_op_request <= '0';
+			flash_op_wr <= '0';
+		else
+			if flash_write_op then
+				if (clk_enable = '1') and cart_type_flash and cart_addr_enable and (rw = '1') then
+					flash_toggle_bit <= not(flash_toggle_bit);
+				end if;
+				-- Because the Flash rom interface is last on the priority list
+				-- in the address decoder we can keep the request signal high,
+				-- if anything gets added to the request queue, the low ping with
+				-- every request is necessary not to starve the requests with lower
+				-- priority.
+				--if (flash_op_request = '0') then flash_op_request <= '1'; end if;
+				if (flash_op_reply = '1') then
+					--flash_op_request <= '0';
+					if flash_count = to_unsigned(0, 22) then
+						flash_op_request <= '0';
+						flash_write_op <= false;
+						flash_toggle_bit <= '0';
+						-- flash_mode_state <= flash_mode_init;
+					else
+						flash_count <= flash_count - 1;
+						if flash_op_type = '1' then -- flash_count should be 1!
+							flash_op_wr <= '1';
+							flash_op_data <= flash_op_data and flash_data_in;
+						else
+							flash_op_address <= std_logic_vector(unsigned(flash_op_address) + 1);
+						end if;
+					end if;
+				end if;
+			end if;
+			if (clk_enable = '1') and cart_type_flash and cart_addr_enable and (rw = '0') then
+				case flash_mode_state is
+				when flash_mode_init =>
+					if d_in = X"F0" then
+						flash_read_sig <= false;
+					elsif ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" and (d_in = X"AA") then
+						flash_mode_state <= flash_mode_unlock1;
+					end if;
+				when flash_mode_unlock1 =>
+					flash_mode_state <= flash_mode_init;
+					if ((cart_addr(15 downto 0) xor X"2AAA") and flash_unlock_mask) = X"0000" and (d_in = X"55") then
+						flash_mode_state <= flash_mode_unlock2;
+					end if;
+				when flash_mode_unlock2 =>
+					flash_mode_state <= flash_mode_init;
+					if ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" then
+						if (d_in = X"F0") then
+							flash_mode_state <= flash_mode_init;
+							flash_read_sig <= false;
+						elsif (d_in = X"90") then
+							flash_mode_state <= flash_mode_init;
+							flash_read_sig <= true;
+						elsif (d_in = X"A0") then
+							flash_mode_state <= flash_mode_write;
+						elsif (d_in = X"80") then
+							flash_mode_state <= flash_mode_erase_unlock1;
+						end if;
+					end if;
+				when flash_mode_erase_unlock1 =>
+					flash_mode_state <= flash_mode_init;
+					if ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" and (d_in = X"AA") then
+						flash_mode_state <= flash_mode_erase_unlock2;
+					end if;
+				when flash_mode_erase_unlock2 =>
+					flash_mode_state <= flash_mode_init;
+					if ((cart_addr(15 downto 0) xor X"2AAA") and flash_unlock_mask) = X"0000" and (d_in = X"55") then
+						flash_mode_state <= flash_mode_erase;
+					end if;
+				when flash_mode_erase =>
+					flash_read_sig <= false;
+					flash_mode_state <= flash_mode_init;
+					if ((cart_addr(15 downto 0) xor X"5555") and flash_unlock_mask) = X"0000" and (d_in = X"10") then
+						flash_write_op <= true;
+						flash_op_type <= '0';
+						flash_op_request <= '1';
+						flash_op_wr <= '1';
+						flash_op_address <= cart_addr and not(std_logic_vector(flash_chip_size));
+						flash_count <= flash_chip_size;
+						flash_op_data <= X"FF";
+					elsif (d_in = X"30") then
+						flash_write_op <= true;
+						flash_op_type <= '0';
+						flash_op_request <= '1';
+						flash_op_wr <= '1';
+						flash_op_address <= cart_addr and not(std_logic_vector(flash_sector_size));
+						flash_count <= flash_sector_size;
+						flash_op_data <= X"FF";
+					end if;
+				when flash_mode_write =>
+					flash_mode_state <= flash_mode_init;
+					flash_read_sig <= false;
+					flash_write_op <= true;
+					flash_op_request <= '1';
+					flash_op_wr <= '0';
+					flash_op_type <= '1';
+					flash_op_address <= cart_addr;
+					flash_count <= to_unsigned(1, 22);
+					flash_op_data <= d_in;
+				when others =>
+					flash_read_sig <= false;
+				end case;
+			end if;
+		end if;
+	end if;
+end process set_write_mode;
 
 end vhdl;

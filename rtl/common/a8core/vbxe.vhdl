@@ -651,24 +651,30 @@ end process;
 memac_data_out <= memac_data_next;
 memac_request_complete <= memac_request_complete_next;
 
--- A solution to an intricate problem -- a MEMAC access from either the CPU or Antic
--- needs to be properly timed, MEMAC can serve one request per Atari cycle, the DMA 
+-- A solution to an intricate problem -- a MEMAC access from either the CPU or ANTIC
+-- needs to be properly timed, MEMAC can serve one request per Atari (big) cycle, the DMA 
 -- state machine resets everything for a new MEMAC round roughly around the ANTIC
--- enable signal and serves the MEMAC request shortly after. This way, when the "actual"
--- Atari asks for MEMAC data we will serve it on the same cycle, and at a particular relative
--- time compared to when the request was made. Now, ZPU/DMA is not Atari clock synchronized/aware,
--- and can drop a request that is potentially MEMAC on the address decoder at any time, 
--- not only when the Atari does it. Long story short - DMA request that is potentially 
--- accessing MEMAC memory needs to come later than any potential CPU or Antic request
--- (so that those get priority and DMA is pushed to the next Atari cycle) but at the same time 
--- early enough so that the DMA engine can catch it and service it on the same Atari cycle.
--- (The priorities implemented in the address decoder do not help much because we can only service
--- one MEMAC request per Atari cycle). Fine if:
+-- enable signal and serves the MEMAC request at a fixed clock offset after this.
+-- This way, when the "actual" Atari asks for MEMAC data we will serve it on the same
+-- cycle, and at a particular relative time compared to when the request was made.
+-- DMA is not Atari clock synchronized/aware, and can drop a request that is potentially
+-- MEMAC on the address decoder at any time, alternatively it can drop any memory request
+-- at a point in the cycle such that when this request is serviced the already active MEMAC
+-- request from Atari will not make it to fixed MEMAC cycle slot.
+-- Long story short - DMA request that is potentially accessing MEMAC memory needs to come
+-- early enough to still get serviced by MEMAC fixed cycle offset for the particular big cycle,
+-- or when it is not accessing MEMAC but other memory, late enough (but not too late) not to
+-- interject with any MEMAC access by CPU or ANTIC that needs to be serviced at a particular
+-- offset. This is all a bit messy, and has to do how the memory access queueing was originally
+-- designed, it all might need a proper overhaul, but for now the conditions below to mask out
+-- DMA accesses were tested to work under all situations I could test.
 
 memac_dma_enable <=
-	not(enable) or -- VBXE is not active 
-	or_reduce(memac_dma_address(25 downto 18)) -- The DMA access is not to the Atari
-	or clock_shift_reg(1) -- we are at the earliest possible cycle not to push out other reqests
+	not(enable) -- VBXE is not active 
+	-- general DMA access and clock cycle safe for Atari MEMAC access not to be disturbed
+	or (or_reduce(memac_dma_address(25 downto 18)) and or_reduce(clock_shift_reg(10 downto 7)))
+	-- Atari area DMA access and clock cycle safe (early enough) to be executed in this big cycle round
+	or (not(or_reduce(memac_dma_address(25 downto 18))) and (or_reduce(clock_shift_reg(4 downto 0))))
 	or not(mems_reg(7) or memb_reg(7) or memb_reg(6)); -- MEMAC is disabled
 
 -- This does not work, not sure why, but just checking for registers should be fine
@@ -1721,6 +1727,8 @@ begin
 	end if;
 	if clock_shift_reg(cycle_length-1) = '1' then
 		memac_request_complete_next <= '0';
+	end if;
+	if clock_shift_reg(2) = '1' then
 		dma_state_next <= "0000";
 	end if;
 end process;
