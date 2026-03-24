@@ -97,6 +97,8 @@ PORT
 
 	cart_select : in std_logic_vector(7 downto 0);
 	cart2_select : in std_logic_vector(7 downto 0);
+	emu_flash_request : out std_logic;
+	emu_flash_slave : out std_logic;
 	
 	ram_select : in std_logic_vector(2 downto 0);
 	
@@ -188,6 +190,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal notify_antic : std_logic;
 	signal notify_DMA : std_logic;
 	signal notify_cpu : std_logic;
+	signal notify_flash : std_logic;
 	signal start_request : std_logic;
 	signal pbi_cycle_next : std_logic;
 	signal pbi_cycle_reg : std_logic;
@@ -212,12 +215,13 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal axlon_bank_next : std_logic_vector(7 downto 0);
 	
 	-- even though we have 3 targets (flash, ram, rom) and 3 masters, only allow access to one a a time - simpler.
-	signal state_next : std_logic_vector(1 downto 0);
-	signal state_reg : std_logic_vector(1 downto 0);
-	constant state_idle : std_logic_vector(1 downto 0) := "00";
-	constant state_waiting_cpu : std_logic_vector(1 downto 0) := "01";
-	constant state_waiting_DMA : std_logic_vector(1 downto 0) := "10";
-	constant state_waiting_antic : std_logic_vector(1 downto 0) := "11";
+	signal state_next : std_logic_vector(2 downto 0);
+	signal state_reg : std_logic_vector(2 downto 0);
+	constant state_idle : std_logic_vector(2 downto 0) := "000";
+	constant state_waiting_cpu : std_logic_vector(2 downto 0) := "001";
+	constant state_waiting_DMA : std_logic_vector(2 downto 0) := "010";
+	constant state_waiting_antic : std_logic_vector(2 downto 0) := "011";
+	constant state_waiting_flash : std_logic_vector(2 downto 0) := "100";
 	
 	signal ram_chip_select : std_logic;
 	signal sdram_chip_select : std_logic;
@@ -268,6 +272,12 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart1_cctl_dout_enable: std_logic_vector(2 downto 0);
 	signal emu_cart1_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart1_int_d_out: std_logic_vector(7 downto 0);
+	signal cart1_flash_request : std_logic;
+	signal cart1_flash_wr : std_logic;
+	signal cart1_flash_address : std_logic_vector(21 downto 0);
+	signal cart1_flash_data : std_logic_vector(7 downto 0);
+	signal cart1_flash_status : std_logic;
+	signal cart1_write_enable : std_logic;
 
 	signal emu_cart2_s4_n: std_logic;
 	signal emu_cart2_s5_n: std_logic;
@@ -279,6 +289,20 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart2_cctl_dout_enable: std_logic_vector(2 downto 0);
 	signal emu_cart2_int_d_in: std_logic_vector(7 downto 0);
 	signal emu_cart2_int_d_out: std_logic_vector(7 downto 0);
+	signal cart2_flash_request : std_logic;
+	signal cart2_flash_wr : std_logic;
+	signal cart2_flash_address : std_logic_vector(21 downto 0);
+	signal cart2_flash_data : std_logic_vector(7 downto 0);
+	signal cart2_flash_status : std_logic;
+	signal cart2_write_enable : std_logic;
+
+	signal cart_flash_status : std_logic;
+	signal cart_flash_request : std_logic;
+	signal cart_flash_wr : std_logic;
+	signal cart_flash_address : std_logic_vector(21 downto 0);
+	signal cart_flash_data : std_logic_vector(7 downto 0);
+	signal emu_cart_write_enable : std_logic;
+	signal emu_cart_write : std_logic;
 
 	signal emu_pbi_enable : std_logic;
 	signal emu_pbi_d1xx : std_logic;
@@ -415,7 +439,15 @@ BEGIN
 		int_d_out => emu_cart1_int_d_out,
 		master => '1',
 		passthru => emu_cart_passthru,
-		rtc_mode => emu_cart_rtc_mode
+		rtc_mode => emu_cart_rtc_mode,
+		flash_request => cart1_flash_request,
+		flash_address => cart1_flash_address,
+		flash_wr => cart1_flash_wr,
+		flash_data => cart1_flash_data,
+		flash_data_in => SDRAM_DATA(7 downto 0),
+		flash_status => cart1_flash_status,
+		cart_write_enable => cart1_write_enable,
+		flash_reply => notify_flash
 	);
 
 	-- emulated cart #2, slave / stacked
@@ -437,7 +469,15 @@ BEGIN
 		cctl_dout_enable => emu_cart2_cctl_dout_enable,
 		int_d_in => emu_cart2_int_d_in,
 		int_d_out => emu_cart2_int_d_out,
-		master => '0'
+		master => '0',
+		flash_request => cart2_flash_request,
+		flash_address => cart2_flash_address,
+		flash_wr => cart2_flash_wr,
+		flash_data => cart2_flash_data,
+		flash_data_in => SDRAM_DATA(7 downto 0),
+		flash_status => cart2_flash_status,
+		cart_write_enable => cart2_write_enable,
+		flash_reply => notify_flash
 	);
 
 	emu_pbi_rom: entity work.PBIROM
@@ -457,7 +497,9 @@ BEGIN
 	);	
 
 	process(emu_cart_passthru,atari800mode,cart2_select,emu_cart_s4_n,emu_cart_s5_n,emu_cart1_rd4,emu_cart2_rd4,emu_cart1_rd5,emu_cart2_rd5,emu_cart1_address,emu_cart1_address_enable,emu_cart2_address,emu_cart2_address_enable,
-		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out)
+		emu_cart1_cctl_dout,emu_cart1_cctl_dout_enable,emu_cart2_cctl_dout,emu_cart2_cctl_dout_enable,emu_cart_int_d_in,emu_cart1_int_d_out,emu_cart2_int_d_out,
+		cart1_flash_wr,cart1_flash_request,cart1_flash_data,cart1_flash_address,cart1_flash_status,cart1_write_enable,cart2_flash_wr,cart2_flash_request,cart2_flash_data,cart2_flash_address,cart2_flash_status,cart2_write_enable,
+		emu_cart_write)
 	begin
 		emu_cart1_int_d_in <= (others => '0');
 		emu_cart2_int_d_in <= (others => '0');
@@ -476,6 +518,14 @@ BEGIN
 		    emu_cart_address_enable <= emu_cart1_address_enable;
 		    emu_cart1_int_d_in <= emu_cart_int_d_in;
 		    emu_cart_int_d_out <= emu_cart1_int_d_out;
+		    emu_flash_slave <= '0';
+		    emu_flash_request <= (cart1_flash_request and cart1_flash_wr) or emu_cart_write;
+		    cart_flash_request <= cart1_flash_request;
+		    cart_flash_wr <= cart1_flash_wr;
+		    cart_flash_address <= cart1_flash_address;
+		    cart_flash_data <= cart1_flash_data;
+		    cart_flash_status <= cart1_flash_status;
+		    emu_cart_write_enable <= cart1_write_enable;
 		    -- if the second/right cart is mounted line 4 reqests are its responsibility
 		    if (cart2_select(7 downto 0) /= "00000000") then
 			emu_cart_rd4 <= emu_cart2_rd4;
@@ -500,6 +550,14 @@ BEGIN
 			emu_cart_cctl_dout_enable <= emu_cart2_cctl_dout_enable;
 			emu_cart2_int_d_in <= emu_cart_int_d_in;
 			emu_cart_int_d_out <= emu_cart2_int_d_out;
+			emu_flash_slave <= '1';
+			emu_flash_request <= (cart2_flash_request and cart2_flash_wr) or emu_cart_write;
+			cart_flash_request <= cart2_flash_request;
+			cart_flash_wr <= cart2_flash_wr;
+			cart_flash_address <= cart2_flash_address;
+			cart_flash_data <= cart2_flash_data;
+			cart_flash_status <= cart2_flash_status;
+			emu_cart_write_enable <= cart2_write_enable;
 		    else
 			emu_cart1_s4_n <= emu_cart_s4_n;
 			emu_cart1_s5_n <= emu_cart_s5_n;
@@ -511,6 +569,14 @@ BEGIN
 			emu_cart_cctl_dout_enable <= emu_cart1_cctl_dout_enable;
 			emu_cart1_int_d_in <= emu_cart_int_d_in;
 			emu_cart_int_d_out <= emu_cart1_int_d_out;
+			emu_flash_slave <= '0';
+			emu_flash_request <= (cart1_flash_request and cart1_flash_wr) or emu_cart_write;
+			cart_flash_request <= cart1_flash_request;
+			cart_flash_wr <= cart1_flash_wr;
+			cart_flash_address <= cart1_flash_address;
+			cart_flash_data <= cart1_flash_data;
+			cart_flash_status <= cart1_flash_status;
+			emu_cart_write_enable <= cart1_write_enable;
 		    end if;
 		end if;
 	end process;
@@ -581,13 +647,15 @@ BEGIN
 	-- state machine impl
 	pbi_takeover_adj <= (pbi_takeover) when (freezer_enable='0' or not(freezer_disable_atari)) else '0';
 
-	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg)
+	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
+		cart_flash_request,cart_flash_wr,cart_flash_address,cart_flash_data)
 	begin
 		start_request <= '0';
 		pbi_request <= '0';
 		notify_antic <= '0';
 		notify_cpu <= '0';
 		notify_DMA <= '0';
+		notify_flash <= '0';
 		state_next <= state_reg;
 		pbi_cycle_next <= pbi_cycle_reg;
 
@@ -627,6 +695,23 @@ BEGIN
 					end if;
 					antic_fetch_real_next <= '1';
 					cpu_fetch_real_next <= '0';
+				elsif cpu_fetch = '1' then
+					start_request <= not(pbi_takeover_adj);
+					pbi_request <= pbi_takeover_adj;
+					pbi_cycle_next <= pbi_takeover_adj;
+					addr_next <= "0000000000"&cpu_ADDR;
+					data_WRITE_next(7 downto 0) <= cpu_WRITE_DATA;
+					width_8bit_next <= '1';
+					write_enable_next <= not(cpu_WRITE_N) and not(pbi_takeover_adj);
+					write_enable_freezer_next <= not(cpu_WRITE_N);
+					pbi_wr_enable <= not(cpu_WRITE_N) and pbi_takeover_adj;
+					if (pbi_takeover_adj='0' and request_complete = '1') then
+						notify_cpu <= '1';
+					else
+						state_next <= state_waiting_cpu;
+					end if;
+					cpu_fetch_real_next <= '1';
+					antic_fetch_real_next <= '0';
 				elsif dma_fetch = '1' then
 					-- It seems it does not matter which priority DMA has
 					-- the important one is that ANTIC comes before CPU
@@ -652,23 +737,20 @@ BEGIN
 					-- we need to be explict that when DMA/ZPU is accessing Atari
 					-- directly, then this is the same as if CPU is accessing it
 					cpu_fetch_real_next <= atari_dma_access;
-				elsif cpu_fetch = '1' then
-					start_request <= not(pbi_takeover_adj);
-					pbi_request <= pbi_takeover_adj;
-					pbi_cycle_next <= pbi_takeover_adj;
-					addr_next <= "0000000000"&cpu_ADDR;
-					data_WRITE_next(7 downto 0) <= cpu_WRITE_DATA;
+				elsif cart_flash_request = '1' then
+					start_request <= '1';
+					addr_next <= "1010" & cart_flash_address;
+					data_WRITE_next(7 downto 0) <= cart_flash_data;
 					width_8bit_next <= '1';
-					write_enable_next <= not(cpu_WRITE_N) and not(pbi_takeover_adj);
-					write_enable_freezer_next <= not(cpu_WRITE_N);
-					pbi_wr_enable <= not(cpu_WRITE_N) and pbi_takeover_adj;
-					if (pbi_takeover_adj='0' and request_complete = '1') then
-						notify_cpu <= '1';
+					write_enable_next <= cart_flash_wr;
+					
+					if (request_complete = '1') then
+						notify_flash <= '1';
 					else
-						state_next <= state_waiting_cpu;
+						state_next <= state_waiting_flash;
 					end if;
-					cpu_fetch_real_next <= '1';
 					antic_fetch_real_next <= '0';
+					cpu_fetch_real_next <= '0';
 				end if;
 			when state_waiting_antic =>
 				notify_antic <= request_complete;
@@ -678,6 +760,11 @@ BEGIN
 				end if;
 			when state_waiting_DMA =>
 				notify_DMA <= request_complete;
+				if (request_complete = '1') then
+					state_next <= state_idle;
+				end if;
+			when state_waiting_flash =>
+				notify_flash <= request_complete;
 				if (request_complete = '1') then
 					state_next <= state_idle;
 				end if;
@@ -913,7 +1000,7 @@ end generate;
 		SDRAM_CART_ADDR,
 		SDRAM_OS_ROM_ADDR,
 
-		cart_select,bank0reg,bank1reg,bank0next,bank1next,
+		cart_select,bank0reg,bank1reg,bank0next,bank1next,cart_flash_status,emu_cart_write_enable,
 
 		STEREO,
 
@@ -960,6 +1047,7 @@ end generate;
 		else
 			emu_cart_rw <= '1';
 		end if;
+		emu_cart_write <= '0';
 
 		rom_request <= '0';
 		--cart_request <= '0';
@@ -1194,9 +1282,12 @@ end generate;
 						request_complete <= '1';
 						MEMORY_DATA_INT(7 downto 0) <= x"ff";
 						if (emu_cart_address_enable) then
-							SDRAM_ADDR <= SDRAM_CART_ADDR;
 							if (write_enable_next = '0') then
-								MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+								MEMORY_DATA_INT(7 downto 0) <= emu_cart_int_d_out;
+							end if;
+							if ((cart_flash_status = '0') and (write_enable_next = '0')) or (emu_cart_write_enable = '1') then
+								emu_cart_write <= write_enable_next and emu_cart_write_enable;
+								SDRAM_ADDR <= SDRAM_CART_ADDR;
 								request_complete <= sdram_request_COMPLETE;
 								sdram_chip_select <= start_request;
 							end if;
@@ -1216,10 +1307,12 @@ end generate;
 						request_complete <= '1';
 						MEMORY_DATA_INT(7 downto 0) <= x"ff";
 						if (emu_cart_address_enable) then
-							SDRAM_ADDR <= SDRAM_CART_ADDR;
-							-- emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
 							if (write_enable_next = '0') then
 								MEMORY_DATA_INT(7 downto 0) <= emu_cart_int_d_out;
+							end if;
+							if ((cart_flash_status = '0') and (write_enable_next = '0')) or (emu_cart_write_enable = '1') then
+								emu_cart_write <= write_enable_next and emu_cart_write_enable;
+								SDRAM_ADDR <= SDRAM_CART_ADDR;
 								request_complete <= sdram_request_COMPLETE;
 								sdram_chip_select <= start_request;
 							end if;
@@ -1622,6 +1715,6 @@ end generate;
 	end process;
 
 	emu_cart_int_d_in <= SDRAM_DATA(7 downto 0);
-	state_reg_out <= state_reg;
+	state_reg_out <= state_reg(1 downto 0);
 	memory_data <= MEMORY_DATA_INT;
 END vhdl;

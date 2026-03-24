@@ -221,7 +221,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X  XXXXXXX       XXX  XXXXXXXXX    X     X               X
+// X  XXXXXXX       XXX  XXXXXXXXXX   X     X              XX X     
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -233,6 +233,9 @@ localparam CONF_STR = {
 	"-;",
 	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"OV,NTSC artifacting,No,Yes;",
+	"d1oN,Artifacting colors,Set 1,Set 2;",
+	"d1oQ,Swap artif. colors,No,Yes;",
 	"-;",
 	"o2,Clip Sides,Off,On;",
 	"d0OO,Vertical Crop,Disabled,216p(5x);",
@@ -316,7 +319,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({en216p}),
+	.status_menumask({status[31],en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -348,9 +351,9 @@ hps_ext hps_ext
 );
 
 
-wire [7:0] R,G,B;
-wire HBlank,VBlank;
-wire VSync, HSync;
+wire [7:0] R,G,B,Ro,Go,Bo;
+wire HBlank,VBlank,HBlank_o,VBlank_o;
+wire VSync, HSync, VSync_o, HSync_o;
 wire ce_pix;
 wire ce_pix_raw;
 
@@ -402,14 +405,14 @@ atari5200top atari5200top
 	.HPS_DMA_DATA_OUT(ioctl_dout),
 	.HPS_DMA_READY(dma_ready),
 
-	.VGA_VS(VSync),
-	.VGA_HS(HSync),
-	.VGA_B(B),
-	.VGA_G(G),
-	.VGA_R(R),
+	.VGA_VS(VSync_o),
+	.VGA_HS(HSync_o),
+	.VGA_B(Bo),
+	.VGA_G(Go),
+	.VGA_R(Ro),
 	.VGA_PIXCE(ce_pix_raw),
-	.HBLANK(HBlank),
-	.VBLANK(VBlank),
+	.HBLANK(HBlank_o),
+	.VBLANK(VBlank_o),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
 
@@ -472,6 +475,40 @@ assign ce_pix = ce_pix_raw & ~ce_pix_raw_old;
 always @(posedge CLK_VIDEO) begin
 	ce_pix_raw_old <= ce_pix_raw;
 end
+
+reg hsync_o, vsync_o;
+always @(posedge CLK_VIDEO) begin
+	if(ce_pix) begin
+		hsync_o <= HSync_o;
+		if(~hsync_o & HSync_o) vsync_o <= VSync_o;
+	end
+end
+
+articolor articolor
+(
+	.clk(CLK_VIDEO),
+	.ce_pix(ce_pix),
+	
+	.enable(status[31]),
+	.colorset(~status[55]),
+	.colorswap(status[58]),
+
+	.r_in(Ro),
+	.g_in(Go),
+	.b_in(Bo),
+	.hbl_in(HBlank_o),
+	.vbl_in(VBlank_o),
+	.hs_in(hsync_o),
+	.vs_in(vsync_o),
+
+	.r_out(R),
+	.g_out(G),
+	.b_out(B),
+	.hbl_out(HBlank),
+	.vbl_out(VBlank),
+	.hs_out(HSync),
+	.vs_out(VSync)
+);
 
 video_mixer #(.GAMMA(1)) video_mixer
 (

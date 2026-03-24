@@ -48,7 +48,15 @@ module hps_ext
 	// Tape / CAS bridge
 	output reg [31:0] tape_data,
 	output reg        tape_data_wr,
-	output reg        tape_reset
+	output reg        tape_reset,
+	
+	// Emulated cart Flash ping to save
+	// TODO also config bit for auto saving to pass on to Main
+	input             emu_flash_request,
+	input             emu_flash_slave,
+	input             emu_flash_autosave,
+	input             emu_flash_save,
+	input             emu_cart_trigger
 );
 
 assign EXT_BUS[15:0] = io_dout;
@@ -91,8 +99,10 @@ localparam REG_START_FORCE = 13;
 localparam REG_SPACE_FORCE = 14;
 
 // General reading for side effect free registers
+// (well, for Flash request check it will be reset by reading)
 localparam REG_ATARI_STATUS1 = 1;
 localparam REG_ATARI_STATUS2 = 2;
+localparam REG_ATARI_FLASH = 3;
 
 reg [15:0] io_dout;
 reg        dout_en = 0;
@@ -100,6 +110,21 @@ reg  [9:0] byte_cnt;
 
 always@(posedge clk_sys) begin
 	reg [15:0] cmd;
+	reg old_flash_request = 0;
+	reg flash_request = 0;
+	reg flash_slave = 0;
+	reg old_flash_save = 0;
+	reg flash_save = 0;
+	
+	if(~old_flash_request & emu_flash_request)
+	begin
+		flash_request <= 1;
+		flash_slave <= emu_flash_slave;
+	end
+	old_flash_request <= emu_flash_request;
+	
+	if(~old_flash_save & emu_flash_save) flash_save <= 1;
+	old_flash_save <= emu_flash_save;
 
 	uart_enable <= 0;
 	uart_wr <= 0;
@@ -160,6 +185,12 @@ always@(posedge clk_sys) begin
 					case(io_din[15:8])
 						REG_ATARI_STATUS1: io_dout <= atari_status1;
 						REG_ATARI_STATUS2: io_dout <= atari_status2;
+						REG_ATARI_FLASH: begin
+							io_dout <= {11'b0, emu_cart_trigger, flash_save, emu_flash_autosave, flash_slave, flash_request};
+							flash_request <= 0;
+							flash_slave <= 0;
+							flash_save <= 0;
+						end
 					endcase
 
 				A800_TAPE_ENQUEUE:
