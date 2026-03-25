@@ -221,7 +221,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X  XXXXXXX       XXX  XXXXXXXXXX   X     X              XX X     
+// X    XXXXX       XXX  XXXXXXXXXX   X     X              XX X     
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -242,7 +242,6 @@ localparam CONF_STR = {
 	"d0OPS,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
 	"OTU,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
-	"O34,Stereo mix,None,25%,50%,100%;",
 	"O5,Swap Joysticks 1&2,No,Yes;",
 	"oO,Mouse X,Normal,Inverted;",
 	"O6,Mouse Y,Normal,Inverted;",
@@ -370,7 +369,7 @@ wire [15:0] laudio, raudio;
 assign AUDIO_R = (cpu_halt | reset) ? 16'b0000000000000000 : {raudio[15],raudio[15:1]};
 assign AUDIO_L = (cpu_halt | reset) ? 16'b0000000000000000 : {laudio[15],laudio[15:1]};
 assign AUDIO_S = 1;
-assign AUDIO_MIX = status[4:3];
+assign AUDIO_MIX = 0;
 
 assign SDRAM_CKE = 1;
 
