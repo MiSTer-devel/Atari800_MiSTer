@@ -406,12 +406,18 @@ BEGIN
 	end process;
 
 	-- Capture Axlon bank register write
-	process(axlon_bank_reg,atari_with_dma_clk_enable,data_write_next,addr_next,write_enable_next)
+	process(axlon_bank_reg,atari_with_dma_clk_enable,data_write_next,addr_next,write_enable_next,atari800mode,portb)
 	begin
 		axlon_bank_next <= axlon_bank_reg;
-		if atari_with_dma_clk_enable = '1' then
-			if (write_enable_next = '1') and (addr_next(15 downto 4) = x"CFF") then
-				axlon_bank_next <= data_write_next(7 downto 0);
+		if (atari_with_dma_clk_enable = '1') and (write_enable_next = '1') then
+			if atari800mode = '1' then
+				if (addr_next(15) = addr_next(14)) and (addr_next(13 downto 6) = "00111111") then
+					axlon_bank_next <= data_write_next(7 downto 0);
+				end if;
+			else
+				if (addr_next(15 downto 0) = x"CFFF") and (portb(0) = '1') then
+					axlon_bank_next <= data_write_next(7 downto 0);
+				end if;
 			end if;
 		end if;
 	end process;
