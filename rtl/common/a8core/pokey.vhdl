@@ -724,7 +724,6 @@ BEGIN
 		serout_holding_load <= '0';
 		serout_holding_next <= serout_holding_reg;
 		
-		serial_reset <= '0';
 		skrest_write <= '0';
 		potgo_write <= '0';
 		
@@ -788,10 +787,6 @@ BEGIN
 
 			if (addr_decoded(15) = '1') then --SKCTL
 				skctl_next <= data_in;
-				
-				if (data_in(6 downto 4)="000") then
-					serial_reset <= '1';
-				end if;
 			end if;	
 	
 		end if;
@@ -993,6 +988,7 @@ BEGIN
 		
 	-- Instantiate pokey noise circuits (lfsr)
 	initmode <= skctl_next(1) nor skctl_next(0);
+	serial_reset <= initmode;
 	poly_17_19_lfsr : pokey_poly_17_9
 		port map(clk=>clk,reset_n=>reset_n,init=>initmode,enable=>enable_179,select_9_17=>audctl_delayed_reg(7),bit_out=>noise_large,rand_out=>rand_out);
 		
