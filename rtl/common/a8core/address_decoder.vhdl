@@ -64,14 +64,11 @@ PORT
 	CACHE_GTIA_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	POKEY_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	CACHE_POKEY_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
-	POKEY2_DATA : IN STD_LOGIC_VECTOR(7 downto 0);	
-	CACHE_POKEY2_DATA : IN STD_LOGIC_VECTOR(7 downto 0);	
 	ANTIC_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	CACHE_ANTIC_DATA : IN STD_LOGIC_VECTOR(7 downto 0);	
 	PIA_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	RAM_DATA : IN STD_LOGIC_VECTOR(15 downto 0);
 	PBI_DATA : in std_logic_Vector(7 downto 0);
-	STEREO : in std_logic;
 	ULTIME_DATA : in std_logic_vector(7 downto 0);
 	ULTIME_WR_ENABLE : out std_logic;
 
@@ -119,14 +116,12 @@ PORT
 		-- these all take 1 cycle, so fine to leave device selected in general
 	GTIA_WR_ENABLE : OUT STD_LOGIC;
 	POKEY_WR_ENABLE : OUT STD_LOGIC;
-	POKEY2_WR_ENABLE : OUT STD_LOGIC;
 	ANTIC_WR_ENABLE : OUT STD_LOGIC;
 	PIA_WR_ENABLE : OUT STD_LOGIC;
 	PIA_RD_ENABLE : OUT STD_LOGIC; -- ... except PIA takes action on reads!
 	RAM_WR_ENABLE : OUT STD_LOGIC;	
 	ROM_WR_ENABLE : OUT STD_LOGIC;	
 	PBI_WR_ENABLE : OUT STD_LOGIC;
-	D6_WR_ENABLE : OUT STD_LOGIC;
 
 	-- ROM and RAM have extended address busses to allow for bank switching etc.
 	ROM_ADDR : OUT STD_LOGIC_VECTOR(21 downto 0);
@@ -983,8 +978,8 @@ end generate;
 		pbi_mpd,
 		
 		-- input data from n sources
-		GTIA_DATA,POKEY_DATA,POKEY2_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
-		CACHE_GTIA_DATA,CACHE_POKEY_DATA,CACHE_POKEY2_DATA,CACHE_ANTIC_DATA,
+		GTIA_DATA,POKEY_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
+		CACHE_GTIA_DATA,CACHE_POKEY_DATA,CACHE_ANTIC_DATA,
 		LAST_BUS_REG,ULTIME_DATA,
 		VBXE_SWITCH,VBXE_REG_BASE,VBXE_DATA,
 		
@@ -1008,8 +1003,6 @@ end generate;
 
 		cart_select,bank0reg,bank1reg,bank0next,bank1next,cart_flash_status,emu_cart_write_enable,
 
-		STEREO,
-
 		freezer_enable, freezer_disable_atari, freezer_access_type,
 		freezer_dout, freezer_request_complete,
 		SDRAM_FREEZER_RAM_ADDR, SDRAM_FREEZER_ROM_ADDR,
@@ -1028,12 +1021,10 @@ end generate;
 		
 		GTIA_WR_ENABLE <= '0';
 		POKEY_WR_ENABLE <= '0';
-		POKEY2_WR_ENABLE <= '0';
 		ANTIC_WR_ENABLE <= '0';
 		PIA_WR_ENABLE <= '0';
 		PIA_RD_ENABLE <= '0';
 		ULTIME_WR_ENABLE <= '0';
-		D6_WR_ENABLE <= '0';
 		ROM_WR_ENABLE <= '0';
 		VBXE_WRITE_ENABLE <= '0';
 		VBXE_SOFT_RESET <= '0';
@@ -1153,15 +1144,9 @@ end generate;
 					
 				-- POKEY
 				when X"D2" =>				
-					if (STEREO = '0' or addr_next(4) = '0') then
-						POKEY_WR_ENABLE <= write_enable_next;
-						MEMORY_DATA_INT(7 downto 0) <= POKEY_DATA;
-						MEMORY_DATA_INT(15 downto 8) <= CACHE_POKEY_DATA;
-					else
-						POKEY2_WR_ENABLE <= write_enable_next;
-						MEMORY_DATA_INT(7 downto 0) <= POKEY2_DATA;
-						MEMORY_DATA_INT(15 downto 8) <= CACHE_POKEY2_DATA;
-					end if;
+					POKEY_WR_ENABLE <= write_enable_next;
+					MEMORY_DATA_INT(7 downto 0) <= POKEY_DATA;
+					MEMORY_DATA_INT(15 downto 8) <= CACHE_POKEY_DATA;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';
@@ -1236,9 +1221,6 @@ end generate;
 					if (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
 						VBXE_WRITE_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= VBXE_DATA;
-					else
-						D6_WR_ENABLE <= write_enable_next and addr_next(8);
-						MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					end if;
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';	
