@@ -298,6 +298,7 @@ SIGNAL	WIDTH_8BIT_ACCESS :  STD_LOGIC;
 
 -- POKEY
 SIGNAL	POKEY_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
+SIGNAL	DRIVE_POKEY_DO :  STD_LOGIC;
 SIGNAL	CACHE_POKEY_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
 SIGNAL	POKEY_IRQ : STD_LOGIC;
 SIGNAL	POKEY_WRITE_ENABLE : STD_LOGIC;
@@ -318,6 +319,7 @@ SIGNAL	ULTIME_WRITE_ENABLE : STD_LOGIC;
 -- VBXE
 SIGNAL	VBXE_SOFT_RESET : STD_LOGIC;
 SIGNAL	VBXE_DO : STD_LOGIC_VECTOR(7 downto 0);
+SIGNAL	CACHE_VBXE_DO : STD_LOGIC_VECTOR(7 downto 0);
 SIGNAL	VBXE_WRITE_ENABLE : STD_LOGIC;
 
 signal memac_address : std_logic_vector(15 downto 0);
@@ -418,6 +420,7 @@ PORT MAP(CLK => CLK,
 	DATA_IN => WRITE_DATA(7 downto 0),
 	WR_EN => POKEY_WRITE_ENABLE,
 	DATA_OUT => POKEY_DO,
+	DRIVE_DATA_OUT => DRIVE_POKEY_DO,
 	KEYBOARD_SCAN => KEYBOARD_SCAN,
 	KEYBOARD_RESPONSE => KEYBOARD_RESPONSE,
 	POT_IN => POT_IN,
@@ -564,6 +567,7 @@ PORT MAP(CLK => CLK,
 		 PIA_DATA => PIA_DO,
 		 ULTIME_DATA => ULTIME_DO,
 		 POKEY_DATA => POKEY_DO,
+		 DRIVE_POKEY_DATA => DRIVE_POKEY_DO,
 		 CACHE_POKEY_DATA => CACHE_POKEY_DO,
 		 PORTB => PORTB_OPTIONS,
 		 RAM_DATA => RAM_DO,
@@ -571,6 +575,7 @@ PORT MAP(CLK => CLK,
 		 VBXE_SWITCH => VBXE_SWITCH,
 		 VBXE_REG_BASE => VBXE_REG_BASE,
 		 VBXE_DATA => VBXE_DO,
+		 CACHE_VBXE_DATA => CACHE_VBXE_DO,
 		 VBXE_WRITE_ENABLE => VBXE_WRITE_ENABLE,
 		 VBXE_SOFT_RESET => VBXE_SOFT_RESET,
 		 memac_address => memac_address,
@@ -733,14 +738,14 @@ PORT MAP(pokey_irq => POKEY_IRQ,
 		 combined_irq => IRQ_n);
 		 
 pokey_mirror : entity work.reg_file
-generic map(BYTES=>32,WIDTH=>5)
+generic map(BYTES=>256,WIDTH=>8)
 port map(
 	CLK => CLK,
-	ADDR => PBI_ADDR_INT(4 downto 0),
+	ADDR => PBI_ADDR_INT(7 downto 0),
 	DATA_IN => WRITE_DATA(7 downto 0),
 	WR_EN => POKEY_WRITE_ENABLE,
 	DATA_OUT => CACHE_POKEY_DO
-);	 
+);
 
 gtia_mirror : entity work.reg_file
 generic map(BYTES=>32,WIDTH=>5)
@@ -750,7 +755,7 @@ port map(
 	DATA_IN => WRITE_DATA(7 downto 0),
 	WR_EN => GTIA_WRITE_ENABLE,
 	DATA_OUT => CACHE_GTIA_DO
-);	
+);
 
 antic_mirror : entity work.reg_file
 generic map(BYTES=>16,WIDTH=>4)
@@ -760,7 +765,17 @@ port map(
 	DATA_IN => WRITE_DATA(7 downto 0),
 	WR_EN => ANTIC_WRITE_ENABLE,
 	DATA_OUT => CACHE_ANTIC_DO
-);	
+);
+
+vbxe_mirror : entity work.reg_file
+generic map(BYTES=>32,WIDTH=>5)
+port map(
+	CLK => CLK,
+	ADDR => PBI_ADDR_INT(4 downto 0),
+	DATA_IN => WRITE_DATA(7 downto 0),
+	WR_EN => VBXE_WRITE_ENABLE,
+	DATA_OUT => CACHE_VBXE_DO
+);
 
 -- outputs
 PBI_ADDR <= PBI_ADDR_INT;

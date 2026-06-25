@@ -13,7 +13,8 @@ PORT
 	DATA_IN : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 	WR_EN : IN STD_LOGIC;
 	DATA_OUT : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
-	
+	DRIVE_DATA_OUT : OUT STD_LOGIC;
+
 	keyboard_scan : out std_logic_vector(5 downto 0);
 	keyboard_response : in std_logic_vector(1 downto 0);
 	
@@ -66,6 +67,9 @@ signal covox_channel1 : std_logic_vector(7 downto 0);
 signal covox_channel2 : std_logic_vector(7 downto 0);
 signal covox_channel3 : std_logic_vector(7 downto 0);
 
+SIGNAL	DO_MUX :  STD_LOGIC_VECTOR(7 DOWNTO 0);
+SIGNAL	DRIVE_DO_MUX :  STD_LOGIC;
+
 SIGNAL	POKEY1_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
 SIGNAL	POKEY1_WRITE_ENABLE :  STD_LOGIC;
 
@@ -73,6 +77,7 @@ SIGNAL	POKEY2_DO :  STD_LOGIC_VECTOR(7 DOWNTO 0);
 SIGNAL	POKEY2_WRITE_ENABLE :  STD_LOGIC;
 
 signal covox_write_enable : std_logic;
+
 
 BEGIN
 
@@ -149,7 +154,12 @@ PORT map(clk => clk,
 		covox_channel2 => covox_channel2,
 		covox_channel3 => covox_channel3);
 
-DATA_OUT <= POKEY2_DO when ADDR(4) = '1' and STEREO = '1' else POKEY1_DO;
+DATA_OUT <= DO_MUX;
+DRIVE_DATA_OUT <= DRIVE_DO_MUX;
+
+DO_MUX <= POKEY2_DO when ADDR(4) = '1' and STEREO = '1' else POKEY1_DO;
+DRIVE_DO_MUX <= '1';
+
 POKEY1_WRITE_ENABLE <= WR_EN and (not(ADDR(4)) or not(STEREO));
 POKEY2_WRITE_ENABLE <= WR_EN and ADDR(4) and STEREO;
 covox_write_enable <= '1' when WR_EN = '1' and ADDR(7 downto 2) = "100000" else '0';

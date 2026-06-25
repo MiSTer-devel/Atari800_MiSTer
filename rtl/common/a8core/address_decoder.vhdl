@@ -44,7 +44,7 @@ PORT
 	VBXE_SWITCH : in std_logic := '0'; -- On / off
 	VBXE_REG_BASE : in std_logic := '0'; -- 0 -> $D640, 1 -> $D740
 	VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
-	-- CACHE_VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
+	CACHE_VBXE_DATA : in std_logic_vector(7 downto 0) := (others => '1');
 	VBXE_WRITE_ENABLE : out std_logic;
 	VBXE_SOFT_RESET : out std_logic;
 	-- VBXE MEMAC
@@ -64,6 +64,7 @@ PORT
 	CACHE_GTIA_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	POKEY_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	CACHE_POKEY_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
+	DRIVE_POKEY_DATA : IN STD_LOGIC;
 	ANTIC_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
 	CACHE_ANTIC_DATA : IN STD_LOGIC_VECTOR(7 downto 0);	
 	PIA_DATA : IN STD_LOGIC_VECTOR(7 downto 0);
@@ -978,8 +979,8 @@ end generate;
 		pbi_mpd,
 		
 		-- input data from n sources
-		GTIA_DATA,POKEY_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
-		CACHE_GTIA_DATA,CACHE_POKEY_DATA,CACHE_ANTIC_DATA,
+		GTIA_DATA,POKEY_DATA,DRIVE_POKEY_DATA,PIA_DATA,ANTIC_DATA,PBI_DATA,ROM_DATA,RAM_DATA,SDRAM_DATA,
+		CACHE_GTIA_DATA,CACHE_POKEY_DATA,CACHE_ANTIC_DATA,CACHE_VBXE_DATA,
 		LAST_BUS_REG,ULTIME_DATA,
 		VBXE_SWITCH,VBXE_REG_BASE,VBXE_DATA,
 		
@@ -1145,8 +1146,11 @@ end generate;
 				-- POKEY
 				when X"D2" =>				
 					POKEY_WR_ENABLE <= write_enable_next;
-					MEMORY_DATA_INT(7 downto 0) <= POKEY_DATA;
+					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					MEMORY_DATA_INT(15 downto 8) <= CACHE_POKEY_DATA;
+					if DRIVE_POKEY_DATA = '1' then
+						MEMORY_DATA_INT(7 downto 0) <= POKEY_DATA;
+					end if;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';
@@ -1221,6 +1225,7 @@ end generate;
 					if (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
 						VBXE_WRITE_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= VBXE_DATA;
+						MEMORY_DATA_INT(15 downto 8) <= CACHE_VBXE_DATA;
 					end if;
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';	

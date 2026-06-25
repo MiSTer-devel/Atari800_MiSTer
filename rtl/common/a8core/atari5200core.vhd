@@ -452,7 +452,6 @@ VIDEO_B(video_bits-1 downto 0) <= VIDEO_B_WIDE(7 downto 8-video_bits);
 -- Combine irq - only one here!
 IRQ_n <= POKEY_IRQ;
 		 
--- TODO - generic ram infer?
 pokey1_mirror : entity work.reg_file
 generic map(BYTES=>16,WIDTH=>4)
 port map(
