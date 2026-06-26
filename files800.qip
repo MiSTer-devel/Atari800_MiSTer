@@ -38,6 +38,9 @@ set_global_assignment -name VHDL_FILE rtl/common/a8core/vbxe_blitter.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/wide_delay_line.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/pokeymax.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/audiotypes.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/dc_blocker.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/pokey_mixer_mux4.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/mixer.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/syncreset_enable_divider.vhd
 set_global_assignment -name VHDL_FILE rtl/common/components/complete_address_decoder.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/delay_line.vhdl

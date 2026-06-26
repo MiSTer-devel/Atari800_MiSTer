@@ -41,7 +41,7 @@ PORT
 
     -- sound sources
     GTIA_SOUND : IN STD_LOGIC;
-	SIO_AUDIO : IN STD_LOGIC_VECTOR(7 downto 0);
+	SIO_SOUND : IN STD_LOGIC_VECTOR(7 downto 0);
 
     -- sound output
     AUDIO_L : OUT STD_LOGIC_VECTOR(15 downto 0);
@@ -53,8 +53,8 @@ END pokeymax;
 
 ARCHITECTURE vhdl OF pokeymax IS
 
-signal AUDIO_L_pre : std_logic_vector(15 downto 0);
-signal AUDIO_R_pre : std_logic_vector(15 downto 0);
+--signal AUDIO_L_pre : std_logic_vector(15 downto 0);
+--signal AUDIO_R_pre : std_logic_vector(15 downto 0);
 
 signal covox_channel0 : std_logic_vector(7 downto 0);
 signal covox_channel1 : std_logic_vector(7 downto 0);
@@ -100,6 +100,16 @@ signal CHANNEL1SUM_REG : unsigned(5 downto 0);
 signal CHANNEL2SUM_REG : unsigned(5 downto 0);
 signal CHANNEL3SUM_REG : unsigned(5 downto 0);	
 
+signal POKEY_AUDIO_UNSIGNED : UNSIGNED_AUDIO_TYPE(3 downto 0);
+signal POKEY_AUDIO_SIGNED : SIGNED_AUDIO_TYPE(3 downto 0);
+
+signal GTIA_AUDIO_SIGNED : signed(15 downto 0);
+
+signal SIO_AUDIO_UNSIGNED : unsigned(15 downto 0);
+signal SIO_AUDIO_SIGNED : signed(15 downto 0);
+
+signal AUDIO_MIXED_SIGNED : SIGNED_AUDIO_TYPE(3 downto 2);
+
 signal POKEY_IRQ : std_logic_vector(3 downto 0);
 
 SIGNAL	ADDR_IN : STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -125,8 +135,8 @@ signal CHANNEL_MODE_REG : std_logic;
 signal SATURATE_REG : std_logic;
 signal POST_DIVIDE_REG : std_logic_vector(7 downto 4);	
 signal GTIA_ENABLE_REG : std_logic_vector(3 downto 2);
---signal ADC_VOLUME_REG : std_logic_vector(1 downto 0);
-signal SIO_DATA_VOLUME_REG : std_logic_vector(1 downto 0);
+signal ADC_VOLUME_REG : std_logic_vector(1 downto 0);
+--signal SIO_DATA_VOLUME_REG : std_logic_vector(1 downto 0);
 signal VERSION_LOC_REG : std_logic_vector(2 downto 0);
 signal PAL_REG : std_logic;
 	
@@ -136,8 +146,8 @@ signal CHANNEL_MODE_NEXT : std_logic;
 signal SATURATE_NEXT : std_logic;
 signal POST_DIVIDE_NEXT : std_logic_vector(7 downto 4);
 signal GTIA_ENABLE_NEXT : std_logic_vector(3 downto 2);
---signal ADC_VOLUME_NEXT : std_logic_vector(1 downto 0);
-signal SIO_DATA_VOLUME_NEXT : std_logic_vector(1 downto 0);
+signal ADC_VOLUME_NEXT : std_logic_vector(1 downto 0);
+--signal SIO_DATA_VOLUME_NEXT : std_logic_vector(1 downto 0);
 signal VERSION_LOC_NEXT : std_logic_vector(2 downto 0);
 signal PAL_NEXT : std_logic;
 
@@ -157,26 +167,6 @@ signal CONFIG_ENABLE_REG : std_logic;
 signal CONFIG_ENABLE_NEXT: std_logic;
 
 BEGIN
-
-pokey_mixer_both : entity work.pokey_mixer_mux
-PORT MAP(CLK => CLK,
-	ENABLE_179 => ENABLE_179,
-	GTIA_SOUND => GTIA_SOUND,
-	SIO_AUDIO => SIO_AUDIO,
-	CHANNEL_L_0 => POKEY_CHANNEL0(0),
-	CHANNEL_L_1 => POKEY_CHANNEL1(0),
-	CHANNEL_L_2 => POKEY_CHANNEL2(0),
-	CHANNEL_L_3 => POKEY_CHANNEL3(0),
-	COVOX_CHANNEL_L_0 => covox_channel0,
-	COVOX_CHANNEL_L_1 => covox_channel1,
-	CHANNEL_R_0 => POKEY_CHANNEL0(1),
-	CHANNEL_R_1 => POKEY_CHANNEL1(1),
-	CHANNEL_R_2 => POKEY_CHANNEL2(1),
-	CHANNEL_R_3 => POKEY_CHANNEL3(1),
-	COVOX_CHANNEL_R_0 => covox_channel2,
-	COVOX_CHANNEL_R_1 => covox_channel3,
-	VOLUME_OUT_L => AUDIO_L_pre,
-	VOLUME_OUT_R => AUDIO_R_pre);
 
 pokey1 : entity work.pokey
 PORT MAP(CLK => CLK,
@@ -204,6 +194,13 @@ PORT MAP(CLK => CLK,
 	DATA_OUT => POKEY_DO(0),
 	keyboard_scan => KEYBOARD_SCAN);
 
+pokey1_dc_blocker : entity work.dc_blocker_pm
+PORT MAP(CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLE_CYCLE => ENABLE_179,
+	AUDIO_IN => POKEY_AUDIO_UNSIGNED(0),
+	AUDIO_OUT => POKEY_AUDIO_SIGNED(0));
+
 other_pokeys: for I in 1 to 3 generate
 pokeyx : entity work.pokey
 GENERIC MAP (custom_keyboard_scan => 2)
@@ -222,6 +219,14 @@ PORT MAP(CLK => CLK,
 	SIO_IN1 => '1',
 	keyboard_response => "00",
 	pot_in => "00000000");
+
+pokeyx_dc_blocker : entity work.dc_blocker_pm
+PORT MAP(CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLE_CYCLE => ENABLE_179,
+	AUDIO_IN => POKEY_AUDIO_UNSIGNED(I),
+	AUDIO_OUT => POKEY_AUDIO_SIGNED(I));
+
 end generate other_pokeys;
 
 covox1 : entity work.covox
@@ -247,8 +252,8 @@ begin
 		SATURATE_REG <= '1';
 		POST_DIVIDE_REG <= "1010"; -- 1/2 5v, 3/4 1v
 		GTIA_ENABLE_REG <= "11"; -- external only
-		--ADC_VOLUME_REG <= "11"; -- 0=silent,1=1x,2=2x,3=4x
-		SIO_DATA_VOLUME_REG <= "10"; -- 0=silent,1=quieter,2=normal,3=louder
+		ADC_VOLUME_REG <= "10"; -- 0=silent,1=1x,2=2x,3=4x
+		--SIO_DATA_VOLUME_REG <= "10"; -- 0=silent,1=quieter,2=normal,3=louder
 		CONFIG_ENABLE_REG <= '0';
 		VERSION_LOC_REG <= (others=>'0');
 		PAL_REG <= '1';
@@ -277,8 +282,8 @@ begin
 		SATURATE_REG <= SATURATE_NEXT;
 		POST_DIVIDE_REG <= POST_DIVIDE_NEXT;
 		GTIA_ENABLE_REG <= GTIA_ENABLE_NEXT;
-		--ADC_VOLUME_REG <= ADC_VOLUME_NEXT;
-		SIO_DATA_VOLUME_REG <= SIO_DATA_VOLUME_NEXT;
+		ADC_VOLUME_REG <= ADC_VOLUME_NEXT;
+		--SIO_DATA_VOLUME_REG <= SIO_DATA_VOLUME_NEXT;
 		CONFIG_ENABLE_REG <= CONFIG_ENABLE_NEXT;
 		VERSION_LOC_REG <= VERSION_LOC_NEXT;
 		PAL_REG <= PAL_NEXT;
@@ -431,8 +436,8 @@ process(CONFIG_WRITE_ENABLE, WRITE_DATA, addr_decoded4,
 	CONFIG_ENABLE_REG,
 	POST_DIVIDE_REG,
 	GTIA_ENABLE_REG,
-	--ADC_VOLUME_REG,
-	SIO_DATA_VOLUME_REG,
+	ADC_VOLUME_REG,
+	--SIO_DATA_VOLUME_REG,
 	VERSION_LOC_REG,
 	--PSG_FREQ_REG,
 	--PSG_STEREOMODE_REG,
@@ -454,8 +459,8 @@ begin
 	
 	GTIA_ENABLE_NEXT <= GTIA_ENABLE_REG;
 
-	-- ADC_VOLUME_NEXT <= ADC_VOLUME_REG;
-	SIO_DATA_VOLUME_NEXT <= SIO_DATA_VOLUME_REG;
+	ADC_VOLUME_NEXT <= ADC_VOLUME_REG;
+	--SIO_DATA_VOLUME_NEXT <= SIO_DATA_VOLUME_REG;
 	
 	CONFIG_ENABLE_NEXT <= CONFIG_ENABLE_REG;
 	
@@ -492,8 +497,8 @@ begin
 				
 		if (addr_decoded4(3)='1') then			
 			GTIA_ENABLE_NEXT <= WRITE_DATA(3 downto 2);
-			--ADC_VOLUME_NEXT <= WRITE_DATA(5 downto 4);
-			SIO_DATA_VOLUME_NEXT <= WRITE_DATA(7 downto 6);
+			ADC_VOLUME_NEXT <= WRITE_DATA(5 downto 4);
+			--SIO_DATA_VOLUME_NEXT <= WRITE_DATA(7 downto 6);
 		end if;		
 
 		if (addr_decoded4(4)='1') then
@@ -539,8 +544,8 @@ end process;
 process(addr_decoded4,VERSION_LOC_REG,
 SATURATE_REG,CHANNEL_MODE_REG,IRQ_EN_REG,DETECT_RIGHT_REG,
 POST_DIVIDE_REG, GTIA_ENABLE_REG,
---ADC_VOLUME_REG,
-SIO_DATA_VOLUME_REG, 
+ADC_VOLUME_REG,
+--SIO_DATA_VOLUME_REG, 
 --PSG_FREQ_REG, PSG_STEREOMODE_REG, PSG_PROFILESEL_REG, PSG_ENVELOPE16_REG,
 --SID_FILTER1_REG, SID_FILTER2_REG,
 RESTRICT_CAPABILITY_REG,
@@ -590,7 +595,8 @@ begin
 	if (addr_decoded4(3)='1') then
 		CONFIG_DO <= (others=>'0');
 		CONFIG_DO(3 downto 2) <= GTIA_ENABLE_REG;
-		CONFIG_DO(7 downto 6) <= SIO_DATA_VOLUME_REG;
+		CONFIG_DO(5 downto 4) <= ADC_VOLUME_REG;
+		--CONFIG_DO(7 downto 6) <= SIO_DATA_VOLUME_REG;
 	end if;
 	
 	if (addr_decoded4(4)='1') then
@@ -651,6 +657,169 @@ begin
 
 end process;
 
+process(clk)
+begin
+	if (clk'event and clk='1') then
+		CHANNEL0SUM_REG <= CHANNEL0SUM_NEXT;
+		CHANNEL1SUM_REG <= CHANNEL1SUM_NEXT;
+		CHANNEL2SUM_REG <= CHANNEL2SUM_NEXT;
+		CHANNEL3SUM_REG <= CHANNEL3SUM_NEXT;
+	end if;
+end process;
+
+process(
+	POKEY_CHANNEL0,POKEY_CHANNEL1,POKEY_CHANNEL2,POKEY_CHANNEL3,
+	CHANNEL_MODE_REG -- 0=pokeys have a channel each,1=ch 0 summed, ch 1 summed, ch 2 summed etc
+	)
+variable p0 : unsigned(5 downto 0);
+variable p1 : unsigned(5 downto 0);
+variable p2 : unsigned(5 downto 0);
+variable p3 : unsigned(5 downto 0);
+
+variable c0 : unsigned(5 downto 0);
+variable c1 : unsigned(5 downto 0);
+variable c2 : unsigned(5 downto 0);
+variable c3 : unsigned(5 downto 0);
+
+variable sum0 : unsigned(5 downto 0);
+variable sum1 : unsigned(5 downto 0);
+variable sum2 : unsigned(5 downto 0);
+variable sum3 : unsigned(5 downto 0);
+
+begin
+	p0 := resize(unsigned(POKEY_CHANNEL0(0)),6) + resize(unsigned(POKEY_CHANNEL1(0)),6) + resize(unsigned(POKEY_CHANNEL2(0)),6) + resize(unsigned(POKEY_CHANNEL3(0)),6);
+	p1 := resize(unsigned(POKEY_CHANNEL0(1)),6) + resize(unsigned(POKEY_CHANNEL1(1)),6) + resize(unsigned(POKEY_CHANNEL2(1)),6) + resize(unsigned(POKEY_CHANNEL3(1)),6);
+	p2 := resize(unsigned(POKEY_CHANNEL0(2)),6) + resize(unsigned(POKEY_CHANNEL1(2)),6) + resize(unsigned(POKEY_CHANNEL2(2)),6) + resize(unsigned(POKEY_CHANNEL3(2)),6);
+	p3 := resize(unsigned(POKEY_CHANNEL0(3)),6) + resize(unsigned(POKEY_CHANNEL1(3)),6) + resize(unsigned(POKEY_CHANNEL2(3)),6) + resize(unsigned(POKEY_CHANNEL3(3)),6);
+
+	c0 := resize(unsigned(POKEY_CHANNEL0(0)),6) + resize(unsigned(POKEY_CHANNEL0(1)),6) + resize(unsigned(POKEY_CHANNEL0(2)),6) + resize(unsigned(POKEY_CHANNEL0(3)),6);
+	c1 := resize(unsigned(POKEY_CHANNEL1(0)),6) + resize(unsigned(POKEY_CHANNEL1(1)),6) + resize(unsigned(POKEY_CHANNEL1(2)),6) + resize(unsigned(POKEY_CHANNEL1(3)),6);
+	c2 := resize(unsigned(POKEY_CHANNEL2(0)),6) + resize(unsigned(POKEY_CHANNEL2(1)),6) + resize(unsigned(POKEY_CHANNEL2(2)),6) + resize(unsigned(POKEY_CHANNEL2(3)),6);
+	c3 := resize(unsigned(POKEY_CHANNEL3(0)),6) + resize(unsigned(POKEY_CHANNEL3(1)),6) + resize(unsigned(POKEY_CHANNEL3(2)),6) + resize(unsigned(POKEY_CHANNEL3(3)),6);
+
+	if CHANNEL_MODE_REG ='1' then
+		sum0 := c0;
+		sum1 := c1;
+		sum2 := c2;
+		sum3 := c3;
+	else
+		sum0 := p0;
+		sum1 := p1;
+		sum2 := p2;
+		sum3 := p3;
+	end if;
+
+	CHANNEL0SUM_NEXT <= sum0;
+	CHANNEL1SUM_NEXT <= sum1;
+	CHANNEL2SUM_NEXT <= sum2;
+	CHANNEL3SUM_NEXT <= sum3;
+end process;
+
+pokey_mixer_all : entity work.pokey_mixer_mux4
+PORT MAP(CLK => CLK,
+	RESET_N => RESET_N,
+	CHANNEL_0 => CHANNEL0SUM_REG,
+	CHANNEL_1 => CHANNEL1SUM_REG,
+	CHANNEL_2 => CHANNEL2SUM_REG,
+	CHANNEL_3 => CHANNEL3SUM_REG,
+	VOLUME_OUT_0 => POKEY_AUDIO_UNSIGNED(0),
+	VOLUME_OUT_1 => POKEY_AUDIO_UNSIGNED(1),
+	VOLUME_OUT_2 => POKEY_AUDIO_UNSIGNED(2),
+	VOLUME_OUT_3 => POKEY_AUDIO_UNSIGNED(3),
+	SATURATE => SATURATE_REG);
+
+process(GTIA_SOUND) is
+begin
+	if GTIA_SOUND='1' then
+		GTIA_AUDIO_SIGNED <= to_signed(5120,16);
+	else
+		GTIA_AUDIO_SIGNED <= to_signed(-5120,16);
+	end if;
+end process;
+
+sio_audio_dc_blocker : entity work.dc_blocker_pm
+PORT  MAP
+(
+	CLK          => CLK,
+	RESET_N      => RESET_N,
+	ENABLE_CYCLE => ENABLE_179,
+	AUDIO_IN    => SIO_AUDIO_UNSIGNED,
+	AUDIO_OUT   => SIO_AUDIO_SIGNED
+);
+
+process(ADC_VOLUME_REG,SIO_SOUND)
+begin
+	SIO_AUDIO_UNSIGNED <= (others=>'0');
+	case ADC_VOLUME_REG is
+		when "01" =>
+			SIO_AUDIO_UNSIGNED(12 downto 5) <= unsigned(SIO_SOUND);
+		when "10" =>
+			SIO_AUDIO_UNSIGNED(13 downto 6) <= unsigned(SIO_SOUND);
+		when "11" =>
+			SIO_AUDIO_UNSIGNED(14 downto 7) <= unsigned(SIO_SOUND);
+		when others =>
+	end case;
+end process;
+
+
+mixer1 : entity work.mixer
+PORT MAP
+(
+	CLK => CLK,
+	RESET_N => RESET_N,
+
+	ENABLE_CYCLE => ENABLE_179,
+
+	POST_DIVIDE => POST_DIVIDE_REG&"0000",
+	DETECT_RIGHT => DETECT_RIGHT_REG,
+	FANCY_ENABLE => FANCY_ENABLE,
+	B_CH0_EN => GTIA_ENABLE_REG&"00",
+	B_CH1_EN => "1100",
+
+	L_CH0 => POKEY_AUDIO_SIGNED(0),
+	R_CH0 => POKEY_AUDIO_SIGNED(1),
+	L_CH1 => POKEY_AUDIO_SIGNED(2),
+	R_CH1 => POKEY_AUDIO_SIGNED(3),
+	L_CH2 => to_signed(0, 16), -- SAMPLE_AUDIO_SIGNED(0),
+	R_CH2 => to_signed(0, 16), -- SAMPLE_AUDIO_SIGNED(1),
+	L_CH3 => to_signed(0, 16), -- SID_AUDIO_SIGNED(0),
+	R_CH3 => to_signed(0, 16), -- SID_AUDIO_SIGNED(1),
+	L_CH4 => to_signed(0, 16), -- PSG_AUDIO_SIGNED(0),
+	R_CH4 => to_signed(0, 16), -- PSG_AUDIO_SIGNED(1),
+	B_CH0 => GTIA_AUDIO_SIGNED,
+	B_CH1 => SIO_AUDIO_SIGNED,
+
+	MUTE_CHANNEL => '0', -- mixer_mute,
+
+	--S_AUDIO  => mixer_audio_out,
+	--S_LEFT => mixer_l_enable,
+	--S_RIGHT => mixer_r_enable,
+	--S_CHANNEL => mixer_audio_out_channel,
+
+	--AUDIO_0_SIGNED => AUDIO_MIXED_SIGNED(0),
+	--AUDIO_1_SIGNED => AUDIO_MIXED_SIGNED(1),
+	AUDIO_2_SIGNED => AUDIO_MIXED_SIGNED(2),
+	AUDIO_3_SIGNED => AUDIO_MIXED_SIGNED(3)
+);
+
+filter_left : entity work.simple_low_pass_filter
+PORT MAP
+(
+	CLK => clk,
+	AUDIO_IN => std_logic_vector(AUDIO_MIXED_SIGNED(2)),
+	SAMPLE_IN => enable_179,
+	AUDIO_OUT => AUDIO_L
+);
+
+filter_right : entity work.simple_low_pass_filter
+PORT MAP
+(
+	CLK => clk,
+	AUDIO_IN => std_logic_vector(AUDIO_MIXED_SIGNED(3)),
+	SAMPLE_IN => enable_179,
+	AUDIO_OUT => AUDIO_R
+);
+
 FANCY_ENABLE <= STEREO;
 ADDR_IN <= ADDR;
 WRITE_DATA <= DATA_IN;
@@ -662,10 +831,6 @@ DRIVE_DATA_OUT <= DRIVE_DO_MUX;
 -- TODO
 SAMPLE_IRQ <= '0';
 covox_write_enable <= SAMPLE_WRITE_ENABLE;
-
--- TODO
-AUDIO_L <= AUDIO_L_pre;
-AUDIO_R <= AUDIO_R_pre when STEREO = '1' else AUDIO_L_pre;
 
 IRQ_N_OUT <= (not(IRQ_EN_REG) or (and_reduce(POKEY_IRQ))) and (IRQ_EN_REG or POKEY_IRQ(0)) and not(SAMPLE_IRQ);
 
