@@ -214,8 +214,8 @@ wire joy_d4ena = ~&joya_3;
 wire cpu_halt;
 
 wire [15:0] laudio, raudio;
-assign AUDIO_R = (cpu_halt | reset) ? 16'b0000000000000000 : {raudio[15],raudio[15:1]};
-assign AUDIO_L = (cpu_halt | reset) ? 16'b0000000000000000 : {laudio[15],laudio[15:1]};
+assign AUDIO_R = (cpu_halt | reset) ? 16'b0000000000000000 : raudio;
+assign AUDIO_L = (cpu_halt | reset) ? 16'b0000000000000000 : laudio;
 assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 

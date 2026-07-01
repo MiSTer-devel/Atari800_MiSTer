@@ -47,8 +47,6 @@ ENTITY atari5200core IS
 
 		CLIP_SIDES : IN STD_LOGIC;
 
-		-- AUDIO OUT - Pokey/GTIA 1-bit and Covox all mixed
-		-- TODO - choose stereo/mono pokey
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
 		AUDIO_R : OUT std_logic_vector(15 downto 0);
 
@@ -279,23 +277,13 @@ PORT MAP(CLK => CLK,
 		 DATA_OUT => ANTIC_DO,
 		 dma_address_out => ANTIC_ADDR);
 
-pokey_mixer : entity work.pokey_mixer_mux
+pokey_mixer : entity work.pokey_mixer_simple
 PORT MAP(CLK => CLK,
 		 ENABLE_179 => ANTIC_ENABLE_179,
-		 GTIA_SOUND => '0',
-		 SIO_AUDIO => "00000000",
-		 CHANNEL_L_0 => POKEY1_CHANNEL0,
-		 CHANNEL_L_1 => POKEY1_CHANNEL1,
-		 CHANNEL_L_2 => POKEY1_CHANNEL2,
-		 CHANNEL_L_3 => POKEY1_CHANNEL3,
-		 COVOX_CHANNEL_L_0 => (others=>'0'),
-		 COVOX_CHANNEL_L_1 => (others=>'0'),
-		 CHANNEL_R_0 => POKEY1_CHANNEL0,
-		 CHANNEL_R_1 => POKEY1_CHANNEL1,
-		 CHANNEL_R_2 => POKEY1_CHANNEL2,
-		 CHANNEL_R_3 => POKEY1_CHANNEL3,
-		 COVOX_CHANNEL_R_0 => (others=>'0'),
-		 COVOX_CHANNEL_R_1 => (others=>'0'),
+		 CHANNEL_0 => POKEY1_CHANNEL0,
+		 CHANNEL_1 => POKEY1_CHANNEL1,
+		 CHANNEL_2 => POKEY1_CHANNEL2,
+		 CHANNEL_3 => POKEY1_CHANNEL3,
 		 VOLUME_OUT_L => AUDIO_L,
 		 VOLUME_OUT_R => AUDIO_R);
 		 
@@ -330,11 +318,9 @@ PORT MAP(CLK => CLK,
 		 GTIA_DATA => GTIA_DO,
 		 CACHE_GTIA_DATA => CACHE_GTIA_DO,
 		 PIA_DATA => (others=>'0'),
-		 POKEY2_DATA => (others=>'0'),
-		 CACHE_POKEY2_DATA => (others=>'0'),
 		 POKEY_DATA => POKEY_DO,
+		 DRIVE_POKEY_DATA => '1',
 		 CACHE_POKEY_DATA => CACHE_POKEY_DO,
-		 STEREO => '0',
 		 PORTB => (others=>'0'),
 		 RAM_DATA => RAM_DO,
 		 ram_select => (others=>'0'),
@@ -350,7 +336,6 @@ PORT MAP(CLK => CLK,
 		 MEMORY_READY_CPU => MEMORY_READY_CPU,
 		 GTIA_WR_ENABLE => GTIA_WRITE_ENABLE,
 		 POKEY_WR_ENABLE => POKEY_WRITE_ENABLE,
-		 POKEY2_WR_ENABLE => open,
 		 ANTIC_WR_ENABLE => ANTIC_WRITE_ENABLE,
 		 PIA_WR_ENABLE => open,
 		 PIA_RD_ENABLE => open,
@@ -372,7 +357,6 @@ PORT MAP(CLK => CLK,
 		 ROM_ADDR => ROM_ADDR,
 		 SDRAM_ADDR => SDRAM_ADDR,
 		 WRITE_DATA => WRITE_DATA,
-		 d6_wr_enable => open,
 		 cart_select => EMULATED_CARTRIDGE_SELECT,
 		 cart2_select => (others=>'0'),
 		 rom_in_ram => ROM_IN_RAM,

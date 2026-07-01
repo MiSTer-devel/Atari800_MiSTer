@@ -964,7 +964,7 @@ begin
 	CHANNEL3SUM_NEXT <= sum3;
 end process;
 
-pokey_mixer_all : entity work.pokey_mixer_mux4
+pokey_mixer_all : entity work.pokey_mixer_mux
 PORT MAP(CLK => CLK,
 	RESET_N => RESET_N,
 	CHANNEL_0 => CHANNEL0SUM_REG,

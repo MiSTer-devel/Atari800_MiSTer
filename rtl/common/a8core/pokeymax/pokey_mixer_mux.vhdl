@@ -10,7 +10,7 @@ USE ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use IEEE.STD_LOGIC_MISC.all;
 
-ENTITY pokey_mixer_mux4 IS
+ENTITY pokey_mixer_mux IS
 PORT 
 ( 
 	CLK : IN STD_LOGIC;
@@ -31,9 +31,9 @@ PORT
 	PROFILE_READY : IN std_logic;
 	PROFILE_DATA : IN std_logic_vector(15 downto 0)
 );
-END pokey_mixer_mux4;
+END pokey_mixer_mux;
 
-ARCHITECTURE vhdl OF pokey_mixer_mux4 IS
+ARCHITECTURE vhdl OF pokey_mixer_mux IS
 	signal CHANNEL_STATE_NEXT : STD_LOGIC_VECTOR(2 downto 0);
 	signal CHANNEL_STATE_REG : STD_LOGIC_VECTOR(2 downto 0);
 	constant CHANNEL_STATE_WAIT0 : STD_LOGIC_VECTOR(2 downto 0) := "000";

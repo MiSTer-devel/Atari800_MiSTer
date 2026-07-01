@@ -21,8 +21,6 @@ set_global_assignment -name VHDL_FILE rtl/common/a8core/pia.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_countdown_timer.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_keyboard_scanner.vhdl
-set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_mixer.vhdl
-set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_mixer_mux.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_noise_filter.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_poly_17_9.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokey_poly_4.vhdl
@@ -39,7 +37,7 @@ set_global_assignment -name VHDL_FILE rtl/common/a8core/wide_delay_line.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/pokeymax.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/audiotypes.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/dc_blocker.vhdl
-set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/pokey_mixer_mux4.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/pokey_mixer_mux.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/mixer.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/sample/top.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/sample/channel.vhdl
