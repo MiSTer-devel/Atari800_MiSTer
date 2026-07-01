@@ -30,8 +30,9 @@ PORT
 
 	ANTIC_ENABLE_179 : OUT STD_LOGIC;  -- always about 1.79MHz to keep sound the same - 1 cycle early
 	oldcpu_enable : OUT STD_LOGIC;     -- always about 1.79MHz to keep sound the same - 1 cycle only, when memory is ready...
-	CPU_ENABLE_OUT : OUT STD_LOGIC    -- for compatibility run at 1.79MHz, for speed run as fast as we can
-	
+	CPU_ENABLE_OUT : OUT STD_LOGIC;    -- for compatibility run at 1.79MHz, for speed run as fast as we can
+	ANTIC_ENABLE_179_DOUBLE : OUT STD_LOGIC
+
 	-- antic DMA runs 1 cycle after 'enable', so ANTIC_ENABLE is delayed by cycle_length-1 cycles vs CPU_ENABLE (when in 1.79MHz mode)
 );
 END shared_enable;
@@ -65,6 +66,8 @@ ARCHITECTURE vhdl OF shared_enable IS
 	
 	signal enable_179 : std_logic;
 	signal enable_179_early : std_logic;
+	signal enable_179_double : std_logic;
+	signal enable_179_double_early : std_logic;
 	signal cpu_enable : std_logic;
 	
 	signal cpu_extra_enable_next : std_logic;
@@ -91,6 +94,10 @@ begin
 	enable_179_clock_div : enable_divider
 		generic map (COUNT=>cycle_length)
 		port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>enable_179);
+
+	enable_179_clock_div2 : enable_divider
+		generic map (COUNT=>cycle_length/2)
+		port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>enable_179_double);
 		
 	process(THROTTLE_COUNT_6502, speed_shift_reg, enable_179)
 		variable speed_shift : std_logic;
@@ -117,7 +124,11 @@ begin
 
 	delay_line_phase : delay_line
 		generic map (COUNT=>cycle_length-1)
-		port map(clk=>clk,sync_reset=>'0',reset_n=>reset_n,data_in=>enable_179, enable=>'1', data_out=>enable_179_early);	
+		port map(clk=>clk,sync_reset=>'0',reset_n=>reset_n,data_in=>enable_179, enable=>'1', data_out=>enable_179_early);
+
+	delay_line_phase_double : delay_line
+		generic map (COUNT=>cycle_length-1)
+		port map(clk=>clk,sync_reset=>'0',reset_n=>reset_n,data_in=>enable_179_double, enable=>'1', data_out=>enable_179_double_early);
 
 	-- registers
 	process(clk,reset_n)
@@ -203,6 +214,7 @@ begin
 	-- output
 	oldcpu_enable <= oldcycle_go;
 	ANTIC_ENABLE_179 <= enable_179_early;
+	ANTIC_ENABLE_179_DOUBLE <= enable_179_double_early;
 	
 	CPU_ENABLE_OUT <= cpu_enable; -- run at 25MHz
 

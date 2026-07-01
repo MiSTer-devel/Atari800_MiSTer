@@ -387,8 +387,10 @@ assign CLK_VIDEO = clk_vdo;
 wire cpu_halt;
 
 wire [15:0] laudio, raudio;
-assign AUDIO_L = (cpu_halt | areset | reset) ? 16'b0000000000000000 : {laudio[15],laudio[15:1]};
-assign AUDIO_R = (cpu_halt | areset | reset) ? 16'b0000000000000000 : (status[20] ? {raudio[15],raudio[15:1]} : AUDIO_L);
+//assign AUDIO_L = (cpu_halt | areset | reset) ? 16'b0000000000000000 : {laudio[15],laudio[15],laudio[15:2]};
+//assign AUDIO_R = (cpu_halt | areset | reset) ? 16'b0000000000000000 : {raudio[15],raudio[15],raudio[15:2]};
+assign AUDIO_L = (cpu_halt | areset | reset) ? 16'b0000000000000000 : laudio;
+assign AUDIO_R = (cpu_halt | areset | reset) ? 16'b0000000000000000 : raudio;
 assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
 

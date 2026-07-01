@@ -149,7 +149,7 @@ filter_left : entity work.simple_low_pass_filter
 	port map
 	(
 		CLK => CLK,
-		AUDIO_IN => VOLUME_OUT_L_REG,
+		AUDIO_IN => unsigned(VOLUME_OUT_L_REG),
 		SAMPLE_IN => ENABLE_179,
 		AUDIO_OUT => VOLUME_POSTLOWPASS_L_REG
 	);
@@ -157,7 +157,7 @@ filter_right : entity work.simple_low_pass_filter
 	port map
 	(
 		CLK => CLK,
-		AUDIO_IN => VOLUME_OUT_R_REG,
+		AUDIO_IN => unsigned(VOLUME_OUT_R_REG),
 		SAMPLE_IN => ENABLE_179,
 		AUDIO_OUT => VOLUME_POSTLOWPASS_R_REG
 	);

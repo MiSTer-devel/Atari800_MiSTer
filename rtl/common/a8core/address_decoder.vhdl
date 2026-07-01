@@ -40,6 +40,12 @@ PORT
 	DMA_8BIT_WRITE_ENABLE : in std_logic; -- for hardware regs	
 	DMA_WRITE_DATA : in std_logic_vector(31 downto 0);
 
+	SAMPLE_RAM_ADDRESS : in std_logic_vector(15 downto 0) := (others => '0');
+	SAMPLE_RAM_WRITE_ENABLE : in std_logic := '0';
+	SAMPLE_RAM_REQUEST : in std_logic := '0';
+	SAMPLE_RAM_READY : out std_logic;
+	SAMPLE_RAM_WRITE_DATA : in std_logic_vector(7 downto 0) := (others => '0');
+
 	-- VBXE, including the registers (excl. below)
 	VBXE_SWITCH : in std_logic := '0'; -- On / off
 	VBXE_REG_BASE : in std_logic := '0'; -- 0 -> $D640, 1 -> $D740
@@ -117,6 +123,7 @@ PORT
 		-- these all take 1 cycle, so fine to leave device selected in general
 	GTIA_WR_ENABLE : OUT STD_LOGIC;
 	POKEY_WR_ENABLE : OUT STD_LOGIC;
+	POKEY_REQ : OUT STD_LOGIC;
 	ANTIC_WR_ENABLE : OUT STD_LOGIC;
 	PIA_WR_ENABLE : OUT STD_LOGIC;
 	PIA_RD_ENABLE : OUT STD_LOGIC; -- ... except PIA takes action on reads!
@@ -187,6 +194,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal notify_DMA : std_logic;
 	signal notify_cpu : std_logic;
 	signal notify_flash : std_logic;
+	signal notify_sample : std_logic;
 	signal start_request : std_logic;
 	signal pbi_cycle_next : std_logic;
 	signal pbi_cycle_reg : std_logic;
@@ -218,6 +226,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	constant state_waiting_DMA : std_logic_vector(2 downto 0) := "010";
 	constant state_waiting_antic : std_logic_vector(2 downto 0) := "011";
 	constant state_waiting_flash : std_logic_vector(2 downto 0) := "100";
+	constant state_waiting_sample : std_logic_vector(2 downto 0) := "101";
 	
 	signal ram_chip_select : std_logic;
 	signal sdram_chip_select : std_logic;
@@ -237,6 +246,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal SDRAM_OS_ROM_ADDR : std_logic_vector(24 downto 0);
 	signal SDRAM_FREEZER_RAM_ADDR   : std_logic_vector(24 downto 0);
 	signal SDRAM_FREEZER_ROM_ADDR   : std_logic_vector(24 downto 0);
+	signal SDRAM_SAMPLE_ADDR : std_logic_vector(24 downto 0);
 	
 	signal emu_cart_enable: std_logic;
 
@@ -650,7 +660,8 @@ BEGIN
 	pbi_takeover_adj <= (pbi_takeover) when (freezer_enable='0' or not(freezer_disable_atari)) else '0';
 
 	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
-		cart_flash_request,cart_flash_wr,cart_flash_address,cart_flash_data)
+		cart_flash_request,cart_flash_wr,cart_flash_address,cart_flash_data,
+		sample_ram_request,sample_ram_address,sample_ram_write_data,sample_ram_write_enable,SDRAM_SAMPLE_ADDR)
 	begin
 		start_request <= '0';
 		pbi_request <= '0';
@@ -658,6 +669,7 @@ BEGIN
 		notify_cpu <= '0';
 		notify_DMA <= '0';
 		notify_flash <= '0';
+		notify_sample <= '0';
 		state_next <= state_reg;
 		pbi_cycle_next <= pbi_cycle_reg;
 
@@ -684,7 +696,21 @@ BEGIN
 				data_WRITE_next <= (others => '0');
 				-- This is confusing, does not seem to be needed?
 				-- addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);
-				if antic_fetch = '1' then
+				if sample_ram_request = '1' then
+					start_request <= '1';
+					addr_next <= '1' & SDRAM_SAMPLE_ADDR(24 downto 16) & SAMPLE_RAM_ADDRESS;
+					data_WRITE_next(7 downto 0) <= SAMPLE_RAM_WRITE_DATA;
+					width_8bit_next <= '1';
+					write_enable_next <= SAMPLE_RAM_WRITE_ENABLE;
+
+					if (request_complete = '1') then
+						notify_sample <= '1';
+					else
+						state_next <= state_waiting_sample;
+					end if;
+					antic_fetch_real_next <= '0';
+					cpu_fetch_real_next <= '0';
+				elsif antic_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
 					pbi_cycle_next <= pbi_takeover_adj;
@@ -765,6 +791,11 @@ BEGIN
 				if (request_complete = '1') then
 					state_next <= state_idle;
 				end if;
+			when state_waiting_sample =>
+				notify_sample <= request_complete;
+				if (request_complete = '1') then
+					state_next <= state_idle;
+				end if;
 			when state_waiting_flash =>
 				notify_flash <= request_complete;
 				if (request_complete = '1') then
@@ -785,6 +816,7 @@ BEGIN
 	MEMORY_READY_ANTIC <= notify_antic;
 	MEMORY_READY_DMA <= notify_DMA;
 	MEMORY_READY_CPU <= notify_cpu;
+	SAMPLE_RAM_READY <= notify_sample;
 	
 	RAM_REQUEST <= ram_chip_select;
 		
@@ -902,13 +934,14 @@ gen_normal_memory : if low_memory=0 generate
 	SDRAM_FREEZER_RAM_ADDR <= "00100100" & freezer_access_address;
 	-- 64k freezer rom		"0 0100 1010 YYYY YYYY YYYY YYYY"
 	SDRAM_FREEZER_ROM_ADDR <= "001001010" & freezer_access_address(15 downto 0);
-	-- CARTS         -              "0 0101 YYYY YYY0 0000 0000 0000" (BOT) - 2MB! 8kb banks
+	-- CARTS         -              "0 10YY YYYY YYY0 0000 0000 0000" (BOT) start at 16MB SDRAM, currently take up to 4MB
 	SDRAM_CART_ADDR	<= "010" & emu_cart_address(21 downto 0);
 	-- BASIC/OS ROM  -              "0 0111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K below 8MB
 	SDRAM_BASIC_ROM_ADDR <= "00111"&"000000" &"00000000000000";
 	SDRAM_OS_ROM_ADDR    <= "00111"&"000010" &"00000000000000" when atari800mode = '1' else
 				"00111"&"000001" &"00000000000000";
-	-- SYSTEM        -              "0 0111 1000 0000 0000 0000 0000" (BOT) - Free 512K below 8MB
+	-- SYSTEM        -              "0 0111 1000 0000 0000 0000 0000" (BOT) - Free 512K below 8MB, first 64K taken by the sample engine
+	SDRAM_SAMPLE_ADDR <= "0011110000000000000000000";
 
 end generate;
 
@@ -1022,6 +1055,7 @@ end generate;
 		
 		GTIA_WR_ENABLE <= '0';
 		POKEY_WR_ENABLE <= '0';
+		POKEY_REQ <= '0';
 		ANTIC_WR_ENABLE <= '0';
 		PIA_WR_ENABLE <= '0';
 		PIA_RD_ENABLE <= '0';
@@ -1144,7 +1178,8 @@ end generate;
 					end if;
 					
 				-- POKEY
-				when X"D2" =>				
+				when X"D2" =>
+					POKEY_REQ <= '1';
 					POKEY_WR_ENABLE <= write_enable_next;
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					MEMORY_DATA_INT(15 downto 8) <= CACHE_POKEY_DATA;
