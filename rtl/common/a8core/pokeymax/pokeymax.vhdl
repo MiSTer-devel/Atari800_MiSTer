@@ -14,6 +14,8 @@ PORT
 
     ENABLE_179 : in std_logic;
     ENABLE_179_DOUBLE : in std_logic;
+	CLOCK_SHIFT : in std_logic_vector(15 downto 0);
+	VBXE_MEMAC_ACTIVE : in std_logic;
 	ADDR : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 	DATA_IN : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 	REQUEST : IN STD_LOGIC;
@@ -56,7 +58,12 @@ PORT
 	SAMPLE_RAM_REQUEST : out std_logic;
 	SAMPLE_RAM_READY : in std_logic;
 	SAMPLE_RAM_READ_DATA : in std_logic_vector(7 downto 0);
-	SAMPLE_RAM_WRITE_DATA : out std_logic_vector(7 downto 0)
+	SAMPLE_RAM_WRITE_DATA : out std_logic_vector(7 downto 0);
+
+	SID_ROM_ADDRESS : out std_logic_vector(16 downto 0);
+	SID_ROM_REQUEST : out std_logic;
+	SID_ROM_READY : in std_logic;
+	SID_ROM_READ_DATA : in std_logic_vector(31 downto 0)
 );
 END pokeymax;
 
@@ -154,6 +161,7 @@ signal SAMPLE_AUDIO_IN_SIGNED : SIGNED_AUDIO_TYPE(3 downto 0);
 signal FANCY_ENABLE : std_logic;
 
 signal SAMPLE_IRQ : std_logic;
+signal SAMPLE_RAM_REQUEST_RAW : std_logic;
 
 -- config
 -- regs
@@ -213,6 +221,16 @@ signal MIX_SEL1_NEXT : std_logic_vector(2 downto 0);
 signal MIX_SEL1_REG : std_logic_vector(2 downto 0);
 signal MIX_SEL2_NEXT : std_logic_vector(2 downto 0);
 signal MIX_SEL2_REG : std_logic_vector(2 downto 0);
+
+signal SID1_ROM_ADDRESS : std_logic_vector(16 downto 0);
+signal SID1_ROM_REQUEST : std_logic;
+signal SID1_ROM_READY : std_logic;
+signal SID1_ROM_READ_DATA : std_logic_vector(31 downto 0);
+
+signal SID2_ROM_ADDRESS : std_logic_vector(16 downto 0);
+signal SID2_ROM_REQUEST : std_logic;
+signal SID2_ROM_READY : std_logic;
+signal SID2_ROM_READ_DATA : std_logic_vector(31 downto 0);
 
 function adpcm_step(x: unsigned(6 downto 0)) return unsigned is
 begin
@@ -473,7 +491,7 @@ PORT MAP(
 	AUDIO_IN3 => SAMPLE_AUDIO_IN_SIGNED(3),
 
 	RAM_ADDR => SAMPLE_RAM_ADDRESS,
-	RAM_REQUEST => SAMPLE_RAM_REQUEST,
+	RAM_REQUEST => SAMPLE_RAM_REQUEST_RAW,
 	RAM_READY => SAMPLE_RAM_READY,
 	RAM_WRITE_ENABLE => SAMPLE_RAM_WRITE_ENABLE,
 	RAM_DATA => SAMPLE_RAM_READ_DATA,
@@ -487,10 +505,129 @@ PORT MAP(
 
 ADPCM_STEP_VALUE <= std_logic_vector(adpcm_step(unsigned(ADPCM_STEP_ADDR)));
 
--- SID - TODO
+-- TODO There is currently no software for sample engine that works
+-- with VBXE, so this is (a) impossible to test, (b) say whether it's at all needed.
+-- SID playing with VBXE active seems to work without a hitch and without any hacks of this sort.
 
-SID_AUDIO_SIGNED(0) <= (others => '0');
-SID_AUDIO_SIGNED(1) <= (others => '0');
+SAMPLE_RAM_REQUEST <= SAMPLE_RAM_REQUEST_RAW and (not(VBXE_MEMAC_ACTIVE) or or_reduce(CLOCK_SHIFT(11 downto 4)));
+
+enable_1mhz_clock_div : entity work.enable_divider
+generic map (COUNT=>28) -- TODO dep cycle_length
+port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>SID_CLK_ENABLE);
+
+sid_data_mapper : entity work.sid_data
+PORT MAP(
+	CLK => CLK,
+	RESET_N => RESET_N,
+
+	SID1_ROM_ADDRESS => SID1_ROM_ADDRESS,
+	SID1_ROM_REQUEST => SID1_ROM_REQUEST,
+	SID1_ROM_READY => SID1_ROM_READY,
+	SID1_ROM_READ_DATA => SID1_ROM_READ_DATA,
+
+	SID2_ROM_ADDRESS => SID2_ROM_ADDRESS,
+	SID2_ROM_REQUEST => SID2_ROM_REQUEST,
+	SID2_ROM_READY => SID2_ROM_READY,
+	SID2_ROM_READ_DATA => SID2_ROM_READ_DATA,
+
+	SID_ROM_ADDRESS => SID_ROM_ADDRESS,
+	SID_ROM_REQUEST => SID_ROM_REQUEST,
+	SID_ROM_READY => SID_ROM_READY,
+	SID_ROM_READ_DATA => SID_ROM_READ_DATA
+);
+
+sid1 : entity work.SID_top
+GENERIC MAP
+(
+	wave_base => "00100000000000000"
+)
+PORT MAP(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLE => SID_CLK_ENABLE, --1MHz
+
+	WRITE_ENABLE => SID_WRITE_ENABLE(0),
+	READ_ENABLE => SID_READ_ENABLE(0),
+	ADDR => ADDR_IN(4 downto 0),
+	DI => WRITE_DATA(7 downto 0),
+	DO => SID_DO(0),
+	DRIVE_DO => SID_DRIVE_DO(0),
+	AUDIO => SID_AUDIO_SIGNED(0),
+
+	SIDTYPE => SID_FILTER1_REG(0),
+	EXT => SID_FILTER1_REG(2 downto 1),
+	EXT_ADC => signed_to_unsigned(SID_AUDIO_IN_SIGNED(0)),
+
+	POT_X => '0',
+	POT_Y => '0',
+
+	rom_addr => SID1_ROM_ADDRESS,
+	rom_data => SID1_ROM_READ_DATA,
+    rom_request => SID1_ROM_REQUEST,
+	rom_ready => SID1_ROM_READY,
+
+	FILTER_BP_OUT => SID1_FILTER_BP,
+	FILTER_HP_OUT => SID1_FILTER_HP,
+	FILTER_F_OUT => SID1_F_RAW,
+	FILTER_F_BP => std_logic_vector(SID1_F_BP),
+	FILTER_F_HP => std_logic_vector(SID1_F_HP)
+);
+
+sid2 : entity work.SID_top
+GENERIC MAP
+(
+	wave_base => "00100000000000000"
+)
+PORT MAP(
+	CLK => CLK,
+	RESET_N => RESET_N,
+	ENABLE => SID_CLK_ENABLE, --1MHz
+
+	WRITE_ENABLE => SID_WRITE_ENABLE(1),
+	READ_ENABLE => SID_READ_ENABLE(1),
+	ADDR => ADDR_IN(4 downto 0),
+	DI => WRITE_DATA(7 downto 0),
+	DO => SID_DO(1),
+	DRIVE_DO => SID_DRIVE_DO(1),
+	AUDIO => SID_AUDIO_SIGNED(1),
+
+	SIDTYPE => SID_FILTER2_REG(0),
+	EXT => SID_FILTER2_REG(2 downto 1),
+	EXT_ADC => signed_to_unsigned(SID_AUDIO_IN_SIGNED(1)),
+
+	POT_X => '0',
+	POT_Y => '0',
+
+	rom_addr => SID2_ROM_ADDRESS,
+	rom_data => SID2_ROM_READ_DATA,
+    rom_request => SID2_ROM_REQUEST,
+	rom_ready => SID2_ROM_READY,
+
+	FILTER_BP_OUT => SID2_FILTER_BP,
+	FILTER_HP_OUT => SID2_FILTER_HP,
+	FILTER_F_OUT => SID2_F_RAW,
+	FILTER_F_BP => std_logic_vector(SID2_F_BP),
+	FILTER_F_HP => std_logic_vector(SID2_F_HP)
+);
+
+f_distortion_mux : entity work.SID_f_distortion_mux
+port map
+(
+	clk=>clk,
+	reset_n=>reset_n,
+	state1=>SID1_FILTER_BP(17 downto 8),
+	state2=>SID1_FILTER_HP(17 downto 8),
+	state3=>SID2_FILTER_BP(17 downto 8),
+	state4=>SID2_FILTER_HP(17 downto 8),
+	SIDTYPE12 => SID_FILTER1_REG(0),
+	SIDTYPE34 => SID_FILTER2_REG(0),
+	f_raw12=>unsigned(SID1_F_RAW),
+	f_raw34=>unsigned(SID2_F_RAW),
+	f_distorted1=>SID1_F_BP,
+	f_distorted2=>SID1_F_HP,
+	f_distorted3=>SID2_F_BP,
+	f_distorted4=>SID2_F_HP
+);
 
 -- Configuration
 
@@ -823,7 +960,7 @@ begin
 	ACTUAL_CAPABILITY(1 downto 0) := "11"; -- POKEY CFG bit1=quad
 
 	--if (enable_sid=1) then
-	--	ACTUAL_CAPABILITY(2) := '1'; -- SID
+	ACTUAL_CAPABILITY(2) := '1'; -- SID
 
 	--if (enable_psg=1) then
 	--	ACTUAL_CAPABILITY(3) := '1'; -- PSG

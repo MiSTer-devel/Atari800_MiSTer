@@ -46,6 +46,10 @@ PORT
 	SAMPLE_RAM_READY : out std_logic;
 	SAMPLE_RAM_WRITE_DATA : in std_logic_vector(7 downto 0) := (others => '0');
 
+	SID_ROM_ADDRESS : in std_logic_vector(16 downto 0) := (others => '0');
+	SID_ROM_REQUEST : in std_logic := '0';
+	SID_ROM_READY : out std_logic;
+
 	-- VBXE, including the registers (excl. below)
 	VBXE_SWITCH : in std_logic := '0'; -- On / off
 	VBXE_REG_BASE : in std_logic := '0'; -- 0 -> $D640, 1 -> $D740
@@ -195,6 +199,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal notify_cpu : std_logic;
 	signal notify_flash : std_logic;
 	signal notify_sample : std_logic;
+	signal notify_sid : std_logic;
 	signal start_request : std_logic;
 	signal pbi_cycle_next : std_logic;
 	signal pbi_cycle_reg : std_logic;
@@ -227,6 +232,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	constant state_waiting_antic : std_logic_vector(2 downto 0) := "011";
 	constant state_waiting_flash : std_logic_vector(2 downto 0) := "100";
 	constant state_waiting_sample : std_logic_vector(2 downto 0) := "101";
+	constant state_waiting_sid: std_logic_vector(2 downto 0) := "110";
 	
 	signal ram_chip_select : std_logic;
 	signal sdram_chip_select : std_logic;
@@ -247,6 +253,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal SDRAM_FREEZER_RAM_ADDR   : std_logic_vector(24 downto 0);
 	signal SDRAM_FREEZER_ROM_ADDR   : std_logic_vector(24 downto 0);
 	signal SDRAM_SAMPLE_ADDR : std_logic_vector(24 downto 0);
+	signal SDRAM_SID_ADDR : std_logic_vector(24 downto 0);
 	
 	signal emu_cart_enable: std_logic;
 
@@ -661,7 +668,8 @@ BEGIN
 
 	process(antic_fetch, dma_fetch, cpu_fetch, atari_dma_access, state_reg, addr_reg, data_write_reg, width_8bit_reg, width_16bit_reg, width_32bit_reg, write_enable_reg, write_enable_freezer_reg, antic_addr, DMA_addr, cpu_addr, request_complete, DMA_8bit_write_enable,DMA_16bit_write_enable,DMA_32bit_write_enable,DMA_read_enable, cpu_write_n, CPU_WRITE_DATA, DMA_WRITE_DATA, antic_fetch_real_reg, cpu_fetch_real_reg, pbi_takeover, pbi_takeover_adj, pbi_release, pbi_cycle_reg,
 		cart_flash_request,cart_flash_wr,cart_flash_address,cart_flash_data,
-		sample_ram_request,sample_ram_address,sample_ram_write_data,sample_ram_write_enable,SDRAM_SAMPLE_ADDR)
+		sample_ram_request,sample_ram_address,sample_ram_write_data,sample_ram_write_enable,SDRAM_SAMPLE_ADDR,
+		sid_rom_request,sid_rom_address,SDRAM_SID_ADDR)
 	begin
 		start_request <= '0';
 		pbi_request <= '0';
@@ -670,6 +678,7 @@ BEGIN
 		notify_DMA <= '0';
 		notify_flash <= '0';
 		notify_sample <= '0';
+		notify_sid <= '0';
 		state_next <= state_reg;
 		pbi_cycle_next <= pbi_cycle_reg;
 
@@ -694,23 +703,8 @@ BEGIN
 				width_16bit_next <= '0';
 				width_32bit_next <= '0';	
 				data_WRITE_next <= (others => '0');
-				-- This is confusing, does not seem to be needed?
-				-- addr_next <= DMA_ADDR(23 downto 16)&cpu_ADDR(15 downto 0);
-				if sample_ram_request = '1' then
-					start_request <= '1';
-					addr_next <= '1' & SDRAM_SAMPLE_ADDR(24 downto 16) & SAMPLE_RAM_ADDRESS;
-					data_WRITE_next(7 downto 0) <= SAMPLE_RAM_WRITE_DATA;
-					width_8bit_next <= '1';
-					write_enable_next <= SAMPLE_RAM_WRITE_ENABLE;
 
-					if (request_complete = '1') then
-						notify_sample <= '1';
-					else
-						state_next <= state_waiting_sample;
-					end if;
-					antic_fetch_real_next <= '0';
-					cpu_fetch_real_next <= '0';
-				elsif antic_fetch = '1' then
+				if antic_fetch = '1' then
 					start_request <= not(pbi_takeover_adj);
 					pbi_request <= pbi_takeover_adj;
 					pbi_cycle_next <= pbi_takeover_adj;
@@ -740,6 +734,33 @@ BEGIN
 					end if;
 					cpu_fetch_real_next <= '1';
 					antic_fetch_real_next <= '0';
+				elsif sample_ram_request = '1' then
+					start_request <= '1';
+					addr_next <= '1' & SDRAM_SAMPLE_ADDR(24 downto 16) & SAMPLE_RAM_ADDRESS;
+					data_WRITE_next(7 downto 0) <= SAMPLE_RAM_WRITE_DATA;
+					width_8bit_next <= '1';
+					write_enable_next <= SAMPLE_RAM_WRITE_ENABLE;
+
+					if (request_complete = '1') then
+						notify_sample <= '1';
+					else
+						state_next <= state_waiting_sample;
+					end if;
+					antic_fetch_real_next <= '0';
+					cpu_fetch_real_next <= '0';
+				elsif sid_rom_request = '1' then
+					start_request <= '1';
+					addr_next <= '1' & SDRAM_SID_ADDR(24 downto 17) & SID_ROM_ADDRESS;
+					width_32bit_next <= '1';
+					write_enable_next <= '0';
+
+					if (request_complete = '1') then
+						notify_sid <= '1';
+					else
+						state_next <= state_waiting_sid;
+					end if;
+					antic_fetch_real_next <= '0';
+					cpu_fetch_real_next <= '0';
 				elsif dma_fetch = '1' then
 					-- It seems it does not matter which priority DMA has
 					-- the important one is that ANTIC comes before CPU
@@ -796,6 +817,11 @@ BEGIN
 				if (request_complete = '1') then
 					state_next <= state_idle;
 				end if;
+			when state_waiting_sid =>
+				notify_sid <= request_complete;
+				if (request_complete = '1') then
+					state_next <= state_idle;
+				end if;
 			when state_waiting_flash =>
 				notify_flash <= request_complete;
 				if (request_complete = '1') then
@@ -817,6 +843,7 @@ BEGIN
 	MEMORY_READY_DMA <= notify_DMA;
 	MEMORY_READY_CPU <= notify_cpu;
 	SAMPLE_RAM_READY <= notify_sample;
+	SID_ROM_READY <= notify_sid;
 	
 	RAM_REQUEST <= ram_chip_select;
 		
@@ -940,8 +967,11 @@ gen_normal_memory : if low_memory=0 generate
 	SDRAM_BASIC_ROM_ADDR <= "00111"&"000000" &"00000000000000";
 	SDRAM_OS_ROM_ADDR    <= "00111"&"000010" &"00000000000000" when atari800mode = '1' else
 				"00111"&"000001" &"00000000000000";
-	-- SYSTEM        -              "0 0111 1000 0000 0000 0000 0000" (BOT) - Free 512K below 8MB, first 64K taken by the sample engine
+	-- SYSTEM        -              "0 0111 1000 0000 0000 0000 0000" (BOT) - Free 512K below 8MB:
+	-- first 64K taken by the sample engine, then 64K empty
+	-- then 128K of SID frequency and wave data
 	SDRAM_SAMPLE_ADDR <= "0011110000000000000000000";
+	SDRAM_SID_ADDR <= "00111101"&"00000000000000000";
 
 end generate;
 

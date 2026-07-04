@@ -80,6 +80,8 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 localparam CONF_STR = {
 	"ATARI800;;",
 	"-;",
+	"FC7,ROMBIN,SID Data (temp);",
+	"-;",
 	"S6,ATRXEXXDFATX,Boot D1;",
 	"S5,XEXCOMEXE,Load XEX;",
 	"F8,CARROMBIN,Load Cart;",
@@ -613,6 +615,7 @@ wire osab_rom_index = ioctl_index[7:0] == 8'b10000000 || ioctl_index[5:0] == 6;
 // boot3.rom (no menu index for this!)
 wire pbi_rom_index = ioctl_index[7:0] == 8'b11000000;
 wire turbofreezer_rom_index = ioctl_index[5:0] == 3;
+wire siddata_rom_index = ioctl_index[5:0] == 7;
 
 wire[25:0] rom_upload_addr;
 assign rom_upload_addr =
@@ -620,7 +623,8 @@ assign rom_upload_addr =
 	(osab_rom_index ? {10'h270, 2'b10, ioctl_addr[13:0]} + 14'h1800 :
 	(basic_rom_index ? {10'h270, 3'b000, ioctl_addr[12:0]} :
 	(pbi_rom_index ? {10'h270, 3'b001, ioctl_addr[12:0]} : 
-	{10'h24A, ioctl_addr[15:0]}))); // Turbo Freezer
+	(turbofreezer_rom_index ? {10'h24A, ioctl_addr[15:0]} :
+	{9'b100111101, ioctl_addr[16:0]})))); // SID data, 128K
 
 wire cart1_rom_index = ioctl_index[5:0] == 8;
 wire cart2_rom_index = ioctl_index[5:0] == 9;

@@ -285,6 +285,7 @@ SIGNAL	CPU_SHARED_ENABLE :  STD_LOGIC;
 SIGNAL	ENABLE_179_MEMWAIT :  STD_LOGIC;
 SIGNAL	ANTIC_ENABLE_179 :  STD_LOGIC;
 SIGNAL	ANTIC_ENABLE_179_DOUBLE :  STD_LOGIC;
+SIGNAL	CLOCK_SHIFT : STD_LOGIC_VECTOR(cycle_length-1 downto 0);
 
 -- MEMORY IS READY - input to all devices
 SIGNAL	MEMORY_DATA :  STD_LOGIC_VECTOR(31 DOWNTO 0);
@@ -329,6 +330,7 @@ signal memac_write_enable : std_logic;
 signal memac_cpu_access : std_logic;
 signal memac_antic_access : std_logic;
 signal memac_check : std_logic;
+signal memac_active : std_logic;
 signal memac_data_write : std_logic_vector(7 downto 0);
 signal memac_data_read : std_logic_vector(7 downto 0);
 signal memac_request : std_logic;
@@ -351,6 +353,12 @@ signal SAMPLE_RAM_WRITE_ENABLE : std_logic;
 signal SAMPLE_RAM_REQUEST : std_logic;
 signal SAMPLE_RAM_READY : std_logic;
 signal SAMPLE_RAM_WRITE_DATA : std_logic_vector(7 downto 0);
+
+-- PokeyMax SID data
+
+signal SID_ROM_ADDRESS : std_logic_vector(16 downto 0);
+signal SID_ROM_REQUEST : std_logic;
+signal SID_ROM_READY : std_logic;
 
 BEGIN 
 
@@ -376,7 +384,8 @@ PORT MAP(CLK => CLK,
 		 ANTIC_ENABLE_179 => ANTIC_ENABLE_179,
 		 ANTIC_ENABLE_179_DOUBLE => ANTIC_ENABLE_179_DOUBLE,
 		 oldcpu_enable => ENABLE_179_MEMWAIT,
-		 CPU_ENABLE_OUT => CPU_SHARED_ENABLE);
+		 CPU_ENABLE_OUT => CPU_SHARED_ENABLE,
+		 CLOCK_SHIFT => CLOCK_SHIFT);
 
 CPU_6502_RESET <= NOT(RESET_N); 
 cpu6502 : entity work.cpu
@@ -428,6 +437,8 @@ PORT MAP(CLK => CLK,
 	RESET_N => RESET_N,
 	ENABLE_179 => ANTIC_ENABLE_179,
 	ENABLE_179_DOUBLE => ANTIC_ENABLE_179_DOUBLE,
+	CLOCK_SHIFT => CLOCK_SHIFT,
+	VBXE_MEMAC_ACTIVE => memac_active,
 	ADDR => PBI_ADDR_INT(7 downto 0),
 	DATA_IN => WRITE_DATA(7 downto 0),
 	REQUEST => POKEY_REQUEST,
@@ -455,7 +466,11 @@ PORT MAP(CLK => CLK,
 	SAMPLE_RAM_REQUEST => SAMPLE_RAM_REQUEST,
 	SAMPLE_RAM_READY => SAMPLE_RAM_READY,
 	SAMPLE_RAM_READ_DATA => SDRAM_DO(7 downto 0),
-	SAMPLE_RAM_WRITE_DATA => SAMPLE_RAM_WRITE_DATA
+	SAMPLE_RAM_WRITE_DATA => SAMPLE_RAM_WRITE_DATA,
+	SID_ROM_ADDRESS => SID_ROM_ADDRESS,
+	SID_ROM_REQUEST => SID_ROM_REQUEST,
+	SID_ROM_READY => SID_ROM_READY,
+	SID_ROM_READ_DATA => SDRAM_DO(31 downto 0)
 );
 
 pia1 : entity work.pia
@@ -501,6 +516,7 @@ PORT MAP(
 	ENABLE => VBXE_SWITCH,
 	NTSC_FIX => VBXE_NTSC_FIX,
 	ENABLE_179 => ANTIC_ENABLE_179, -- ENABLE_179_MEMWAIT,
+	CLOCK_SHIFT => CLOCK_SHIFT,
 	RESET_N => RESET_N,
 	SOFT_RESET => VBXE_SOFT_RESET,
 	PAL => PAL,
@@ -521,6 +537,7 @@ PORT MAP(
 	memac_cpu_access => memac_cpu_access,
 	memac_antic_access => memac_antic_access,
 	memac_check => memac_check,
+	memac_active => memac_active,
 	memac_data_in => memac_data_write,
 	memac_data_out => memac_data_read,
 	memac_request => memac_request,
@@ -569,6 +586,9 @@ PORT MAP(CLK => CLK,
 		 SAMPLE_RAM_REQUEST => SAMPLE_RAM_REQUEST,
 		 SAMPLE_RAM_READY => SAMPLE_RAM_READY,
 		 SAMPLE_RAM_WRITE_DATA => SAMPLE_RAM_WRITE_DATA,
+		 SID_ROM_ADDRESS => SID_ROM_ADDRESS,
+		 SID_ROM_REQUEST => SID_ROM_REQUEST,
+		 SID_ROM_READY => SID_ROM_READY,
 		 RAM_REQUEST_COMPLETE => RAM_REQUEST_COMPLETE,
 		 ROM_REQUEST_COMPLETE => ROM_REQUEST_COMPLETE,
 		 PBI_REQUEST_COMPLETE => PBI_REQUEST_COMPLETE,

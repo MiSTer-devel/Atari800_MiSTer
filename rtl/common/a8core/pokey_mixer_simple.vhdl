@@ -132,9 +132,11 @@ end process;
 filter_left : entity work.simple_low_pass_filter
 	port map (CLK => CLK,AUDIO_IN => VOLUME_OUT_L_REG,SAMPLE_IN => ENABLE_179,AUDIO_OUT => VL);
 
-	-- Post divide 8, should be equivalent to the default PokeyMax settings...
-	VLS <= not(VL(15))&not(VL(15))&not(VL(15))&not(VL(15))&VL(14 downto 3);
+--	-- Post divide 8, should be equivalent to the default PokeyMax settings...
+--	VLS <= not(VL(15))&not(VL(15))&not(VL(15))&not(VL(15))&VL(14 downto 3);
 
+--	-- Post divide 4, should be equivalent to the default PokeyMax settings...
+	VLS <= not(VL(15))&not(VL(15))&not(VL(15))&VL(14 downto 2);
 	-- output, full mono here
 	VOLUME_OUT_L <= VLS;
 	VOLUME_OUT_R <= VLS;

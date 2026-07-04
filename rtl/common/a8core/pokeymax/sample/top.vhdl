@@ -150,8 +150,8 @@ ARCHITECTURE vhdl OF sample_top IS
 	signal store_channel : std_logic_vector(1 downto 0);
 	signal store : std_logic;
 
-	signal ram_request_next : std_logic_vector(2 downto 0);
-	signal ram_request_reg : std_logic_vector(2 downto 0);
+	signal ram_request_next : std_logic_vector(3 downto 0);
+	signal ram_request_reg : std_logic_vector(3 downto 0);
 	signal ram_address_next : std_logic_vector(16 downto 0);
 	signal ram_address_reg : std_logic_vector(16 downto 0);
 	signal ram_data_to_write_reg : std_logic_vector(7 downto 0);
@@ -293,7 +293,7 @@ BEGIN
 			dirty=>data_request,
 
 			data_request => adpcm_data_request,
-			data_ready => ram_request_reg(1) and RAM_READY,
+			data_ready => (ram_request_reg(1) and RAM_READY) or ram_request_reg(3),
 			data_in => adpcm_data_in,
 
 			step_addr => adpcm_step_addr,
@@ -596,7 +596,7 @@ BEGIN
 		adpcm_reg,
 		bits8_reg,
 		adpcm_data_request,
-		ram_request_reg,ram_address_reg,ram_data_to_write_reg,ram_data,ram_ready,
+		ram_request_reg,ram_address_reg,ram_data_to_write_reg,ram_ready,
 		ram_record_enabled_reg,
 		DI,RAM_CPU_WRITE_ENABLE,
 		AUDIO_IN0,AUDIO_IN1,AUDIO_IN2,AUDIO_IN3)
@@ -607,10 +607,12 @@ BEGIN
 		ram_data_to_write_next <= ram_data_to_write_reg;
 
 		if ram_ready = '0' then
-			ram_request_next <= "01" & adpcm_data_request;
+			ram_request_next(2 downto 1) <= "01";
 			case adpcm_channel is
 				when "00" =>
         			ram_address_next <= ch0_addr;
+					ram_request_next(3) <= not(dma_on_reg(0)) and adpcm_data_request;
+					ram_request_next(0) <= dma_on_reg(0) and adpcm_data_request;
 					if (enable_record=1) then
 						if (ram_record_enabled_reg(0) ='1') then
 					      ram_data_to_write_next <= std_logic_vector(AUDIO_IN0(15 downto 8));
@@ -619,6 +621,8 @@ BEGIN
 					end if;
 				when "01" =>
         			ram_address_next <= ch1_addr;
+					ram_request_next(3) <= not(dma_on_reg(1)) and adpcm_data_request;
+					ram_request_next(0) <= dma_on_reg(1) and adpcm_data_request;
 					if (enable_record=1) then
 						if (ram_record_enabled_reg(1) ='1') then
 					      ram_data_to_write_next <= std_logic_vector(AUDIO_IN1(15 downto 8));
@@ -627,6 +631,8 @@ BEGIN
 					end if;
 				when "10" =>
         			ram_address_next <= ch2_addr;
+					ram_request_next(3) <= not(dma_on_reg(2)) and adpcm_data_request;
+					ram_request_next(0) <= dma_on_reg(2) and adpcm_data_request;
 					if (enable_record=1) then
 						if (ram_record_enabled_reg(2) ='1') then
 					      ram_data_to_write_next <= std_logic_vector(AUDIO_IN2(15 downto 8));
@@ -635,6 +641,8 @@ BEGIN
 					end if;
 				when "11" =>
         			ram_address_next <= ch3_addr;
+					ram_request_next(3) <= not(dma_on_reg(3)) and adpcm_data_request;
+					ram_request_next(0) <= dma_on_reg(3) and adpcm_data_request;
 					if (enable_record=1) then
 						if (ram_record_enabled_reg(3) ='1') then
 					      ram_data_to_write_next <= std_logic_vector(AUDIO_IN3(15 downto 8));
@@ -645,11 +653,11 @@ BEGIN
 	
 			if (request='1') then
 				ram_address_next(16 downto 1) <= ram_cpu_addr_reg;
-				ram_request_next <= RAM_CPU_WRITE_ENABLE & "01";
+				ram_request_next <= "0" & RAM_CPU_WRITE_ENABLE & "01";
 				ram_data_to_write_next <= DI;
 			end if;
 		else
-			ram_request_next <= "000";
+			ram_request_next(3 downto 0) <= "0000";
 		end if;
 	end process;
 
@@ -698,7 +706,7 @@ BEGIN
 			channel_reg <= (others=>'0');
 			
 			adpcm_reg <= (others=>'0');
-			ram_request_reg <= "000";
+			ram_request_reg <= (others=>'0');
 			ram_address_reg <= (others=>'0');
 			ram_data_to_write_reg <= (others=>'0');
 
