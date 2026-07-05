@@ -128,6 +128,8 @@ SIGNAL	DO_MUX : STD_LOGIC_VECTOR(7 DOWNTO 0);
 SIGNAL	DRIVE_DO_MUX : STD_LOGIC;
 signal	readreq_s : std_logic;
 signal	writereq_s : std_logic;
+signal	CLOCK_ENABLE_1MHZ : std_logic;
+signal	CLOCK_ENABLE_2MHZ : std_logic;
 
 -- SID
 signal SID_CLK_ENABLE : std_logic;
@@ -153,6 +155,35 @@ signal SID2_FILTER_HP : signed(17 downto 8);
 signal SID2_F_RAW : std_logic_vector(12 downto 0);
 signal SID2_F_BP : unsigned(12 downto 0);
 signal SID2_F_HP : unsigned(12 downto 0);
+
+-- PSG
+signal PSG_ENABLE_2Mhz : std_logic;
+signal PSG_ENABLE_1Mhz : std_logic;
+signal PSG_ENABLE : std_logic;
+signal PSG_AUDIO_UNSIGNED : UNSIGNED_AUDIO_TYPE(1 downto 0);	
+signal PSG_AUDIO_SIGNED : SIGNED_AUDIO_TYPE(1 downto 0);	
+
+signal PSG_CHANNEL : PSG_CHANNEL_TYPE(5 downto 0);	
+signal PSG_CHANGED : std_logic_vector(1 downto 0);
+
+signal PSG_FREQ_REG : std_logic_vector(1 downto 0);
+signal PSG_FREQ_NEXT : std_logic_vector(1 downto 0);
+
+signal PSG_STEREOMODE_REG : std_logic_vector(1 downto 0);
+signal PSG_STEREOMODE_NEXT : std_logic_vector(1 downto 0);
+
+signal PSG_PROFILESEL_REG : std_logic_vector(1 downto 0);
+signal PSG_PROFILESEL_NEXT : std_logic_vector(1 downto 0);
+signal PSG_PROFILE_ADDR : std_logic_vector(4 downto 0);
+signal PSG_PROFILE_REQUEST : std_logic;
+signal PSG_PROFILE_READY_REG : std_logic;
+signal PSG_PROFILE_READY_NEXT : std_logic;
+
+signal PSG_ENVELOPE16_REG : std_logic;
+signal PSG_ENVELOPE16_NEXT : std_logic;
+
+signal PSG_MIX1 : std_logic_vector(5 downto 0);
+signal PSG_MIX2 : std_logic_vector(5 downto 0);
 
 	-- SAMPLE/COVOX
 signal SAMPLE_AUDIO_SIGNED : SIGNED_AUDIO_TYPE(1 downto 0);	
@@ -397,6 +428,86 @@ begin
 	end case;
 end pokey_volume;
 
+function psg_volume0(x: unsigned(4 downto 0)) return unsigned is
+begin
+	case x is
+		when "00000" => return x"0000";
+		when "00001" => return x"001C";
+		when "00010" => return x"003D";
+		when "00011" => return x"0066";
+		when "00100" => return x"0099";
+		when "00101" => return x"00D7";
+		when "00110" => return x"0123";
+		when "00111" => return x"0180";
+		when "01000" => return x"01F1";
+		when "01001" => return x"027D";
+		when "01010" => return x"0327";
+		when "01011" => return x"03F8";
+		when "01100" => return x"04F8";
+		when "01101" => return x"0631";
+		when "01110" => return x"07B1";
+		when "01111" => return x"0987";
+		when "10000" => return x"0BC7";
+		when "10001" => return x"0E88";
+		when "10010" => return x"11E8";
+		when "10011" => return x"160A";
+		when "10100" => return x"1B19";
+		when "10101" => return x"214C";
+		when "10110" => return x"28E3";
+		when "10111" => return x"322F";
+		when "11000" => return x"3D92";
+		when "11001" => return x"4B84";
+		when "11010" => return x"5C98";
+		when "11011" => return x"7183";
+		when "11100" => return x"8B21";
+		when "11101" => return x"AA81";
+		when "11110" => return x"D0EF";
+		when "11111" => return x"FFFF";
+		when others => return x"0000";
+	end case;
+end psg_volume0;
+
+function psg_volume2(x: unsigned(4 downto 0)) return unsigned is
+begin
+	case x is
+		when "00000" => return x"0000";
+		when "00001" => return x"0000";
+		when "00010" => return x"0001";
+		when "00011" => return x"0002";
+		when "00100" => return x"0004";
+		when "00101" => return x"0006";
+		when "00110" => return x"000A";
+		when "00111" => return x"000E";
+		when "01000" => return x"0015";
+		when "01001" => return x"001E";
+		when "01010" => return x"002C";
+		when "01011" => return x"003E";
+		when "01100" => return x"0059";
+		when "01101" => return x"007E";
+		when "01110" => return x"00B4";
+		when "01111" => return x"00FF";
+		when "10000" => return x"0169";
+		when "10001" => return x"01FF";
+		when "10010" => return x"02D3";
+		when "10011" => return x"03FF";
+		when "10100" => return x"05A7";
+		when "10101" => return x"07FF";
+		when "10110" => return x"0B4F";
+		when "10111" => return x"0FFF";
+		when "11000" => return x"169F";
+		when "11001" => return x"1FFF";
+		when "11010" => return x"2D40";
+		when "11011" => return x"3FFF";
+		when "11100" => return x"5A81";
+		when "11101" => return x"7FFF";
+		when "11110" => return x"B503";
+		when "11111" => return x"FFFF";
+		when others => return x"0000";
+	end case;
+end psg_volume2;
+
+signal PSG_PROFILE_DATA : std_logic_vector(15 downto 0);
+
 function signed_to_unsigned(audio_in : signed(15 downto 0)) return unsigned is
 	variable ret : std_logic_vector(15 downto 0);
 begin
@@ -512,8 +623,31 @@ ADPCM_STEP_VALUE <= std_logic_vector(adpcm_step(unsigned(ADPCM_STEP_ADDR)));
 SAMPLE_RAM_REQUEST <= SAMPLE_RAM_REQUEST_RAW and (not(VBXE_MEMAC_ACTIVE) or or_reduce(CLOCK_SHIFT(11 downto 4)));
 
 enable_1mhz_clock_div : entity work.enable_divider
-generic map (COUNT=>28) -- TODO dep cycle_length
-port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>SID_CLK_ENABLE);
+generic map (COUNT=>28)
+port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>CLOCK_ENABLE_1MHZ);
+
+enable_2mhz_clock_div : entity work.enable_divider
+generic map (COUNT=>14)
+port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>CLOCK_ENABLE_2MHZ);
+
+SID_CLK_ENABLE <= CLOCK_ENABLE_1MHZ;
+
+PSG_ENABLE_2Mhz <= CLOCK_ENABLE_2MHZ;
+PSG_ENABLE_1Mhz <= CLOCK_ENABLE_1MHZ;
+
+process(PSG_FREQ_REG,PSG_ENABLE_2MHz,PSG_ENABLE_1MHz,ENABLE_179)
+begin
+	PSG_ENABLE <= '0';
+
+	case PSG_FREQ_REG is
+		when "00"=>
+			PSG_ENABLE <= PSG_ENABLE_2MHz;
+		when "01"=>
+			PSG_ENABLE <= PSG_ENABLE_1MHz;
+		when others=>
+			PSG_ENABLE <= ENABLE_179;
+	end case;
+end process;
 
 sid_data_mapper : entity work.sid_data
 PORT MAP(
@@ -646,10 +780,11 @@ begin
 		VERSION_LOC_REG <= (others=>'0');
 		PAL_REG <= '1';
 
-		--PSG_FREQ_REG <= "00"; --2MHz
-		--PSG_STEREOMODE_REG <= "01"; --Polish
-		--PSG_PROFILESEL_REG <= "00"; --Simple log
-		--PSG_ENVELOPE16_REG <= '0'; --32 step
+		PSG_FREQ_REG <= "00"; --2MHz
+		PSG_STEREOMODE_REG <= "01"; --Polish
+		PSG_PROFILESEL_REG <= "00"; --Simple log
+		PSG_ENVELOPE16_REG <= '0'; --32 step
+		PSG_PROFILE_READY_REG <= '0';
 
 		SID_FILTER1_REG <= "010"; -- 0=8580,1=6581,2=digifix
 		SID_FILTER2_REG <= "010"; -- 0=8580,1=6581,2=digifix
@@ -676,10 +811,11 @@ begin
 		VERSION_LOC_REG <= VERSION_LOC_NEXT;
 		PAL_REG <= PAL_NEXT;
 
-		--PSG_FREQ_REG <= PSG_FREQ_NEXT;
-		--PSG_STEREOMODE_REG <= PSG_STEREOMODE_NEXT;
-		--PSG_PROFILESEL_REG <= PSG_PROFILESEL_NEXT;
-		--PSG_ENVELOPE16_REG <= PSG_ENVELOPE16_NEXT;
+		PSG_FREQ_REG <= PSG_FREQ_NEXT;
+		PSG_STEREOMODE_REG <= PSG_STEREOMODE_NEXT;
+		PSG_PROFILESEL_REG <= PSG_PROFILESEL_NEXT;
+		PSG_ENVELOPE16_REG <= PSG_ENVELOPE16_NEXT;
+		PSG_PROFILE_READY_REG <= PSG_PROFILE_READY_NEXT;
 
 		SID_FILTER1_REG <= SID_FILTER1_NEXT;
 		SID_FILTER2_REG <= SID_FILTER2_NEXT;
@@ -828,10 +964,10 @@ process(CONFIG_WRITE_ENABLE, WRITE_DATA, addr_decoded4,
 	ADC_VOLUME_REG,
 	--SIO_DATA_VOLUME_REG,
 	VERSION_LOC_REG,
-	--PSG_FREQ_REG,
-	--PSG_STEREOMODE_REG,
-	--PSG_PROFILESEL_REG,
-	--PSG_ENVELOPE16_REG,
+	PSG_FREQ_REG,
+	PSG_STEREOMODE_REG,
+	PSG_PROFILESEL_REG,
+	PSG_ENVELOPE16_REG,
 	SID_FILTER1_REG, SID_FILTER2_REG,
 	RESTRICT_CAPABILITY_REG,
 	CHANNEL_EN_REG,
@@ -855,10 +991,10 @@ begin
 	
 	VERSION_LOC_NEXT <= VERSION_LOC_REG;
 
-	--PSG_FREQ_NEXT <= PSG_FREQ_REG;
-	--PSG_STEREOMODE_NEXT <= PSG_STEREOMODE_REG;
-	--PSG_PROFILESEL_NEXT <= PSG_PROFILESEL_REG;
-	--PSG_ENVELOPE16_NEXT <= PSG_ENVELOPE16_REG;
+	PSG_FREQ_NEXT <= PSG_FREQ_REG;
+	PSG_STEREOMODE_NEXT <= PSG_STEREOMODE_REG;
+	PSG_PROFILESEL_NEXT <= PSG_PROFILESEL_REG;
+	PSG_ENVELOPE16_NEXT <= PSG_ENVELOPE16_REG;
 
 	SID_FILTER1_NEXT <= SID_FILTER1_REG;
 	SID_FILTER2_NEXT <= SID_FILTER2_REG;
@@ -894,12 +1030,12 @@ begin
 			VERSION_LOC_NEXT <= WRITE_DATA(2 downto 0);
 		end if;
 		
-		--if (addr_decoded4(5)='1') then
-		--	PSG_FREQ_NEXT <= WRITE_DATA(1 downto 0);
-		--	PSG_STEREOMODE_NEXT <= WRITE_DATA(3 downto 2);
-		--	PSG_ENVELOPE16_NEXT <= WRITE_DATA(4);
-		--	PSG_PROFILESEL_NEXT <= WRITE_DATA(6 downto 5);
-		--end if;
+		if (addr_decoded4(5)='1') then
+			PSG_FREQ_NEXT <= WRITE_DATA(1 downto 0);
+			PSG_STEREOMODE_NEXT <= WRITE_DATA(3 downto 2);
+			PSG_ENVELOPE16_NEXT <= WRITE_DATA(4);
+			PSG_PROFILESEL_NEXT <= WRITE_DATA(6 downto 5);
+		end if;
 
 		if (addr_decoded4(6)='1') then
 			SID_FILTER1_NEXT <= WRITE_DATA(2 downto 0);
@@ -935,7 +1071,7 @@ SATURATE_REG,CHANNEL_MODE_REG,IRQ_EN_REG,DETECT_RIGHT_REG,
 POST_DIVIDE_REG, GTIA_ENABLE_REG,
 ADC_VOLUME_REG,
 --SIO_DATA_VOLUME_REG, 
---PSG_FREQ_REG, PSG_STEREOMODE_REG, PSG_PROFILESEL_REG, PSG_ENVELOPE16_REG,
+PSG_FREQ_REG, PSG_STEREOMODE_REG, PSG_PROFILESEL_REG, PSG_ENVELOPE16_REG,
 SID_FILTER1_REG, SID_FILTER2_REG,
 RESTRICT_CAPABILITY_REG,
 CHANNEL_EN_REG,
@@ -959,11 +1095,9 @@ begin
 
 	ACTUAL_CAPABILITY(1 downto 0) := "11"; -- POKEY CFG bit1=quad
 
-	--if (enable_sid=1) then
 	ACTUAL_CAPABILITY(2) := '1'; -- SID
 
-	--if (enable_psg=1) then
-	--	ACTUAL_CAPABILITY(3) := '1'; -- PSG
+	ACTUAL_CAPABILITY(3) := '1'; -- PSG
 
 	ACTUAL_CAPABILITY(4) := '1'; -- COVOX
 	ACTUAL_CAPABILITY(5) := '1'; -- Sample engine
@@ -1008,13 +1142,13 @@ begin
 		end case;		
 	end if;
 
-	--if (addr_decoded4(5)='1') then
-	--	CONFIG_DO <= (others=>'0');
-	--	CONFIG_DO(1 downto 0) <= PSG_FREQ_REG;
-	--	CONFIG_DO(3 downto 2) <= PSG_STEREOMODE_REG;
-	--	CONFIG_DO(4) <= PSG_ENVELOPE16_REG;
-	--	CONFIG_DO(6 downto 5) <= PSG_PROFILESEL_REG;
-	--end if;
+	if (addr_decoded4(5)='1') then
+		CONFIG_DO <= (others=>'0');
+		CONFIG_DO(1 downto 0) <= PSG_FREQ_REG;
+		CONFIG_DO(3 downto 2) <= PSG_STEREOMODE_REG;
+		CONFIG_DO(4) <= PSG_ENVELOPE16_REG;
+		CONFIG_DO(6 downto 5) <= PSG_PROFILESEL_REG;
+	end if;
 
 	if (addr_decoded4(6)='1') then -- different use on sidmax
 		CONFIG_DO <= (others=>'0');
@@ -1119,6 +1253,111 @@ PORT MAP(CLK => CLK,
 
 POKEY_PROFILE_DATA <= std_logic_vector(pokey_volume(unsigned(POKEY_PROFILE_ADDR))) when saturate_reg = '1' else POKEY_PROFILE_ADDR&"0000000000";
 
+-- PSG
+
+process(PSG_STEREOMODE_REG)
+begin
+	PSG_MIX1 <= (others=>'0');
+	PSG_MIX2 <= (others=>'0');
+
+	case PSG_STEREOMODE_REG is
+		when "00"=>
+			PSG_MIX1 <= "111111";
+			PSG_MIX2 <= "111111";
+		when "01"=>
+			PSG_MIX1 <= "110110";
+			PSG_MIX2 <= "011011";
+		when "10"=>
+			PSG_MIX1 <= "101101";
+			PSG_MIX2 <= "011011";
+		when others=>
+			PSG_MIX1 <= "111000";
+			PSG_MIX2 <= "000111";
+	end case;
+end process;
+
+PSG_1 : entity work.PSG_top
+port map(
+	clk=>clk,
+	reset_n=>reset_n,
+	enable=>psg_enable,
+	addr=>addr_in(3 downto 0),
+	write_enable=>PSG_WRITE_ENABLE(0),
+	ENVELOPE32=>not(PSG_ENVELOPE16_REG),
+	di=>write_data,
+	do=>PSG_DO(0),
+	channel_a_vol => PSG_CHANNEL(0),
+	channel_b_vol => PSG_CHANNEL(1),
+	channel_c_vol => PSG_CHANNEL(2),
+	channel_changed => PSG_CHANGED(0)
+);
+	
+PSG_2 : entity work.PSG_top
+port map(
+	clk=>clk,
+	reset_n=>reset_n,
+	enable=>psg_enable,
+	addr=>addr_in(3 downto 0),
+	write_enable=>PSG_WRITE_ENABLE(1),
+	ENVELOPE32=>not(PSG_ENVELOPE16_REG),
+	di=>write_data,
+	do=>PSG_DO(1),
+	channel_a_vol => PSG_CHANNEL(3),
+	channel_b_vol => PSG_CHANNEL(4),
+	channel_c_vol => PSG_CHANNEL(5),
+	channel_changed => PSG_CHANGED(1)
+);
+
+psg_vol_profile : entity work.PSG_volume_profile
+PORT MAP ( 
+	CLK => clk,
+	RESET_N => reset_n,		
+
+	CHANNEL_1A => PSG_CHANNEL(0),
+	CHANNEL_1B => PSG_CHANNEL(1),
+	CHANNEL_1C => PSG_CHANNEL(2),
+	CHANNEL_1_CHANGED => PSG_CHANGED(0),
+	CHANNEL_2A => PSG_CHANNEL(3),
+	CHANNEL_2B => PSG_CHANNEL(4),
+	CHANNEL_2C => PSG_CHANNEL(5),
+	CHANNEL_2_CHANGED => PSG_CHANGED(1),
+
+	CHANNEL_MASK_1=>PSG_MIX1, --LABC:RABC
+	CHANNEL_MASK_2=>PSG_MIX2,
+
+	AUDIO_OUT_1 => PSG_AUDIO_UNSIGNED(0),
+	AUDIO_OUT_2 => PSG_AUDIO_UNSIGNED(1),
+
+	PROFILE_ADDR => PSG_PROFILE_ADDR,
+	PROFILE_REQUEST => PSG_PROFILE_REQUEST,
+	PROFILE_READY => PSG_PROFILE_READY_REG,
+	PROFILE_DATA => PSG_PROFILE_DATA
+);	
+
+PSG_PROFILE_READY_NEXT <= PSG_PROFILE_REQUEST;
+
+PSG_PROFILE_DATA <= std_logic_vector(psg_volume0(unsigned(PSG_PROFILE_ADDR))) when psg_profilesel_reg(1) = '0' else std_logic_vector(psg_volume2(unsigned(PSG_PROFILE_ADDR))) when psg_profilesel_reg(1 downto 0) = "10" else PSG_PROFILE_ADDR&"00000000000";
+
+psg1_dc_blocker : entity work.dc_blocker_pm
+PORT MAP ( 
+	CLK          => CLK,
+	RESET_N      => RESET_N,
+	ENABLE_CYCLE => ENABLE_179,
+
+	AUDIO_IN    => PSG_AUDIO_UNSIGNED(0),
+	AUDIO_OUT   => PSG_AUDIO_SIGNED(0)
+);
+
+psg2_dc_blocker : entity work.dc_blocker_pm
+PORT MAP ( 
+	CLK          => CLK,
+	RESET_N      => RESET_N,
+	ENABLE_CYCLE => ENABLE_179,
+
+	AUDIO_IN    => PSG_AUDIO_UNSIGNED(1),
+	AUDIO_OUT   => PSG_AUDIO_SIGNED(1)
+);
+
 -- provide audio back to:
 -- sample enggine -> to record to ram
 -- sid ext        -> to use filter (mutes original output)
@@ -1216,8 +1455,8 @@ PORT MAP
 	R_CH2 => SAMPLE_AUDIO_SIGNED(1),
 	L_CH3 => SID_AUDIO_SIGNED(0),
 	R_CH3 => SID_AUDIO_SIGNED(1),
-	L_CH4 => to_signed(0, 16), -- PSG_AUDIO_SIGNED(0),
-	R_CH4 => to_signed(0, 16), -- PSG_AUDIO_SIGNED(1),
+	L_CH4 => PSG_AUDIO_SIGNED(0),
+	R_CH4 => PSG_AUDIO_SIGNED(1),
 	B_CH0 => GTIA_AUDIO_SIGNED,
 	B_CH1 => SIO_AUDIO_SIGNED,
 

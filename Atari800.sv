@@ -615,7 +615,7 @@ wire osab_rom_index = ioctl_index[7:0] == 8'b10000000 || ioctl_index[5:0] == 6;
 // boot3.rom (no menu index for this!)
 wire pbi_rom_index = ioctl_index[7:0] == 8'b11000000;
 wire turbofreezer_rom_index = ioctl_index[5:0] == 3;
-wire siddata_rom_index = ioctl_index[5:0] == 7;
+//wire siddata_rom_index = ioctl_index[5:0] == 7; // TODO currently not needed
 
 wire[25:0] rom_upload_addr;
 assign rom_upload_addr =

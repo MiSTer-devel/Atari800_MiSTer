@@ -54,6 +54,13 @@ set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/sid/postFilterS
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/sid/preFilterSum.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/sid/top.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/sid/wavegen.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/psg/envelope.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/psg/freqdiv.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/psg/mixer.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/psg/noise.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/psg/top.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/psg/volume_profile.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/pokeymax/psg/volume.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/syncreset_enable_divider.vhd
 set_global_assignment -name VHDL_FILE rtl/common/components/complete_address_decoder.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/delay_line.vhdl
