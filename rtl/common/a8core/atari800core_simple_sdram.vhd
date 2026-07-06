@@ -66,7 +66,7 @@ ENTITY atari800core_simple_sdram is
 		VBLANK : OUT STD_LOGIC;
 
 		-- AUDIO OUT - all audio mix mixed
-		STEREO : IN  STD_LOGIC;
+		POKEYMAX_CONFIG : IN STD_LOGIC_VECTOR(38 downto 0);
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
 		AUDIO_R : OUT std_logic_vector(15 downto 0);
 
@@ -436,7 +436,7 @@ PORT MAP
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
 
-	STEREO => STEREO,
+	POKEYMAX_CONFIG => POKEYMAX_CONFIG,
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
 	SIO_AUDIO => TAPE_AUDIO,

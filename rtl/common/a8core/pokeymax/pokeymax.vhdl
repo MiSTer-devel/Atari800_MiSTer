@@ -41,7 +41,7 @@ PORT
 	IRQ_N_OUT : OUT std_logic;
 	
     -- OSD config
-    STEREO : in STD_LOGIC;
+    INIT_CONFIG : in STD_LOGIC_VECTOR(38 downto 0);
 
     -- sound sources
     GTIA_SOUND : IN STD_LOGIC;
@@ -130,6 +130,8 @@ signal	readreq_s : std_logic;
 signal	writereq_s : std_logic;
 signal	CLOCK_ENABLE_1MHZ : std_logic;
 signal	CLOCK_ENABLE_2MHZ : std_logic;
+signal	INIT_COMPLETE_REG : std_logic;
+signal	INIT_COMPLETE_NEXT : std_logic;
 
 -- SID
 signal SID_CLK_ENABLE : std_logic;
@@ -768,6 +770,8 @@ port map
 process(clk,reset_n)
 begin
 	if (reset_n='0') then
+		INIT_COMPLETE_REG <= '0';
+
 		DETECT_RIGHT_REG <= '1';
 		IRQ_EN_REG <= '0';
 		CHANNEL_MODE_REG <= '0';
@@ -798,7 +802,9 @@ begin
 		MIXER_SIGNED_REG(3) <= to_signed(0,16);
 		MIX_SEL1_REG <= (others=>'0');
 		MIX_SEL2_REG <= (others=>'0');
-	elsif (clk'event and clk='1') then
+	elsif rising_edge(clk) then
+		INIT_COMPLETE_REG <= INIT_COMPLETE_NEXT;
+
 		DETECT_RIGHT_REG <= DETECT_RIGHT_NEXT;
 		IRQ_EN_REG <= IRQ_EN_NEXT;
 		CHANNEL_MODE_REG <= CHANNEL_MODE_NEXT;
@@ -972,7 +978,8 @@ process(CONFIG_WRITE_ENABLE, WRITE_DATA, addr_decoded4,
 	RESTRICT_CAPABILITY_REG,
 	CHANNEL_EN_REG,
 	MIX_SEL1_REG, MIX_SEL2_REG,
-	PAL_REG
+	PAL_REG,
+	INIT_COMPLETE_REG,INIT_CONFIG
 )
 begin
 	SATURATE_NEXT <= SATURATE_REG;
@@ -1007,7 +1014,33 @@ begin
 	MIX_SEL1_NEXT <= MIX_SEL1_REG;
 	MIX_SEL2_NEXT <= MIX_SEL2_REG;
 
-	if (CONFIG_WRITE_ENABLE='1') then
+	INIT_COMPLETE_NEXT <= INIT_COMPLETE_REG;
+
+	if INIT_COMPLETE_REG = '0' then
+		INIT_COMPLETE_NEXT <= '1';
+		DETECT_RIGHT_NEXT <= INIT_CONFIG(1);
+		IRQ_EN_NEXT <= INIT_CONFIG(14);
+		CHANNEL_MODE_NEXT <= INIT_CONFIG(12);
+		SATURATE_NEXT <= INIT_CONFIG(13);
+		POST_DIVIDE_NEXT <= INIT_CONFIG(7 downto 4);
+		GTIA_ENABLE_NEXT <= INIT_CONFIG(9 downto 8);
+		ADC_VOLUME_NEXT <= INIT_CONFIG(11 downto 10);
+		--SIO_DATA_VOLUME_NEXT <= "10";
+
+		PSG_FREQ_NEXT <= INIT_CONFIG(27 downto 26);
+		PSG_STEREOMODE_NEXT <= INIT_CONFIG(32 downto 31);
+		PSG_PROFILESEL_NEXT <= INIT_CONFIG(29 downto 28);
+		PSG_ENVELOPE16_NEXT <= INIT_CONFIG(30);
+
+		SID_FILTER1_NEXT <= INIT_CONFIG(22 downto 20);
+		SID_FILTER2_NEXT <= INIT_CONFIG(25 downto 23);
+
+		RESTRICT_CAPABILITY_NEXT <= INIT_CONFIG(19 downto 15);
+		CHANNEL_EN_NEXT <= INIT_CONFIG(3 downto 2);
+
+		MIX_SEL1_NEXT <= INIT_CONFIG(35 downto 33);
+		MIX_SEL2_NEXT <= INIT_CONFIG(38 downto 36);
+	elsif (CONFIG_WRITE_ENABLE='1') then
 		if (addr_decoded4(0)='1') then
 			SATURATE_NEXT <= WRITE_DATA(0);
 			CHANNEL_MODE_NEXT <= WRITE_DATA(2);
@@ -1171,7 +1204,7 @@ begin
 		CONFIG_DO(4 downto 0) <= '0'&CHANNEL_EN_REG&"00";
 	end if;
 
-	if (addr_decoded4(12)='1') then
+	if (addr_decoded4(12)='1') and (FANCY_ENABLE = '1') then
 		CONFIG_DO <= x"01";
 	end if;		
 
@@ -1494,7 +1527,7 @@ PORT MAP
 AUDIO_L <= not(AUDIO_2_FILTERED(15))&AUDIO_2_FILTERED(14 downto 0);
 AUDIO_R <= not(AUDIO_3_FILTERED(15))&AUDIO_3_FILTERED(14 downto 0);
 
-FANCY_ENABLE <= STEREO;
+FANCY_ENABLE <= INIT_CONFIG(0);
 ADDR_IN <= ADDR;
 WRITE_DATA <= DATA_IN;
 WRITE_N <= not(WR_EN);

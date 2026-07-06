@@ -68,12 +68,12 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXXXXX                                                         
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                     
 
 
 `include "build_id.v" 
@@ -109,9 +109,9 @@ localparam CONF_STR = {
 	"P1O[12:10],SIO drive speed,Standard,Fast-6,Fast-5,Fast-4,Fast-3,Fast-2,Fast-1,Fast-0;",
 	"P1O[38],ATX drive timing,1050,810;",
 	"P1-;",
-	"P1O[69],On cart (u)mount,PwrReset,Nothing;",
-	"P1O[70],Cart auto-save,Disabled,Enabled;",
-	"P1R[71],Save cart(s);",
+	"P1O[68],On cart (u)mount,PwrReset,Nothing;",
+	"P1O[69],Cart auto-save,Disabled,Enabled;",
+	"P1R[70],Save cart(s);",
 	"P1-;",
 	"P1O[66:64],Tape turbo system,Standard,SIO/Cmd,Turbo-D,K.S.O.,K.S.O. 2,Blizzard,Rambit,T6000;",
 	"P1O[67],Invert turbo PWM,Disabled,Enabled;",
@@ -152,9 +152,40 @@ localparam CONF_STR = {
 	"d0P3O[28:25],Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
 	"P4,Audio;",
 	"P4-;",
-	"P4O[20],Dual Pokey,Disabled,Enabled;",
-	"P4O[4:3],Stereo mix,None,25%,50%,100%;",
-	"P4O[68],Tape sounds,Enabled,Disabled;",
+	"P4O[4:3],Stereo mix (sys),None,25%,50%,100%;",
+	"P4O[20],PokeyMax,Off/Mono,Enabled;",
+	"P4-;",
+	"d6P4O[71],Mono detect,On,Off;",
+	"P4O[32],Output Left Channel,On,Off;",
+	"P4O[33],Output Right Channel,On,Off;",
+	"P4O[73:72],Post-divide Left,4,8,1,2;",
+	"P4O[75:74],Post-divide Right,4,8,1,2;",
+	"P4O[77:76],GTIA mix-in,Left+Right,None,Left,Right;",
+	"P4O[79:78],Tape volume,2x,4x,0x,1x;",
+	"P4-;",
+	"d6P4O[81:80],Number of Pokeys,4,1,2;",
+	"P4O[82],Pokey volume,Saturated,Linear;",
+	"P4O[83],Channel mode,Normal,Split;",
+	"d6P4O[84],Multi IRQs,Off,On;",
+	"P4-;",
+	"d6P4O[85],SIDs,Enabled,Disabled;",
+	"d7P4O[86],SID1 filter,8580,6581;",
+	"d7P4O[87],SID2 filter,8580,6581;",
+	"d7P4O[89:88],SID1 DFix/audio-in,DigiFix,None,Mixer LB;",
+	"d7P4O[91:90],SID2 DFix/audio-in,DigiFix,None,Mixer LB;",
+	"P4-;",
+	"d6P4O[95],Covox/Sample,Enabled,Disabled;",
+	"P4-;",
+	"dAP4O[94:92],SID/CVX1+2 LB src,Pokey1+2,Pokey3+4,Covox,SID,PSG,GTIA,Tape;",
+	"d8P4O[98:96],Covox3+4 LB src,Pokey3+4,Covox,SID,PSG,GTIA,Tape,Pokey1+2;",
+	"P4-;",
+	"d6P4O[99],PSGs,Enabled,Disabled;",
+	"d9P4O[101:100],PSG clock,2MHz,1MHz,1.79MHz;",
+	"d9P4O[103:102],PSG stereo,Polish,Czech,By chip,Mono;",
+	"d9P4O[104],PSG envelope,32 steps,16 steps;",
+	"d9P4O[106:105],PSG volume,YM,AY3,Log,Linear;",
+	"P4-;",
+	"P4-,      (Reset to apply);",
 	"P5,Input;",
 	"P5-;",
 	"P5O[21],Swap Joysticks 1&2,No,Yes;",
@@ -249,6 +280,52 @@ wire        emu_flash_slave;
 
 wire [64:0] rtc;
 
+wire       pokeymax_enable = status[20];
+wire [1:0] pokeymax_channel_en = { ~status[33], ~status[32] };
+wire       pokeymax_mono_detect = ~status[71];
+wire [3:0] pokeymax_post_divide = { status[75:74] + 2'b10, status[73:72] + 2'b10 };
+wire [1:0] pokeymax_gtia_mix = status[77:76] + 2'b11;
+wire [1:0] pokeymax_adc_vol = status[79:78] + 2'b10;
+wire [1:0] pokeymax_pokey_restrict = !status[81] ? { ~status[80], 1'b0 } : 2'b01;
+wire       pokeymax_volume = ~status[82];
+wire       pokeymax_channel_mode = status[83];
+wire       pokeymax_irqs = status[84];
+wire       pokeymax_sid_restrict = ~status[85];
+wire [2:0] pokeymax_sid1_filter = { status[89] ? status[89:88] : { 1'b0, ~status[88] }, status[86] };
+wire [2:0] pokeymax_sid2_filter = { status[91] ? status[91:90] : { 1'b0, ~status[90] }, status[87] };
+wire [2:0] pokeymax_mix_sel1 = status[94:92] < 3'b101 ? status[94:92] : status[94:92] + 3'b001;
+wire [2:0] pokeymax_mix_sel2 = status[98:96] < 3'b100 ? status[98:96] + 3'b001 : status[98:96] + 3'b010;
+wire       pokeymax_covox_restrict = ~status[95];
+wire       pokeymax_psg_restrict = ~status[99];
+wire [1:0] pokeymax_psg_freq = status[101:100];
+wire [1:0] pokeymax_psg_stereo = status[103:102] + 2'b01;
+wire       pokeymax_psg_envelope = status[104];
+wire [1:0] pokeymax_psg_volume = status[106:105];
+
+wire [38:0] pokeymax_config = {
+	pokeymax_mix_sel2,			// 38:36
+	pokeymax_mix_sel1,			// 35:33
+	pokeymax_psg_stereo,		// 32:31
+	pokeymax_psg_envelope,		// 30
+	pokeymax_psg_volume,		// 29:28
+	pokeymax_psg_freq,			// 27:26
+	pokeymax_sid2_filter,		// 25:23
+	pokeymax_sid1_filter,		// 22:20
+	pokeymax_covox_restrict,	// 19
+	pokeymax_psg_restrict,		// 18
+	pokeymax_sid_restrict,		// 17
+	pokeymax_pokey_restrict,	// 16:15
+	pokeymax_irqs,				// 14
+	pokeymax_volume,			// 13
+	pokeymax_channel_mode,		// 12
+	pokeymax_adc_vol,			// 11:10
+	pokeymax_gtia_mix,			// 9:8
+	pokeymax_post_divide,		// 7:4
+	pokeymax_channel_en,		// 3:2
+	pokeymax_mono_detect,		// 1
+	pokeymax_enable				// 0
+};
+
 wire file_download = ioctl_download && (ioctl_index != 99);
 
 always @(posedge clk_sys) begin
@@ -322,7 +399,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({~status[2] & pbi_rom_loaded, status[31] & status[5], status[5] & ~status[59] & ~status[60], ~status[2] & status[42] & pbi_rom_loaded, status[2], en216p}),
+	.status_menumask({(~status[95] | ~status[85]) & status[20], ~status[99] & status[20],~status[95] & status[20],~status[85] & status[20],status[20],~status[2] & pbi_rom_loaded, status[31] & status[5], status[5] & ~status[59] & ~status[60], ~status[2] & status[42] & pbi_rom_loaded, status[2], en216p}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -373,9 +450,9 @@ hps_ext hps_ext
 
 	.emu_flash_request(emu_flash_request),
 	.emu_flash_slave(emu_flash_slave),
-	.emu_flash_autosave(status[70] & ~status[57]),
-	.emu_flash_save(status[71]),
-	.emu_cart_trigger(~status[69])
+	.emu_flash_autosave(status[69] & ~status[57]),
+	.emu_flash_save(status[70]),
+	.emu_cart_trigger(~status[68])
 );
 
 wire [7:0] R,G,B, Ro,Go,Bo;
@@ -449,7 +526,6 @@ atari800top atari800top
 	.TAPE_FIFO_EMPTY(tape_fifo_empty),
 	.TAPE_PWM_CONFIG(status[66:64]),
 	.TAPE_PWM_INVERT(status[67]),
-	.TAPE_SOUND_EN(~status[68]),
 	.TAPE_RESET(tape_reset),
 	.TAPE_ACTIVE(tape_active),
 
@@ -488,7 +564,7 @@ atari800top atari800top
 	.VBXE_PALETTE_INDEX(vbxe_palette_index),
 	.VBXE_PALETTE_COLOR(vbxe_palette_color),
 
-	.STEREO(status[20]),
+	.POKEYMAX_CONFIG(pokeymax_config),
 	.AUDIO_L(laudio),
 	.AUDIO_R(raudio),
 

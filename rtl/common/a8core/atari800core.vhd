@@ -49,7 +49,7 @@ ENTITY atari800core IS
 
 
 		-- AUDIO OUT all mixed
-		STEREO  : IN  STD_LOGIC;
+		POKEYMAX_CONFIG : IN STD_LOGIC_VECTOR(38 downto 0);
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
 		AUDIO_R : OUT std_logic_vector(15 downto 0);
 		SIO_AUDIO : IN std_logic_vector(7 downto 0);
@@ -456,7 +456,7 @@ PORT MAP(CLK => CLK,
 	SIO_CLOCKIN_OUT => SIO_CLOCKIN_OUT,
 	SIO_CLOCKIN_OE => SIO_CLOCKIN_OE,
 	SIO_CLOCKOUT => SIO_CLOCKOUT,
-	STEREO => STEREO,
+	INIT_CONFIG => POKEYMAX_CONFIG,
 	GTIA_SOUND => GTIA_SOUND,
 	SIO_SOUND => SIO_AUDIO,
 	AUDIO_L => AUDIO_L,

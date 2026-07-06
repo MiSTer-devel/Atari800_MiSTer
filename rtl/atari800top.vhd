@@ -36,7 +36,7 @@ PORT
 	HBLANK     : OUT STD_LOGIC;
 	VBLANK     : OUT STD_LOGIC;
 
-	STEREO     : IN  STD_LOGIC;
+	POKEYMAX_CONFIG : IN  STD_LOGIC_VECTOR(38 downto 0);
 	AUDIO_L    : OUT STD_LOGIC_VECTOR(15 downto 0);
 	AUDIO_R    : OUT STD_LOGIC_VECTOR(15 downto 0);
 
@@ -89,7 +89,6 @@ PORT
 	TAPE_PWM_INVERT : in std_logic; -- from status config
 	TAPE_RESET : in std_logic;
 	TAPE_ACTIVE : out std_logic;
-	TAPE_SOUND_EN : in std_logic;
 
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
@@ -386,7 +385,7 @@ PORT MAP
 	HBLANK => HBLANK,
 	VBLANK => VBLANK,
 
-	STEREO => STEREO,
+	POKEYMAX_CONFIG => POKEYMAX_CONFIG,
 	AUDIO_L => AUDIO_L,
 	AUDIO_R => AUDIO_R,
 
@@ -590,7 +589,7 @@ PORT MAP
 	pwm_invert => TAPE_PWM_INVERT,
 	fsk_motor => tape_fsk_motor,
 	pwm_motor => tape_pwm_motor,
-	tape_sound_en => TAPE_SOUND_EN,
+	tape_sound_en => '1',
 	audio_out => tape_audio
 );
 
