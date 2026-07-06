@@ -1510,13 +1510,8 @@ BEGIN
 			--shiftclock_next(3) <= shiftclock_reg(0) nor playfield_reset;						
 			case shift_rate_reg is
 				when slow_shift =>
-					-- HSCROL bit 1 must NOT re-phase the shifter: the playfield DMA start
-					-- already moves by 2 colour clocks per bit-1 unit (hscrol_adj), and
-					-- playfield_load resets the shiftclock phase, so the load shift alone
-					-- provides the visible delay (as on real ANTIC / Altirra). The old
-					-- shiftclock(2) phase-select added a second +2cc on top, summing to a
-					-- full 4cc pixel period that aliases to zero: HSCROL bits 1-3 had no
-					-- visible effect in modes 8/9 (fine scroll stuttered in 4cc jumps).
+					-- HSCROL bit 1 must NOT re-phase the shifter: The old
+					-- shiftclock(2) phase-select added a second +2cc on top
 					enable_shift <= shiftclock_reg(0);
 				when medium_shift =>
 					enable_shift <= shiftclock_reg(2) or shiftclock_reg(0);
