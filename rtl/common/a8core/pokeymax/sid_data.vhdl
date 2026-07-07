@@ -5,25 +5,24 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.STD_LOGIC_MISC.all;
 
 ENTITY sid_data IS
-PORT 
-( 
+PORT (
 	CLK : IN STD_LOGIC;
 	RESET_N : IN STD_LOGIC;
 
     SID1_ROM_ADDRESS : in std_logic_vector(16 downto 0);
-	SID1_ROM_REQUEST : in std_logic;
-	SID1_ROM_READY : out std_logic;
-	SID1_ROM_READ_DATA : out std_logic_vector(31 downto 0);
+    SID1_ROM_REQUEST : in std_logic;
+    SID1_ROM_READY : out std_logic;
+    SID1_ROM_READ_DATA : out std_logic_vector(31 downto 0);
 
-	SID2_ROM_ADDRESS : in std_logic_vector(16 downto 0);
-	SID2_ROM_REQUEST : in std_logic;
-	SID2_ROM_READY : out std_logic;
-	SID2_ROM_READ_DATA : out std_logic_vector(31 downto 0);
+    SID2_ROM_ADDRESS : in std_logic_vector(16 downto 0);
+    SID2_ROM_REQUEST : in std_logic;
+    SID2_ROM_READY : out std_logic;
+    SID2_ROM_READ_DATA : out std_logic_vector(31 downto 0);
 
     SID_ROM_ADDRESS : out std_logic_vector(16 downto 0);
-	SID_ROM_REQUEST : out std_logic;
-	SID_ROM_READY : in std_logic;
-	SID_ROM_READ_DATA : in std_logic_vector(31 downto 0)
+    SID_ROM_REQUEST : out std_logic;
+    SID_ROM_READY : in std_logic;
+    SID_ROM_READ_DATA : in std_logic_vector(31 downto 0)
 );
 END sid_data;
 
@@ -109,7 +108,6 @@ begin
     SID2_ROM_READY <= not(SID2_NEED_ROM) and SID2_ROM_REQUEST;
     alt_next <= alt_reg;
     if SID_ROM_READY = '1' then
-        -- alt_next <= not(CURRENT_REQUEST);
         if CURRENT_REQUEST = '1' then
             SID2_ROM_READY <= '1';
             alt_next <= '0';

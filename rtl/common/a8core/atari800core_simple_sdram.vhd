@@ -65,8 +65,8 @@ ENTITY atari800core_simple_sdram is
 		HBLANK : OUT STD_LOGIC;
 		VBLANK : OUT STD_LOGIC;
 
-		-- AUDIO OUT - all audio mix mixed
 		POKEYMAX_CONFIG : IN STD_LOGIC_VECTOR(38 downto 0);
+		-- AUDIO OUT - all audio mix mixed
 		AUDIO_L : OUT std_logic_vector(15 downto 0);
 		AUDIO_R : OUT std_logic_vector(15 downto 0);
 

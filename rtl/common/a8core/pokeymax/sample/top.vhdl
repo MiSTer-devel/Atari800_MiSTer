@@ -598,7 +598,7 @@ BEGIN
 		adpcm_data_request,
 		ram_request_reg,ram_address_reg,ram_data_to_write_reg,ram_ready,
 		ram_record_enabled_reg,
-		DI,RAM_CPU_WRITE_ENABLE,
+		DI,ram_cpu_write_enable,
 		AUDIO_IN0,AUDIO_IN1,AUDIO_IN2,AUDIO_IN3)
 	begin
 
@@ -653,7 +653,7 @@ BEGIN
 	
 			if (request='1') then
 				ram_address_next(16 downto 1) <= ram_cpu_addr_reg;
-				ram_request_next <= "0" & RAM_CPU_WRITE_ENABLE & "01";
+				ram_request_next <= "0" & ram_cpu_write_enable & "01";
 				ram_data_to_write_next <= DI;
 			end if;
 		else

@@ -80,8 +80,6 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 localparam CONF_STR = {
 	"ATARI800;;",
 	"-;",
-	"FC7,ROMBIN,SID Data (temp);",
-	"-;",
 	"S6,ATRXEXXDFATX,Boot D1;",
 	"S5,XEXCOMEXE,Load XEX;",
 	"F8,CARROMBIN,Load Cart;",
@@ -154,6 +152,9 @@ localparam CONF_STR = {
 	"P4-;",
 	"P4O[4:3],Stereo mix (sys),None,25%,50%,100%;",
 	"P4O[20],PokeyMax,Off/Mono,Enabled;",
+	// Since there is no alternative for this really, Main loads this automatically
+	// from a name fixed file
+	//"P4FC7,ROMBIN,SID wave data;",
 	"P4-;",
 	"d6P4O[71],Mono detect,On,Off;",
 	"P4O[32],Output Left Channel,On,Off;",
@@ -286,7 +287,7 @@ wire       pokeymax_mono_detect = ~status[71];
 wire [3:0] pokeymax_post_divide = { status[75:74] + 2'b10, status[73:72] + 2'b10 };
 wire [1:0] pokeymax_gtia_mix = status[77:76] + 2'b11;
 wire [1:0] pokeymax_adc_vol = status[79:78] + 2'b10;
-wire [1:0] pokeymax_pokey_restrict = !status[81] ? { ~status[80], 1'b0 } : 2'b01;
+wire [1:0] pokeymax_pokey_restrict = status[81:80] == 2'b00 ? 2'b11 : status[81:80] - 2'b01;
 wire       pokeymax_volume = ~status[82];
 wire       pokeymax_channel_mode = status[83];
 wire       pokeymax_irqs = status[84];
@@ -691,7 +692,8 @@ wire osab_rom_index = ioctl_index[7:0] == 8'b10000000 || ioctl_index[5:0] == 6;
 // boot3.rom (no menu index for this!)
 wire pbi_rom_index = ioctl_index[7:0] == 8'b11000000;
 wire turbofreezer_rom_index = ioctl_index[5:0] == 3;
-//wire siddata_rom_index = ioctl_index[5:0] == 7; // TODO currently not needed
+// sid_data.bin
+//wire siddata_rom_index = ioctl_index[5:0] == 7; // wire currently unused
 
 wire[25:0] rom_upload_addr;
 assign rom_upload_addr =

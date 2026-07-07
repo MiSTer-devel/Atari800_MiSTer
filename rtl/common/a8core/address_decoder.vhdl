@@ -970,7 +970,7 @@ gen_normal_memory : if low_memory=0 generate
 	-- SYSTEM        -              "0 0111 1000 0000 0000 0000 0000" (BOT) - Free 512K below 8MB:
 	-- first 64K taken by the sample engine, then 64K empty
 	-- then 128K of SID frequency and wave data
-	SDRAM_SAMPLE_ADDR <= "0011110000000000000000000";
+	SDRAM_SAMPLE_ADDR <= "001111000"&"0000000000000000";
 	SDRAM_SID_ADDR <= "00111101"&"00000000000000000";
 
 end generate;

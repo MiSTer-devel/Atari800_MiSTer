@@ -5,14 +5,15 @@
 -- please contact me for explicit permission at scrameta (gmail).
 -- This applies for source and binary form and derived works.
 ---------------------------------------------------------------------------
+
 LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use IEEE.STD_LOGIC_MISC.all;
 
 ENTITY pokey_mixer_mux IS
-PORT 
-( 
+PORT
+(
 	CLK : IN STD_LOGIC;
 	RESET_N : IN STD_LOGIC;
 
@@ -20,12 +21,12 @@ PORT
 	CHANNEL_1 : IN unsigned(5 downto 0);
 	CHANNEL_2 : IN unsigned(5 downto 0);
 	CHANNEL_3 : IN unsigned(5 downto 0);
-	
+
 	VOLUME_OUT_0 : OUT unsigned(15 downto 0);
 	VOLUME_OUT_1 : OUT unsigned(15 downto 0);
 	VOLUME_OUT_2 : OUT unsigned(15 downto 0);
 	VOLUME_OUT_3 : OUT unsigned(15 downto 0);
-	
+
 	PROFILE_ADDR : OUT std_logic_vector(5 downto 0);
 	PROFILE_REQUEST : OUT std_logic;
 	PROFILE_READY : IN std_logic;
@@ -139,7 +140,7 @@ begin
 	CHANNEL_MUX <= (others=>'0');
 	PROFILE_REQUEST <= '0';
 
-	case CHANNEL_STATE_REG is 
+	case CHANNEL_STATE_REG is
 		when CHANNEL_STATE_WAIT0 =>
 			if (CHANNEL_DIRTY_REG(0)='1') then
 				CHANNEL_STATE_NEXT <= CHANNEL_STATE_REQUEST0;
@@ -208,16 +209,16 @@ BEGIN
 
 	case channel_mux is
 	when "00" => -- 0
-	     	channel_sum := CHANNEL_0;
+	    channel_sum := CHANNEL_0;
 	when "01" => -- 1
-	     	channel_sum := CHANNEL_1;
+	    channel_sum := CHANNEL_1;
 	when "10" => -- 2
 		channel_sum := CHANNEL_2;
    --when "0000001" => -- 3
 	when others =>
 		channel_sum := CHANNEL_3;
 	end case;
-	
+
 	channel_sum_out <= channel_sum;
 
 END PROCESS;

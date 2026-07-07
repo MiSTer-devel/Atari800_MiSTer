@@ -11,7 +11,7 @@ use ieee.numeric_std.all;
 use IEEE.STD_LOGIC_MISC.all;
 
 ENTITY pokey_mixer_simple IS
-PORT 
+PORT
 ( 
 	CLK : IN STD_LOGIC;
 	ENABLE_179 : IN STD_LOGIC;
@@ -94,20 +94,20 @@ begin
 	end case;
 end pokeyvolume;
 
-signal VOLUME_OUT_L_NEXT : unsigned(15 downto 0);
-signal VOLUME_OUT_L_REG : unsigned(15 downto 0);
+signal volume_out_l_next : unsigned(15 downto 0);
+signal volume_out_l_reg : unsigned(15 downto 0);
 
-signal VL : STD_LOGIC_VECTOR(15 downto 0);
-signal VLS : STD_LOGIC_VECTOR(15 downto 0);
+signal vol : std_logic_vector(15 downto 0);
+signal vol_signed : std_logic_vector(15 downto 0);
 
 BEGIN
 
 process(clk)
 begin
 	if rising_edge(clk) then
-		VOLUME_OUT_L_REG <= VOLUME_OUT_L_NEXT;
-	END IF;
-END PROCESS;
+		volume_out_l_reg <= volume_out_l_next;
+	end if;
+end process;
 
 process (channel_0,channel_1,channel_2,channel_3)
 	variable channel0_long : unsigned(5 downto 0);
@@ -125,21 +125,18 @@ begin
 	channel2_long(3 downto 0) := unsigned(channel_2);
 	channel3_long(3 downto 0) := unsigned(channel_3);
 
-	VOLUME_OUT_L_NEXT <= pokeyvolume((channel0_long + channel1_long) + (channel2_long + channel3_long));
+	volume_out_l_next <= pokeyvolume((channel0_long + channel1_long) + (channel2_long + channel3_long));
 end process;
 
--- low pass filter output
+	-- low pass filter output
 filter_left : entity work.simple_low_pass_filter
-	port map (CLK => CLK,AUDIO_IN => VOLUME_OUT_L_REG,SAMPLE_IN => ENABLE_179,AUDIO_OUT => VL);
+port map (CLK => CLK,AUDIO_IN => volume_out_l_reg,SAMPLE_IN => ENABLE_179,AUDIO_OUT => vol);
 
---	-- Post divide 8, should be equivalent to the default PokeyMax settings...
---	VLS <= not(VL(15))&not(VL(15))&not(VL(15))&not(VL(15))&VL(14 downto 3);
+-- Post divide 4, should be equivalent to the default PokeyMax settings...
+vol_signed <= not(vol(15))&not(vol(15))&not(vol(15))&vol(14 downto 2);
 
---	-- Post divide 4, should be equivalent to the default PokeyMax settings...
-	VLS <= not(VL(15))&not(VL(15))&not(VL(15))&VL(14 downto 2);
-	-- output, full mono here
-	VOLUME_OUT_L <= VLS;
-	VOLUME_OUT_R <= VLS;
+-- output, full mono here
+VOLUME_OUT_L <= vol_signed;
+VOLUME_OUT_R <= vol_signed;
 
 END vhdl;
-

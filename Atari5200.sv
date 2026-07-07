@@ -28,7 +28,7 @@ assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
-assign {SD_SCK, SD_MOSI, SD_CS} = 'Z; 
+assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign LED_USER  = file_download;
 assign LED_DISK  = 0;
@@ -309,7 +309,7 @@ sdramclk_ddr
 	.outclocken(1'b1),
 	.sclr(1'b0),
 	.sset(1'b0)
-); 
+);
 
 assign VGA_F1 = 0;
 assign VGA_SL = scale ? scale[1:0] - 1'd1 : 2'd0;
