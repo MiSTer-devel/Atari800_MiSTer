@@ -1510,7 +1510,9 @@ BEGIN
 			--shiftclock_next(3) <= shiftclock_reg(0) nor playfield_reset;						
 			case shift_rate_reg is
 				when slow_shift =>
-					enable_shift <= (shiftclock_reg(0) and not(hscrol_reg(1) and hscrol_enabled_reg)) or (shiftclock_reg(2) and hscrol_reg(1) and hscrol_enabled_reg);
+					-- HSCROL bit 1 must NOT re-phase the shifter: The old
+					-- shiftclock(2) phase-select added a second +2cc on top
+					enable_shift <= shiftclock_reg(0);
 				when medium_shift =>
 					enable_shift <= shiftclock_reg(2) or shiftclock_reg(0);
 				when fast_shift =>			
