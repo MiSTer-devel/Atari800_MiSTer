@@ -184,7 +184,7 @@ localparam CONF_STR = {
 	"d9P4O[101:100],PSG clock,2MHz,1MHz,1.79MHz;",
 	"d9P4O[103:102],PSG stereo,Polish,Czech,By chip,Mono;",
 	"d9P4O[104],PSG envelope,32 steps,16 steps;",
-	"d9P4O[106:105],PSG volume,YM,AY3,Log,Linear;",
+	"d9P4O[106:105],PSG volume,Log 0,Log 1,Log 2,Linear;",
 	"P4-;",
 	"P4-,      (Reset to apply);",
 	"P5,Input;",
