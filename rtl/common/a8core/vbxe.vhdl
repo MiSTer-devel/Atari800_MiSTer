@@ -32,6 +32,7 @@ port (
 	ntsc_fix : in std_logic := '0';
 	soft_reset : in std_logic;
 	enable_179 : in std_logic; -- Original Atari speed (based on Antic enable, always active)
+	clock_shift : in std_logic_vector(cycle_length-1 downto 0);
 	reset_n : in std_logic;
 	pal : in std_logic := '1';
 	addr : in std_logic_vector(4 downto 0); -- 32 registers based at $D640/$D740
@@ -57,6 +58,7 @@ port (
 	memac_cpu_access : in std_logic;
 	memac_antic_access : in std_logic;
 	memac_check : out std_logic;
+	memac_active : out std_logic;
 	memac_data_in : in std_logic_vector(7 downto 0);
 	memac_data_out : out std_logic_vector(7 downto 0);
 	memac_request : in std_logic;
@@ -355,9 +357,6 @@ signal trans15_next : std_logic;
 signal vram_op_reg : std_logic_vector(1 downto 0);
 signal vram_op_next : std_logic_vector(1 downto 0);
 
-signal clock_shift_reg : std_logic_vector(cycle_length-1 downto 0);
-signal clock_shift_next : std_logic_vector(cycle_length-1 downto 0);
-
 signal cr_wren : std_logic;
 signal cg_wren : std_logic;
 signal cb_wren : std_logic;
@@ -626,7 +625,9 @@ memac_check_b <=
 
 memac_check <= memac_check_a or memac_check_b;
 
-process(clock_shift_reg, memac_request_reg, memac_request, memac_write_enable, memac_check_reg, memac_check_a, memac_check_b)
+memac_active <= (mems_reg(7) and (memc_reg(3) or memc_reg(2))) or memb_reg(7) or memb_reg(6);
+
+process(clock_shift, memac_request_reg, memac_request, memac_write_enable, memac_check_reg, memac_check_a, memac_check_b)
 begin
 	memac_request_next <= memac_request_reg;
 	memac_check_next <= memac_check_reg;
@@ -642,7 +643,7 @@ begin
 	if (memac_check_b = '1') then
 		memac_check_next(1) <= '1';
 	end if;	
-	if (clock_shift_reg(cycle_length-1) = '1') then
+	if (clock_shift(cycle_length-1) = '1') then
 		memac_request_next <= "00";
 		memac_check_next <= "00";
 	end if;
@@ -672,9 +673,9 @@ memac_request_complete <= memac_request_complete_next;
 memac_dma_enable <=
 	not(enable) -- VBXE is not active 
 	-- general DMA access and clock cycle safe for Atari MEMAC access not to be disturbed
-	or (or_reduce(memac_dma_address(25 downto 18)) and or_reduce(clock_shift_reg(10 downto 7)))
+	or (or_reduce(memac_dma_address(25 downto 18)) and or_reduce(clock_shift(8 downto 4)))
 	-- Atari area DMA access and clock cycle safe (early enough) to be executed in this big cycle round
-	or (not(or_reduce(memac_dma_address(25 downto 18))) and (or_reduce(clock_shift_reg(4 downto 0))))
+	or (not(or_reduce(memac_dma_address(25 downto 18))) and (or_reduce(clock_shift(0 downto 0))))
 	or not(mems_reg(7) or memb_reg(7) or memb_reg(6)); -- MEMAC is disabled
 
 -- This does not work, not sure why, but just checking for registers should be fine
@@ -902,7 +903,6 @@ begin
 		vram_data_reg <= (others => '0');
 		vram_addr_reg <= (others => '0');
 		memac_check_reg <= "00";
-		clock_shift_reg <= (others => '0');
 		memac_data_reg <= (others => '0');
 		blitter_addr_reg <= (others => 'U');
 		blitter_irqen_reg <= '0';
@@ -992,7 +992,6 @@ begin
 		vram_data_reg <= vram_data_next;
 		vram_addr_reg <= vram_addr_next;
 		memac_check_reg <= memac_check_next;
-		clock_shift_reg <= clock_shift_next;
 		memac_data_reg <= memac_data_next;
 		blitter_addr_reg <= blitter_addr_next;
 		blitter_irqen_reg <= blitter_irqen_next;
@@ -1118,9 +1117,11 @@ map_glive_delay_end : delay_line
 	generic map (COUNT=>11)
 	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_end,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_glive_end);
 
-map_tlive_delay_start : delay_line
-	generic map (COUNT=>11)
-	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_tlive_start);
+--map_tlive_delay_start : delay_line
+--	generic map (COUNT=>11)
+--	port map(clk=>clk,sync_reset=>'0',data_in=>xdl_field_start,enable=>video_clock_vbxe,reset_n=>reset_n,data_out=>xdl_ov_tlive_start);
+
+xdl_ov_tlive_start <= xdl_ov_glive_start;
 
 map_tlive_delay_end : delay_line
 	generic map (COUNT=>19) -- previous plus 8 to catch one more character (for scrolling)
@@ -1190,7 +1191,7 @@ begin
 end process;
 
 -- VBXE DMA state machine
-process(clock_shift_reg,
+process(clock_shift,
 	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
 	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,memac_address, blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
 	blitter_status,blitter_pending_reg, xdl_ovscr_h_reg, xdl_ovscr_v_reg,
@@ -1348,6 +1349,7 @@ begin
 			xdl_or_blitter_notify := true;
 		end if;
 	when "0011" =>
+		memac_request_complete_next <= '0';
 		if (xdl_ov_tlive_reg = '1') then
 			if xdl_ov_text_reg = '1' then
 				xdl_char_attr_next <= vram_data_in;
@@ -1423,6 +1425,7 @@ begin
 			xdl_or_blitter_notify := true;
 		end if;
 	when "0101" =>
+		memac_request_complete_next <= '0';
 		if (xdl_ov_tlive_reg = '1') then
 			if (xdl_ov_text_reg = '1') then
 				for pi in 0 to 7 loop
@@ -1725,21 +1728,9 @@ begin
 		-- on the next cycle
 		blitter_pending_next <= not(blitter_vram_wren);
 	end if;
-	if clock_shift_reg(cycle_length-1) = '1' then
-		memac_request_complete_next <= '0';
-	end if;
-	if clock_shift_reg(2) = '1' then
+
+	if clock_shift(cycle_length-1) = '1' then
 		dma_state_next <= "0000";
-	end if;
-end process;
-
-process(enable_179, clock_shift_reg)
-begin
-	clock_shift_next(cycle_length-1 downto 0) <= clock_shift_reg(cycle_length-2 downto 0) & '0';
-
-	if (enable_179 = '1') then
-		clock_shift_next(cycle_length-1 downto 1) <= (others=>'0');
-		clock_shift_next(0) <= '1';
 	end if;
 end process;
 

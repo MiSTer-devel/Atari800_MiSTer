@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------
--- (c) 2013 mark watson
+-- (c) 2014 mark watson
 -- I am happy for anyone to use this for non-commercial use.
 -- If my vhdl files are used commercially or otherwise sold,
 -- please contact me for explicit permission at scrameta (gmail).
@@ -10,27 +10,23 @@ USE ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use IEEE.STD_LOGIC_MISC.all;
 
-ENTITY pokey_mixer IS
-PORT 
+ENTITY pokey_mixer_simple IS
+PORT
 ( 
 	CLK : IN STD_LOGIC;
+	ENABLE_179 : IN STD_LOGIC;
 
 	CHANNEL_0 : IN STD_LOGIC_VECTOR(3 downto 0);
 	CHANNEL_1 : IN STD_LOGIC_VECTOR(3 downto 0);
 	CHANNEL_2 : IN STD_LOGIC_VECTOR(3 downto 0);
 	CHANNEL_3 : IN STD_LOGIC_VECTOR(3 downto 0);
-	
-	GTIA_SOUND : IN STD_LOGIC;
-	SIO_AUDIO : IN STD_LOGIC_VECTOR(7 downto 0);
 
-	COVOX_CHANNEL_0 : IN STD_LOGIC_VECTOR(7 downto 0);
-	COVOX_CHANNEL_1 : IN STD_LOGIC_VECTOR(7 downto 0);
-	
-	VOLUME_OUT_NEXT : OUT STD_LOGIC_vector(15 downto 0)
+	VOLUME_OUT_L : OUT STD_LOGIC_vector(15 downto 0);
+	VOLUME_OUT_R : OUT STD_LOGIC_vector(15 downto 0)
 );
-END pokey_mixer;
+END pokey_mixer_simple;
 
-ARCHITECTURE vhdl OF pokey_mixer IS
+ARCHITECTURE vhdl OF pokey_mixer_simple IS
 
 -- This comes from PokeyMax(4) implementation
 function pokeyvolume(x: unsigned(5 downto 0)) return unsigned is
@@ -98,59 +94,49 @@ begin
 	end case;
 end pokeyvolume;
 
-signal volume_sum_next : std_logic_vector(15 downto 0);
-signal volume_sum_reg : std_logic_vector(15 downto 0);
+signal volume_out_l_next : unsigned(15 downto 0);
+signal volume_out_l_reg : unsigned(15 downto 0);
+
+signal vol : std_logic_vector(15 downto 0);
+signal vol_signed : std_logic_vector(15 downto 0);
 
 BEGIN
 
 process(clk)
 begin
-	if (clk'event and clk='1') then
-		VOLUME_SUM_REG <= VOLUME_SUM_NEXT;
-	END IF;
-END PROCESS;
+	if rising_edge(clk) then
+		volume_out_l_reg <= volume_out_l_next;
+	end if;
+end process;
 
-	-- next state
-	process (channel_0,channel_1,channel_2,channel_3,covox_CHANNEL_0,covox_channel_1,gtia_sound,sio_audio)
-		variable channel0_en_long : unsigned(5 downto 0);
-		variable channel1_en_long : unsigned(5 downto 0);
-		variable channel2_en_long : unsigned(5 downto 0);
-		variable channel3_en_long : unsigned(5 downto 0);
-		variable channels_long : unsigned(16 downto 0);
-		variable gtia_sound_long : unsigned(16 downto 0);
-		variable sio_audio_long : unsigned(16 downto 0);
-		variable covox_0_long : unsigned(16 downto 0);
-		variable covox_1_long : unsigned(16 downto 0);
-		
-		variable volume_int_sum : unsigned(16 downto 0);
-	begin
-		channel0_en_long := (others=>'0');
-		channel1_en_long := (others=>'0');
-		channel2_en_long := (others=>'0');
-		channel3_en_long := (others=>'0');
-		-- Bits 14 downto 0 can also be filled in with gtia_sound
-		-- without harm to amplify GTIA sound further
-		gtia_sound_long := (15 => gtia_sound, others=>'0');
+process (channel_0,channel_1,channel_2,channel_3)
+	variable channel0_long : unsigned(5 downto 0);
+	variable channel1_long : unsigned(5 downto 0);
+	variable channel2_long : unsigned(5 downto 0);
+	variable channel3_long : unsigned(5 downto 0);
+begin
+	channel0_long := (others=>'0');
+	channel1_long := (others=>'0');
+	channel2_long := (others=>'0');
+	channel3_long := (others=>'0');
 
-		channel0_en_long(3 downto 0) := unsigned(channel_0);
-		channel1_en_long(3 downto 0) := unsigned(channel_1);
-		channel2_en_long(3 downto 0) := unsigned(channel_2);
-		channel3_en_long(3 downto 0) := unsigned(channel_3);
+	channel0_long(3 downto 0) := unsigned(channel_0);
+	channel1_long(3 downto 0) := unsigned(channel_1);
+	channel2_long(3 downto 0) := unsigned(channel_2);
+	channel3_long(3 downto 0) := unsigned(channel_3);
 
-		channels_long := "0" & pokeyvolume((channel0_en_long + channel1_en_long) + (channel2_en_long + channel3_en_long));
-		sio_audio_long := unsigned("0" & sio_audio & sio_audio);
-		covox_0_long := unsigned("0" & covox_channel_0 & covox_channel_0);
-		covox_1_long := unsigned("0" & covox_channel_1 & covox_channel_1);
+	volume_out_l_next <= pokeyvolume((channel0_long + channel1_long) + (channel2_long + channel3_long));
+end process;
 
-		volume_int_sum := channels_long + ((gtia_sound_long + sio_audio_long) + (covox_0_long + covox_1_long));
+	-- low pass filter output
+filter_left : entity work.simple_low_pass_filter
+port map (CLK => CLK,AUDIO_IN => volume_out_l_reg,SAMPLE_IN => ENABLE_179,AUDIO_OUT => vol);
 
-		-- Alternatively remove - X"8000" and make the MiSTer audio unsigned (top 800 & 5200 .sv files)
-		volume_sum_next <= std_logic_vector(volume_int_sum(16 downto 1) - X"8000");
-		
-	end process;
-	
+-- Post divide 4, should be equivalent to the default PokeyMax settings...
+vol_signed <= not(vol(15))&not(vol(15))&not(vol(15))&vol(14 downto 2);
 
-	-- output
-	volume_out_next <= volume_sum_reg; 
+-- output, full mono here
+VOLUME_OUT_L <= vol_signed;
+VOLUME_OUT_R <= vol_signed;
 
 END vhdl;

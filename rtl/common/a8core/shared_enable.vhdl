@@ -30,8 +30,10 @@ PORT
 
 	ANTIC_ENABLE_179 : OUT STD_LOGIC;  -- always about 1.79MHz to keep sound the same - 1 cycle early
 	oldcpu_enable : OUT STD_LOGIC;     -- always about 1.79MHz to keep sound the same - 1 cycle only, when memory is ready...
-	CPU_ENABLE_OUT : OUT STD_LOGIC    -- for compatibility run at 1.79MHz, for speed run as fast as we can
-	
+	CPU_ENABLE_OUT : OUT STD_LOGIC;    -- for compatibility run at 1.79MHz, for speed run as fast as we can
+	ANTIC_ENABLE_179_DOUBLE : OUT STD_LOGIC;
+	CLOCK_SHIFT : out STD_LOGIC_VECTOR(cycle_length-1 downto 0)
+
 	-- antic DMA runs 1 cycle after 'enable', so ANTIC_ENABLE is delayed by cycle_length-1 cycles vs CPU_ENABLE (when in 1.79MHz mode)
 );
 END shared_enable;
@@ -65,6 +67,8 @@ ARCHITECTURE vhdl OF shared_enable IS
 	
 	signal enable_179 : std_logic;
 	signal enable_179_early : std_logic;
+	signal enable_179_double : std_logic;
+	signal enable_179_double_early : std_logic;
 	signal cpu_enable : std_logic;
 	
 	signal cpu_extra_enable_next : std_logic;
@@ -73,6 +77,9 @@ ARCHITECTURE vhdl OF shared_enable IS
 	signal speed_shift_next : std_logic_vector(cycle_length-1 downto 0);
 	signal speed_shift_reg : std_logic_vector(cycle_length-1 downto 0);	
 	
+	signal clock_shift_reg : std_logic_vector(cycle_length-1 downto 0);
+	signal clock_shift_next : std_logic_vector(cycle_length-1 downto 0);
+
 	signal oldcycle_go : std_logic;
 	signal oldcycle_state_next : std_logic_vector(2 downto 0);
 	signal oldcycle_state_reg : std_logic_vector(2 downto 0);
@@ -91,6 +98,10 @@ begin
 	enable_179_clock_div : enable_divider
 		generic map (COUNT=>cycle_length)
 		port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>enable_179);
+
+	enable_179_clock_div2 : enable_divider
+		generic map (COUNT=>cycle_length/2)
+		port map(clk=>clk,reset_n=>reset_n,enable_in=>'1',enable_out=>enable_179_double);
 		
 	process(THROTTLE_COUNT_6502, speed_shift_reg, enable_179)
 		variable speed_shift : std_logic;
@@ -115,9 +126,23 @@ begin
 		speed_shift_next(0) <= speed_shift;
 	end process;
 
+	process(enable_179_early, clock_shift_reg)
+	begin
+		clock_shift_next(cycle_length-1 downto 0) <= clock_shift_reg(cycle_length-2 downto 0) & '0';
+
+		if (enable_179_early = '1') then
+			clock_shift_next(cycle_length-1 downto 1) <= (others=>'0');
+			clock_shift_next(0) <= '1';
+		end if;
+	end process;
+
 	delay_line_phase : delay_line
 		generic map (COUNT=>cycle_length-1)
-		port map(clk=>clk,sync_reset=>'0',reset_n=>reset_n,data_in=>enable_179, enable=>'1', data_out=>enable_179_early);	
+		port map(clk=>clk,sync_reset=>'0',reset_n=>reset_n,data_in=>enable_179, enable=>'1', data_out=>enable_179_early);
+
+	delay_line_phase_double : delay_line
+		generic map (COUNT=>4)
+		port map(clk=>clk,sync_reset=>'0',reset_n=>reset_n,data_in=>enable_179_double, enable=>'1', data_out=>enable_179_double_early);
 
 	-- registers
 	process(clk,reset_n)
@@ -126,10 +151,12 @@ begin
 			cpu_extra_enable_reg <= '0';
 			oldcycle_state_reg <= oldcycle_state_idle;
 			speed_shift_reg <= (others=>'0');
+			clock_shift_reg <= (others => '0');
 		elsif (clk'event and clk='1') then										
 			cpu_extra_enable_reg <= cpu_extra_enable_next;
 			oldcycle_state_reg <= oldcycle_state_next;
 			speed_shift_reg <= speed_shift_next;
+			clock_shift_reg <= clock_shift_next;
 		end if;
 	end process;
 	
@@ -203,6 +230,8 @@ begin
 	-- output
 	oldcpu_enable <= oldcycle_go;
 	ANTIC_ENABLE_179 <= enable_179_early;
+	ANTIC_ENABLE_179_DOUBLE <= enable_179_double_early;
+	CLOCK_SHIFT <= clock_shift_reg;
 	
 	CPU_ENABLE_OUT <= cpu_enable; -- run at 25MHz
 
