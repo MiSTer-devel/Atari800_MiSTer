@@ -136,8 +136,8 @@ localparam CONF_STR = {
 	"P3O[62:61],Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
 	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
-	"P3O[63],Fix VBXE NTSC bug,Disabled,Enabled;",
-	"P3FC2,ACT,VBXE Palette;",
+	"dBP3O[63],Fix VBXE NTSC bug,Disabled,Enabled;",
+	"dBP3FC2,ACT,VBXE Palette;",
 	"P3-;",
 	"P3O[23:22],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P3O[19:17],Scandoubler FX,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -400,7 +400,20 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({(~status[95] | ~status[85]) & status[20], ~status[99] & status[20],~status[95] & status[20],~status[85] & status[20],status[20],~status[2] & pbi_rom_loaded, status[31] & status[5], status[5] & ~status[59] & ~status[60], ~status[2] & status[42] & pbi_rom_loaded, status[2], en216p}),
+	.status_menumask({
+		menu_vbxe, // B
+		pokeymax_enable & (pokeymax_covox_restrict | pokeymax_sid_restrict), // A
+		pokeymax_enable & pokeymax_psg_restrict, // 9
+		pokeymax_enable & pokeymax_covox_restrict, // 8
+		pokeymax_enable & pokeymax_sid_restrict, // 7
+		pokeymax_enable, // 6
+		~menu_mode800 & pbi_rom_loaded, // 5
+		menu_ntsc & ~menu_vbxe & menu_artifacting, // 4
+		menu_ntsc & ~menu_vbxe, // 3
+		~menu_mode800 & menu_pbibios & pbi_rom_loaded, // 2
+		menu_mode800, // 1
+		en216p // 0
+	}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -560,7 +573,7 @@ atari800top atari800top
 	.WARM_RESET_MENU(status[39]),
 	.COLD_RESET_MENU(status[40] | buttons[1]),
 	.RTC(rtc),
-	.VBXE_MODE({status[63],status[60],status[59]}),
+	.VBXE_MODE({status[63],status[60:59]}),
 	.VBXE_PALETTE_RGB(vbxe_palette_rgb_out),
 	.VBXE_PALETTE_INDEX(vbxe_palette_index),
 	.VBXE_PALETTE_COLOR(vbxe_palette_color),
@@ -651,7 +664,7 @@ articolor articolor
 	.clk(CLK_VIDEO),
 	.ce_pix(ce_pix),
 	
-	.enable(status[5] & status[31] & ~status[59] & ~status[60]),
+	.enable(menu_ntsc & menu_artifacting & ~menu_vbxe),
 	.colorset(~status[55]),
 	.colorswap(status[58]),
 
@@ -717,6 +730,12 @@ assign cart2_upload_addr = {6'b101001, ioctl_addr[19:0]};
 
 assign cart_upload_addr = cart1_rom_index ? cart1_upload_addr : cart2_upload_addr;
 
+wire menu_mode800 = status[2];
+wire menu_pbibios = status[42];
+wire menu_ntsc = status[5];
+wire menu_artifacting = status[31];
+wire menu_vbxe = status[59] | status[60];
+
 reg mode800 = 0;
 reg modepbi = 0;
 wire xex_loader_mode;
@@ -733,13 +752,13 @@ assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_load
 assign atari_status2 = {tape_fifo_full, tape_fifo_empty, tape_active, tape_slow, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
-	mode800 <= status[2];
-	modepbi <= ~status[2] & status[42] & pbi_rom_loaded;
+	mode800 <= menu_mode800;
+	modepbi <= ~menu_mode800 & menu_pbibios & pbi_rom_loaded;
 	splashpbi <= status[43];
 	bootpbi <= status[54:52];
 	drivesmodepbi <= status[51:44];
-	ram_config <= (status[2] ? status[37:35] : status[15:13]);
-	pal_video <= ~status[5];
+	ram_config <= (menu_mode800 ? status[37:35] : status[15:13]);
+	pal_video <= ~menu_ntsc;
 end
 
 reg pbi_rom_loaded = 0;
