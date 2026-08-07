@@ -185,7 +185,8 @@ ENTITY atari800core IS
 		HALT : in std_logic;
 		freezer_enable: in std_logic;
 		freezer_activate: in std_logic;
-		ATARI800MODE : in std_logic := '0';
+		ATARI800MODE : in std_logic;
+		ATARI800MODE_16K : in std_logic;
 		PBI_ROM_MODE : in std_logic := '0';
 		XEX_LOADER_MODE : in std_logic := '0';
 		RTC : IN STD_LOGIC_VECTOR(64 DOWNTO 0);
@@ -635,6 +636,7 @@ PORT MAP(CLK => CLK,
 
 		 ram_select => RAM_SELECT(2 downto 0),
 		 ATARI800MODE => ATARI800MODE,
+		 ATARI800MODE_16K => ATARI800MODE_16K,
 		 PBI_ROM_MODE => PBI_ROM_MODE,
 		 XEX_LOADER_MODE => XEX_LOADER_MODE,
 		 ROM_DATA => ROM_DO,
