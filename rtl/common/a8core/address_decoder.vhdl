@@ -135,6 +135,7 @@ PORT
 	RAM_WR_ENABLE : OUT STD_LOGIC;	
 	ROM_WR_ENABLE : OUT STD_LOGIC;	
 	PBI_WR_ENABLE : OUT STD_LOGIC;
+	D6_WR_ENABLE : OUT STD_LOGIC;
 
 	-- ROM and RAM have extended address busses to allow for bank switching etc.
 	ROM_ADDR : OUT STD_LOGIC_VECTOR(21 downto 0);
@@ -1089,6 +1090,7 @@ end generate;
 		ANTIC_WR_ENABLE <= '0';
 		PIA_WR_ENABLE <= '0';
 		PIA_RD_ENABLE <= '0';
+		D6_WR_ENABLE <= '0';
 		ULTIME_WR_ENABLE <= '0';
 		ROM_WR_ENABLE <= '0';
 		VBXE_WRITE_ENABLE <= '0';
@@ -1287,7 +1289,10 @@ end generate;
 					end if;
 
 				when X"D6"|X"D7"	=>
-					if (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
+					if addr_next(8 downto 2) = "0000000" then
+						D6_WR_ENABLE <= write_enable_next;
+						MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
+					elsif (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
 						VBXE_WRITE_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= VBXE_DATA;
 						MEMORY_DATA_INT(15 downto 8) <= CACHE_VBXE_DATA;
