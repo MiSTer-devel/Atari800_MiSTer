@@ -293,7 +293,7 @@ begin
 			if JOY4(6) = '1'             then paddle_4(2) <= '1';   end if;
 			if JOY4(8 downto 7) /= "00"  then paddle_4    <= "001"; end if;
 
-			if cnt < 50000000 then
+			if cnt < 25000000 then
 				cnt := cnt + 1;
 				option_tmp <= option_tmp or SET_OPTION_FORCE_IN or JOY(5);
 				start_tmp <= start_tmp or SET_START_FORCE_IN;
