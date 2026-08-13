@@ -73,7 +73,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                     
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   X                 
 
 
 `include "build_id.v" 
@@ -118,6 +118,7 @@ localparam CONF_STR = {
 	"P2O[9:7],CPU speed,1x,2x,4x,8x,16x;",
 	"P2-;",
 	"P2O[2],Machine,XL/XE,400/800;",
+	"d1P2O[110],400/800 OS ROM type,10KB,16KB;",
 	"H1P2O[15:13],RAM XL,64K,128K,320K(Compy),320K(Rambo),576K(Compy),576K(Rambo),1MB,4MB(Axlon);",
 	"h1P2O[37:35],RAM 800,8K,16K,32K,48K,52K,4MB(Axlon);",
 	"d5P2O[42],PBI BIOS,Disabled,Enabled;",
@@ -126,9 +127,9 @@ localparam CONF_STR = {
 	"P2-;",
 	"P2O[41],Use bootX.rom,Enabled,Disabled;",
 	"P2-;",
-	"P2FC4,ROMBIN,XL/XE OS;",
+	"P2FC4,ROMBIN,OS 16K;",
 	"P2FC5,ROMBIN,Basic;",
-	"P2FC6,ROMBIN,OS-A/B;",
+	"P2FC6,ROMBIN,OS 10K (400/800);",
 	"P2FC3,ROMBIN,TurboFreezer;",
 	"P3,Video;",
 	"P3-;",
@@ -568,6 +569,7 @@ atari800top atari800top
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
 	.RAM_SIZE(ram_config),
 	.OS_MODE_800(mode800),
+	.OS_800_16K(os800_16k),
 	.PBI_MODE(modepbi),
 	.XEX_LOADER_MODE(xex_loader_mode),
 	.WARM_RESET_MENU(status[39]),
@@ -737,6 +739,7 @@ wire menu_artifacting = status[31];
 wire menu_vbxe = status[59] | status[60];
 
 reg mode800 = 0;
+reg os800_16k = 0;
 reg modepbi = 0;
 wire xex_loader_mode;
 reg splashpbi = 0;
@@ -748,11 +751,12 @@ reg pal_video = 0;
 wire [15:0] atari_status1;
 wire [15:0] atari_status2;
 wire [2:0] atari_hotkeys;
-assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], 1'b0, ~status[41], mode800, atari_hotkeys};
+assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], os800_16k, ~status[41], mode800, atari_hotkeys};
 assign atari_status2 = {tape_fifo_full, tape_fifo_empty, tape_active, tape_slow, splashpbi, bootpbi, drivesmodepbi};
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= menu_mode800;
+	os800_16k <= status[110];
 	modepbi <= ~menu_mode800 & menu_pbibios & pbi_rom_loaded;
 	splashpbi <= status[43];
 	bootpbi <= status[54:52];

@@ -19,6 +19,7 @@ PORT (
 	DATA_IN : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 	REQUEST : IN STD_LOGIC;
 	WR_EN : IN STD_LOGIC;
+	D6_WR_EN : IN STD_LOGIC; -- To mirror COVOX at D600 for compatibility
 	DATA_OUT : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 	DRIVE_DATA_OUT : OUT STD_LOGIC;
 
@@ -876,8 +877,8 @@ process(
 	CONFIG_DO,
 	write_n,
 	request,
-	RESTRICT_CAPABILITY_REG, readreq_s, writereq_s
-	)
+	RESTRICT_CAPABILITY_REG, readreq_s, writereq_s,
+	D6_WR_EN)
 	variable writereq : std_logic;
 	variable readreq : std_logic;
 	variable enable_region : std_logic;
@@ -889,7 +890,7 @@ begin
 	SID_WRITE_ENABLE <= (others=>'0');
 	SID_READ_ENABLE <= (others=>'0');
 	PSG_WRITE_ENABLE <= (others=>'0');
-	SAMPLE_WRITE_ENABLE <= '0';
+	SAMPLE_WRITE_ENABLE <= RESTRICT_CAPABILITY_REG(4) and D6_WR_EN;
 	CONFIG_WRITE_ENABLE <= '0';
 	enable_region :='0';
 

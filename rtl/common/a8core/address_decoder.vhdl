@@ -100,6 +100,7 @@ PORT
 	rom_in_ram : in std_logic;
 
 	atari800mode : in std_logic := '0';
+	atari800mode_16k : in std_logic := '0';
 	pbi_rom_mode : in std_logic := '0';
 	xex_loader_mode : in std_logic := '0';
 
@@ -134,6 +135,7 @@ PORT
 	RAM_WR_ENABLE : OUT STD_LOGIC;	
 	ROM_WR_ENABLE : OUT STD_LOGIC;	
 	PBI_WR_ENABLE : OUT STD_LOGIC;
+	D6_WR_ENABLE : OUT STD_LOGIC;
 
 	-- ROM and RAM have extended address busses to allow for bank switching etc.
 	ROM_ADDR : OUT STD_LOGIC_VECTOR(21 downto 0);
@@ -869,7 +871,7 @@ BEGIN
 	extended_access_cpu <= (extended_access_addr and cpu_fetch_real_next and not(portb(4)));
 	extended_access_either <= extended_access_addr and not(portb(4));
 	
-	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode,axlon_bank_reg)
+	process(extended_access_cpu_or_antic,extended_access_either,extended_access_addr,addr_next,ram_select,portb,atari800mode,atari800mode_16k,axlon_bank_reg)
 	begin	
 		extended_bank <= "0000000"&addr_next(15 downto 14);
 		extended_self_test <= '1';
@@ -877,9 +879,9 @@ BEGIN
 		ram_c000 <= '0';
 		has_ram <= '1';
 
-		if (atari800mode='1') then
+		if atari800mode = '1' then
 			extended_self_test <= '0';
-			ram_c000 <= '1';
+			ram_c000 <= not(atari800mode_16k);
 			case ram_select is
 				when "000" => -- 8k
 					has_ram <= not(addr_next(15) or addr_next(14) or addr_next(13));
@@ -890,8 +892,7 @@ BEGIN
 				when "011" => -- 48k
 					has_ram <= not(addr_next(15)) or not(addr_next(14));
 				when "100" => -- 52k
-					null;
-					-- yes we have 64k here, but its hidden!
+					has_ram <= not(atari800mode_16k) or not(addr_next(15)) or not(addr_next(14));
 				when "101" => -- 4MB Axlon
 					-- 48K Basic RAM
 					has_ram <= not(addr_next(15)) or not(addr_next(14));
@@ -965,7 +966,7 @@ gen_normal_memory : if low_memory=0 generate
 	SDRAM_CART_ADDR	<= "010" & emu_cart_address(21 downto 0);
 	-- BASIC/OS ROM  -              "0 0111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K below 8MB
 	SDRAM_BASIC_ROM_ADDR <= "00111"&"000000" &"00000000000000";
-	SDRAM_OS_ROM_ADDR    <= "00111"&"000010" &"00000000000000" when atari800mode = '1' else
+	SDRAM_OS_ROM_ADDR    <= "00111"&"000010" &"00000000000000" when atari800mode = '1' and atari800mode_16k = '0' else
 				"00111"&"000001" &"00000000000000";
 	-- SYSTEM        -              "0 0111 1000 0000 0000 0000 0000" (BOT) - Free 512K below 8MB:
 	-- first 64K taken by the sample engine, then 64K empty
@@ -1089,6 +1090,7 @@ end generate;
 		ANTIC_WR_ENABLE <= '0';
 		PIA_WR_ENABLE <= '0';
 		PIA_RD_ENABLE <= '0';
+		D6_WR_ENABLE <= '0';
 		ULTIME_WR_ENABLE <= '0';
 		ROM_WR_ENABLE <= '0';
 		VBXE_WRITE_ENABLE <= '0';
@@ -1287,7 +1289,10 @@ end generate;
 					end if;
 
 				when X"D6"|X"D7"	=>
-					if (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
+					if addr_next(8 downto 2) = "0000000" then
+						D6_WR_ENABLE <= write_enable_next;
+						MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
+					elsif (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
 						VBXE_WRITE_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= VBXE_DATA;
 						MEMORY_DATA_INT(15 downto 8) <= CACHE_VBXE_DATA;
