@@ -156,6 +156,7 @@ ENTITY atari800core_simple_sdram is
 		PBI_ROM_MODE : in STD_LOGIC := '0';
 		XEX_LOADER_MODE : in STD_LOGIC := '0';
 		RTC : in std_logic_vector(64 downto 0);
+		CLK_CONF : in std_logic_vector(2 downto 0);
 		VBXE_SWITCH : IN STD_LOGIC := '0';
 		VBXE_REG_BASE : IN STD_LOGIC := '0';
 		VBXE_NTSC_FIX : IN STD_LOGIC := '0';
@@ -538,6 +539,7 @@ PORT MAP
 	PBI_ROM_MODE => PBI_ROM_MODE,
 	XEX_LOADER_MODE => XEX_LOADER_MODE,
 	RTC => RTC,
+	CLK_CONF => CLK_CONF,
 	VBXE_SWITCH => VBXE_SWITCH,
 	VBXE_REG_BASE => VBXE_REG_BASE,
 	VBXE_NTSC_FIX => VBXE_NTSC_FIX,

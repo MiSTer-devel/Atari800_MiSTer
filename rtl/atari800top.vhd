@@ -101,6 +101,7 @@ PORT
 	WARM_RESET_MENU : IN STD_LOGIC;
 	COLD_RESET_MENU : IN STD_LOGIC;
 	RTC        : IN STD_LOGIC_VECTOR(64 downto 0);
+	CLK_CONF   : IN STD_LOGIC_VECTOR(2 downto 0);
 	VBXE_MODE  : IN STD_LOGIC_VECTOR(2 downto 0) := "000";
 	VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0);
 	VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0);
@@ -293,17 +294,22 @@ begin
 			if JOY4(6) = '1'             then paddle_4(2) <= '1';   end if;
 			if JOY4(8 downto 7) /= "00"  then paddle_4    <= "001"; end if;
 
-			if cnt < 25000000 then
+			if cnt < 50000000 then
 				cnt := cnt + 1;
-				option_tmp <= option_tmp or SET_OPTION_FORCE_IN or JOY(5);
 				start_tmp <= start_tmp or SET_START_FORCE_IN;
 				space_tmp <= space_tmp or SET_SPACE_FORCE_IN;
 			else
 				tape_hold <= '0';
-				option_tmp <= '0';
 				start_tmp <= '0';
 				space_tmp <= '0';
 			end if;
+
+			if cnt < 25000000 then
+				option_tmp <= option_tmp or SET_OPTION_FORCE_IN or JOY(5);
+			else
+				option_tmp <= '0';
+			end if;
+
 			warm_reset_request <= not(reset_rnmi_atari) and (warm_reset_request or warm_reset_menu);
 			cold_reset_request <= cold_reset_request or cold_reset_menu;
 		end if;
@@ -454,6 +460,7 @@ PORT MAP
 	PBI_ROM_MODE => PBI_MODE,
 	XEX_LOADER_MODE => XEX_LOADER_MODE,
 	RTC => RTC,
+	CLK_CONF => CLK_CONF,
 	VBXE_SWITCH => VBXE_MODE(0) or VBXE_MODE(1),
 	VBXE_REG_BASE => VBXE_MODE(1),
 	VBXE_NTSC_FIX => VBXE_MODE(2),
