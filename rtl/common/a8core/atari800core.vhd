@@ -262,6 +262,14 @@ signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
 signal VIDEO_G_GTIA : std_logic_vector(7 downto 0);
 signal VIDEO_B_GTIA : std_logic_vector(7 downto 0);
 
+-- VBXE memory
+signal vbxe_vram_addr : std_logic_vector(18 downto 0);
+signal vbxe_vram_data : std_logic_vector(7 downto 0);
+signal vbxe_vram_data_in : std_logic_vector(7 downto 0);
+signal vbxe_vram_request : std_logic;
+signal vbxe_vram_wr_en : std_logic;
+signal vbxe_vram_request_complete : std_logic;
+
 -- VBXE PALETTE
 signal VIDEO_R_VBXE : std_logic_vector(7 downto 0);
 signal VIDEO_G_VBXE : std_logic_vector(7 downto 0);
@@ -286,7 +294,6 @@ SIGNAL	CPU_SHARED_ENABLE :  STD_LOGIC;
 SIGNAL	ENABLE_179_MEMWAIT :  STD_LOGIC;
 SIGNAL	ANTIC_ENABLE_179 :  STD_LOGIC;
 SIGNAL	ANTIC_ENABLE_179_DOUBLE :  STD_LOGIC;
-SIGNAL	CLOCK_SHIFT : STD_LOGIC_VECTOR(cycle_length-1 downto 0);
 
 -- MEMORY IS READY - input to all devices
 SIGNAL	MEMORY_DATA :  STD_LOGIC_VECTOR(31 DOWNTO 0);
@@ -334,13 +341,10 @@ signal memac_write_enable : std_logic;
 signal memac_cpu_access : std_logic;
 signal memac_antic_access : std_logic;
 signal memac_check : std_logic;
-signal memac_active : std_logic;
 signal memac_data_write : std_logic_vector(7 downto 0);
 signal memac_data_read : std_logic_vector(7 downto 0);
 signal memac_request : std_logic;
 signal memac_request_complete : std_logic;
-signal memac_dma_enable : std_logic;
-signal dma_fetch_vbxe_adj : std_logic;
 
 signal VBXE_IRQ_N : std_logic;
 
@@ -373,9 +377,6 @@ PBI_WRITE_DATA <= WRITE_DATA;
 PBI_SNOOP_DATA <= MEMORY_DATA;
 PBI_SNOOP_READY <= MEMORY_READY_CPU or MEMORY_READY_ANTIC;
 
-dma_fetch_vbxe_adj <= 
-	dma_fetch and memac_dma_enable;
-
 enables : entity work.shared_enable
 GENERIC MAP(cycle_length => cycle_length)
 PORT MAP(CLK => CLK,
@@ -388,8 +389,7 @@ PORT MAP(CLK => CLK,
 		 ANTIC_ENABLE_179 => ANTIC_ENABLE_179,
 		 ANTIC_ENABLE_179_DOUBLE => ANTIC_ENABLE_179_DOUBLE,
 		 oldcpu_enable => ENABLE_179_MEMWAIT,
-		 CPU_ENABLE_OUT => CPU_SHARED_ENABLE,
-		 CLOCK_SHIFT => CLOCK_SHIFT);
+		 CPU_ENABLE_OUT => CPU_SHARED_ENABLE);
 
 CPU_6502_RESET <= NOT(RESET_N); 
 cpu6502 : entity work.cpu
@@ -441,8 +441,6 @@ PORT MAP(CLK => CLK,
 	RESET_N => RESET_N,
 	ENABLE_179 => ANTIC_ENABLE_179,
 	ENABLE_179_DOUBLE => ANTIC_ENABLE_179_DOUBLE,
-	CLOCK_SHIFT => CLOCK_SHIFT,
-	VBXE_MEMAC_ACTIVE => memac_active,
 	ADDR => PBI_ADDR_INT(7 downto 0),
 	DATA_IN => WRITE_DATA(7 downto 0),
 	REQUEST => POKEY_REQUEST,
@@ -514,6 +512,18 @@ PORT MAP(
 	RTC_IN => RTC
 );
 
+vbxe_memory : entity work.large_bram
+PORT MAP(
+	clk => CLK,
+	reset_n => RESET_N,
+	data => vbxe_vram_data,
+	address => vbxe_vram_addr,
+	req => vbxe_vram_request,
+	we => vbxe_vram_wr_en,
+	ready => vbxe_vram_request_complete,
+	q => vbxe_vram_data_in
+);
+
 vbxe_board : entity work.VBXE
 GENERIC MAP ( cycle_length => cycle_length)
 PORT MAP(
@@ -521,7 +531,6 @@ PORT MAP(
 	ENABLE => VBXE_SWITCH,
 	NTSC_FIX => VBXE_NTSC_FIX,
 	ENABLE_179 => ANTIC_ENABLE_179, -- ENABLE_179_MEMWAIT,
-	CLOCK_SHIFT => CLOCK_SHIFT,
 	RESET_N => RESET_N,
 	SOFT_RESET => VBXE_SOFT_RESET,
 	PAL => PAL,
@@ -537,17 +546,23 @@ PORT MAP(
 	VBXE_UPLOAD_PALETTE_RGB => VBXE_PALETTE_RGB,
 	VBXE_UPLOAD_PALETTE_INDEX => VBXE_PALETTE_INDEX,
 	VBXE_UPLOAD_PALETTE_COLOR => VBXE_PALETTE_COLOR,
+
+	vram_addr => vbxe_vram_addr,
+	vram_data => vbxe_vram_data,
+	vram_data_in => vbxe_vram_data_in,
+	vram_request => vbxe_vram_request,
+	vram_wr_en => vbxe_vram_wr_en,
+	vram_request_complete => vbxe_vram_request_complete,
+
 	memac_address => memac_address,
 	memac_write_enable => memac_write_enable,
 	memac_cpu_access => memac_cpu_access,
 	memac_antic_access => memac_antic_access,
 	memac_check => memac_check,
-	memac_active => memac_active,
 	memac_data_in => memac_data_write,
 	memac_data_out => memac_data_read,
 	memac_request => memac_request,
 	memac_request_complete => memac_request_complete,
-	memac_dma_enable => memac_dma_enable,
 	memac_dma_address => dma_addr,
 	irq_n => VBXE_IRQ_N,
 	video_clock_antic_lowres => ANTIC_COLOUR_CLOCK_OUT,
@@ -581,7 +596,7 @@ PORT MAP(CLK => CLK,
 		 CPU_FETCH => CPU_FETCH,
 		 CPU_WRITE_N => R_W_N,
 		 ANTIC_FETCH => ANTIC_FETCH,
-		 DMA_FETCH => dma_fetch_vbxe_adj,
+		 DMA_FETCH => dma_fetch,
 		 DMA_READ_ENABLE => DMA_READ_ENABLE,
 		 DMA_32BIT_WRITE_ENABLE => DMA_32BIT_WRITE_ENABLE,
 		 DMA_16BIT_WRITE_ENABLE => DMA_16BIT_WRITE_ENABLE,

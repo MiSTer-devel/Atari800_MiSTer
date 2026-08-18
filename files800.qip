@@ -65,6 +65,7 @@ set_global_assignment -name VHDL_FILE rtl/common/components/syncreset_enable_div
 set_global_assignment -name VHDL_FILE rtl/common/components/complete_address_decoder.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/delay_line.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/generic_ram_infer.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/components/large_bram.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/mult_infer.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/ps2_keyboard.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/components/sdram_statemachine.vhdl
