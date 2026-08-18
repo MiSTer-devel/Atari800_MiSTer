@@ -651,9 +651,9 @@ BEGIN
 					end if;
 			end case;
 	
-			if (request='1') then
+			if (request='1') and (ram_cpu_write_enable = '1') then
 				ram_address_next(16 downto 1) <= ram_cpu_addr_reg;
-				ram_request_next <= "0" & ram_cpu_write_enable & "01";
+				ram_request_next <= "0101";
 				ram_data_to_write_next <= DI;
 			end if;
 		else

@@ -32,7 +32,6 @@ port (
 	ntsc_fix : in std_logic := '0';
 	soft_reset : in std_logic;
 	enable_179 : in std_logic; -- Original Atari speed (based on Antic enable, always active)
-	clock_shift : in std_logic_vector(cycle_length-1 downto 0);
 	reset_n : in std_logic;
 	pal : in std_logic := '1';
 	addr : in std_logic_vector(4 downto 0); -- 32 registers based at $D640/$D740
@@ -58,12 +57,10 @@ port (
 	memac_cpu_access : in std_logic;
 	memac_antic_access : in std_logic;
 	memac_check : out std_logic;
-	memac_active : out std_logic;
 	memac_data_in : in std_logic_vector(7 downto 0);
 	memac_data_out : out std_logic_vector(7 downto 0);
 	memac_request : in std_logic;
 	memac_request_complete : out std_logic;
-	memac_dma_enable : out std_logic;
 	memac_dma_address : in std_logic_vector(25 downto 0);
 	-- Blitter irq
 	irq_n : out std_logic;
@@ -91,7 +88,14 @@ port (
 	video_clock_antic_lowres : in std_logic;
 	video_clock_vbxe : in std_logic;
 	gtia_hpos : in std_logic_vector(7 downto 0);	
-	vsync : in std_logic
+	vsync : in std_logic;
+
+	vram_addr : out std_logic_vector(18 downto 0);
+	vram_data : out std_logic_vector(7 downto 0);
+	vram_data_in : in std_logic_vector(7 downto 0);
+	vram_request : out std_logic;
+	vram_wr_en : out std_logic;
+	vram_request_complete : in std_logic
 );
 end VBXE;
 
@@ -110,22 +114,10 @@ PORT
 );
 end component;	
 
-signal vram_addr : std_logic_vector(18 downto 0);
 signal vram_addr_reg : std_logic_vector(18 downto 0);
 signal vram_addr_next : std_logic_vector(18 downto 0);
-signal vram_request : std_logic;
-signal vram_request_complete : std_logic;
-signal vram_wr_en : std_logic;
-signal vram_data_in_low : std_logic_vector(2 downto 0);
-signal vram_data_in_high : std_logic_vector(4 downto 0);
-signal vram_data_in : std_logic_vector(7 downto 0);
-signal vram_data : std_logic_vector(7 downto 0);
 signal vram_data_next : std_logic_vector(7 downto 0);
 signal vram_data_reg : std_logic_vector(7 downto 0);
-
-signal vram_request_reg : std_logic;
-signal vram_request_next : std_logic;
-signal vram_wr_en_temp : std_logic;
 
 signal color_index_in : std_logic_vector(9 downto 0);
 signal color_index_out : std_logic_vector(9 downto 0);
@@ -170,8 +162,6 @@ signal memc_window_address_start : std_logic_vector(15 downto 0);
 signal memc_window_address_end : std_logic_vector(15 downto 0);
 signal memac_check_a : std_logic;
 signal memac_check_b : std_logic;
---signal memac_dma_check_a : std_logic;
---signal memac_dma_check_b : std_logic;
 signal memac_check_next : std_logic_vector(1 downto 0);
 signal memac_check_reg : std_logic_vector(1 downto 0);
 
@@ -535,7 +525,6 @@ port map (
 	blitter_irqc => blitter_irqc
 );
 
-
 memc_window_address_start <= memc_reg(7 downto 4) & x"000";
 memc_window_address_end <=
 	memc_reg(7 downto 4) & x"FFF" when memc_reg(1 downto 0) = "00" else
@@ -581,34 +570,6 @@ r_out <= data_color_r & '0';
 g_out <= data_color_g & '0';
 b_out <= data_color_b & '0';
 
-vbxe_vram_low_bits: entity work.spram
-generic map(addr_width => 19, data_width => 3, mem_depth => 8192)
-port map
-(
-	clock => clk,
-	address => vram_addr(18 downto 0),
-	data => vram_data(2 downto 0),
-	wren => vram_wr_en_temp, 
-	q => vram_data_in_low
-);
-
-vbxe_vram_high_bits: entity work.spram
-generic map(addr_width => 19, data_width => 5, mem_depth => 2048)
-port map
-(
-	clock => clk,
-	address => vram_addr(18 downto 0),
-	data => vram_data(7 downto 3),
-	wren => vram_wr_en_temp, 
-	q => vram_data_in_high
-);
-
-vram_data_in <= vram_data_in_high & vram_data_in_low;
-
-vram_wr_en_temp <= vram_wr_en and vram_request;
-vram_request_next <= vram_request and not(vram_wr_en);
-vram_request_complete <= vram_wr_en_temp or vram_request_reg;
-
 vram_addr <= vram_addr_next;
 vram_request <= vram_op_next(0);
 vram_wr_en <= vram_op_next(1);
@@ -625,69 +586,21 @@ memac_check_b <=
 
 memac_check <= memac_check_a or memac_check_b;
 
-memac_active <= (mems_reg(7) and (memc_reg(3) or memc_reg(2))) or memb_reg(7) or memb_reg(6);
-
-process(clock_shift, memac_request_reg, memac_request, memac_write_enable, memac_check_reg, memac_check_a, memac_check_b)
+process(memac_request_reg, memac_request_complete_reg, memac_request, memac_write_enable, memac_check_reg, memac_check_a, memac_check_b)
 begin
 	memac_request_next <= memac_request_reg;
 	memac_check_next <= memac_check_reg;
 	if (memac_request ='1') then
-		memac_request_next(0) <= '1';
+		memac_request_next <= memac_write_enable & '1';
+		memac_check_next <= memac_check_b & memac_check_a;
 	end if;
-	if (memac_write_enable = '1') then
-		memac_request_next(1) <= '1';
-	end if;
-	if (memac_check_a = '1') then
-		memac_check_next(0) <= '1';
-	end if;
-	if (memac_check_b = '1') then
-		memac_check_next(1) <= '1';
-	end if;	
-	if (clock_shift(cycle_length-1) = '1') then
-		memac_request_next <= "00";
-		memac_check_next <= "00";
+	if (memac_request_complete_reg = '1') then
+		memac_request_next(0) <= '0';
 	end if;
 end process;
 
-memac_data_out <= memac_data_next;
-memac_request_complete <= memac_request_complete_next;
-
--- A solution to an intricate problem -- a MEMAC access from either the CPU or ANTIC
--- needs to be properly timed, MEMAC can serve one request per Atari (big) cycle, the DMA 
--- state machine resets everything for a new MEMAC round roughly around the ANTIC
--- enable signal and serves the MEMAC request at a fixed clock offset after this.
--- This way, when the "actual" Atari asks for MEMAC data we will serve it on the same
--- cycle, and at a particular relative time compared to when the request was made.
--- DMA is not Atari clock synchronized/aware, and can drop a request that is potentially
--- MEMAC on the address decoder at any time, alternatively it can drop any memory request
--- at a point in the cycle such that when this request is serviced the already active MEMAC
--- request from Atari will not make it to fixed MEMAC cycle slot.
--- Long story short - DMA request that is potentially accessing MEMAC memory needs to come
--- early enough to still get serviced by MEMAC fixed cycle offset for the particular big cycle,
--- or when it is not accessing MEMAC but other memory, late enough (but not too late) not to
--- interject with any MEMAC access by CPU or ANTIC that needs to be serviced at a particular
--- offset. This is all a bit messy, and has to do how the memory access queueing was originally
--- designed, it all might need a proper overhaul, but for now the conditions below to mask out
--- DMA accesses were tested to work under all situations I could test.
-
-memac_dma_enable <=
-	not(enable) -- VBXE is not active 
-	-- general DMA access and clock cycle safe for Atari MEMAC access not to be disturbed
-	or (or_reduce(memac_dma_address(25 downto 18)) and or_reduce(clock_shift(8 downto 4)))
-	-- Atari area DMA access and clock cycle safe (early enough) to be executed in this big cycle round
-	or (not(or_reduce(memac_dma_address(25 downto 18))) and (or_reduce(clock_shift(0 downto 0))))
-	or not(mems_reg(7) or memb_reg(7) or memb_reg(6)); -- MEMAC is disabled
-
--- This does not work, not sure why, but just checking for registers should be fine
--- (i.e. no slowdown of DMA access for programs not using VBXE)
---memac_dma_check_a <= '1' when
---	(unsigned(memac_dma_address(15 downto 0)) >= unsigned(memc_window_address_start)) and
---	(unsigned(memac_dma_address(15 downto 0)) <= unsigned(memc_window_address_end)) and
---	((mems_reg(7) and (memc_reg(3) or memc_reg(2))) = '1')
---	else '0';
-
---memac_dma_check_b <= 
---	not(memac_dma_address(15)) and memac_dma_address(14) and (memb_reg(7) or memb_reg(6));
+memac_data_out <= memac_data_reg;
+memac_request_complete <= memac_request_complete_reg;
 
 color_index_in <= 
 	"00" & VBXE_UPLOAD_PALETTE_INDEX 
@@ -882,7 +795,6 @@ end process;
 process(clk, reset_n)
 begin
 	if (reset_n = '0') then
-		vram_request_reg <= '0';
 		csel_reg <= (others => 'U');
 		psel_reg <= (others => 'U');
 		cr_reg <= (others => 'U');
@@ -970,7 +882,6 @@ begin
 		coldetect_reg <= (others => '0');
 
 	elsif rising_edge(clk) then
-		vram_request_reg <= vram_request_next;
 		csel_reg <= csel_next;
 		psel_reg <= psel_next;
 		cr_reg <= cr_next;
@@ -1191,8 +1102,8 @@ begin
 end process;
 
 -- VBXE DMA state machine
-process(clock_shift,
-	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, memac_data_reg,memac_data_in,memac_request_next, memac_check_next,
+process(enable_179,
+	dma_state_reg, memac_request_complete_reg, vram_op_reg, vram_data_reg, vram_addr_reg, memac_data_reg,memac_data_in,memac_request_reg, memac_check_reg,
 	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,memac_address, blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
 	blitter_status,blitter_pending_reg, xdl_ovscr_h_reg, xdl_ovscr_v_reg,
 	xdl_map_active_reg, xdl_ov_active_reg, xdl_ov_text_reg, xdl_fetch_reg, xdl_pending_reg, xdl_read_state_reg, xdl_cmd_reg, xdl_active_reg,
@@ -1267,7 +1178,7 @@ begin
 	xdl_char_attr_next <= xdl_char_attr_reg;
 	xdl_vcount_next <= xdl_vcount_reg;
 	
-	if blitter_pending_reg = '1' then
+	if (blitter_pending_reg = '1') and (vram_request_complete = '1') then
 		blitter_vram_data_in_next <= vram_data_in;
 		blitter_pending_next <= '0';
 	end if;
@@ -1277,245 +1188,309 @@ begin
 
 	case dma_state_reg(3 downto 0) is
 	when "0000" =>
-		dma_state_next <= "0001";
-		if xdl_ov_tlive_reg = '1' then
-			vram_op_next <= "01";
-			vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
-			xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
-		else
-			xdl_or_blitter_notify := true;
-		end if;
-	when "0001" =>
-		if (xdl_ov_tlive_reg = '1') then
-			if xdl_ov_text_reg = '1' then
-				xdl_char_code_next <= vram_data_in;
-			else
-				-- pixels 0,1
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= '0';
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= '0';
-				if xdl_ov_hi_reg = '1' then
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= "0000" & vram_data_in(7 downto 4);
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+1) <= "0000" & vram_data_in(3 downto 0);
-					if vram_data_in(7 downto 4) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= not(no_trans_reg);
-					end if;
-					if vram_data_in(3 downto 0) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= not(no_trans_reg);
-					end if;
-				else
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= vram_data_in;
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+1) <= vram_data_in;
-					if vram_data_in = x"00" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= not(no_trans_reg);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= not(no_trans_reg);
-					end if;
-				end if;
-			end if;
-		end if;
-		if (memac_request_next = "01") then
-			vram_op_next <= "01";
-			if memac_check_next(0) = '1' then
-				vram_addr_next <= mems_reg(6 downto 0) & memac_address(11 downto 0);
-				case memc_reg(1 downto 0) is
-				when "00" =>
-					null;
-				when "01" =>
-					vram_addr_next(12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(0);
-				when "10" =>
-					vram_addr_next(13 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(1 downto 0);
-				when "11" =>
-					vram_addr_next(14 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(2 downto 0);
-				end case;
-			else -- memac_check_b = '1'
-				vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);
-			end if;
-			dma_state_next(3) <= '1';
-		else 
-			dma_state_next(3) <= '0';
-			xdl_or_blitter_notify := true;
-		end if;
-		dma_state_next(2 downto 0) <= "010";
-	when "0010" | "1010" =>
-		if dma_state_reg(3) = '1' then
-			memac_data_next <= vram_data_in;
-			memac_request_complete_next <= '1';
-		end if;
-		dma_state_next <= "0011";
-		if (xdl_ov_tlive_reg = '1') and (xdl_ov_lo_reg = '0') then
-			vram_op_next <= "01";
-			vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
-			xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
-		else
-			xdl_or_blitter_notify := true;
-		end if;
-	when "0011" =>
-		memac_request_complete_next <= '0';
-		if (xdl_ov_tlive_reg = '1') then
-			if xdl_ov_text_reg = '1' then
-				xdl_char_attr_next <= vram_data_in;
-			else
-				-- pixels 2,3
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= '0';
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= '0';
-				if xdl_ov_hi_reg = '1' then
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= "0000" & vram_data_in(7 downto 4);
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= "0000" & vram_data_in(3 downto 0);
-					if vram_data_in(7 downto 4) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
-					end if;
-					if vram_data_in(3 downto 0) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
-					end if;
-				elsif xdl_ov_lo_reg = '1' then
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg);
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+1);
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg);
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+1);
-				else
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= vram_data_in;
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= vram_data_in;
-					if vram_data_in = x"00" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
-					end if;
-				end if;
-			end if;
-		end if;
-		if (memac_request_next = "11") then
-			vram_op_next <= "11";
-			vram_data_next <= memac_data_in;
-			if memac_check_next(0) = '1' then
-				vram_addr_next <= mems_reg(6 downto 0) & memac_address(11 downto 0);
-				case memc_reg(1 downto 0) is
-				when "00" =>
-					null;
-				when "01" =>
-					vram_addr_next(12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(0);
-				when "10" =>
-					vram_addr_next(13 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(1 downto 0);
-				when "11" =>
-					vram_addr_next(14 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(2 downto 0);
-				end case;
-			else -- memac_check_b = '1'
-				vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);
-			end if;
-			dma_state_next(3) <= '1';
-		else 
-			dma_state_next(3) <= '0';
-			xdl_or_blitter_notify := true;
-		end if;
-		dma_state_next(2 downto 0) <= "100";
-	when "0100" | "1100"=>
-		if dma_state_reg(3) = '1' then
-			memac_request_complete_next <= '1';
-		end if;
-		dma_state_next <= "0101";
-		if (xdl_ov_tlive_reg = '1') then
-			if xdl_ov_text_reg = '1' then
-				vram_op_next <= "01";
-				vram_addr_next(18 downto 11) <= xdl_chbase_reg;
-				vram_addr_next(10 downto 3) <= xdl_char_code_reg;
-				vram_addr_next(2 downto 0) <= std_logic_vector(xdl_ov_vcount_reg);
-			else
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			dma_state_next <= "0001";
+			if xdl_ov_tlive_reg = '1' then
 				vram_op_next <= "01";
 				vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
 				xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
+			else
+				xdl_or_blitter_notify := true;
 			end if;
-		else
-			xdl_or_blitter_notify := true;
+		end if;
+	when "0001" =>
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			if xdl_ov_tlive_reg = '1' then
+				if xdl_ov_text_reg = '1' then
+					xdl_char_code_next <= vram_data_in;
+				else
+					-- pixels 0,1
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= '0';
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= '0';
+					if xdl_ov_hi_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= "0000" & vram_data_in(7 downto 4);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+1) <= "0000" & vram_data_in(3 downto 0);
+						if vram_data_in(7 downto 4) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= not(no_trans_reg);
+						end if;
+						if vram_data_in(3 downto 0) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= not(no_trans_reg);
+						end if;
+					else
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= vram_data_in;
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+1) <= vram_data_in;
+						if vram_data_in = x"00" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= not(no_trans_reg);
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= not(no_trans_reg);
+						end if;
+					end if;
+				end if;
+			end if;
+			if (memac_request_reg = "01") then
+				vram_op_next <= "01";
+				if memac_check_reg(0) = '1' then
+					vram_addr_next <= mems_reg(6 downto 0) & memac_address(11 downto 0);
+					case memc_reg(1 downto 0) is
+					when "00" =>
+						null;
+					when "01" =>
+						vram_addr_next(12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(0);
+					when "10" =>
+						vram_addr_next(13 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(1 downto 0);
+					when "11" =>
+						vram_addr_next(14 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(2 downto 0);
+					end case;
+				else -- memac_check_b = '1'
+					vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);
+				end if;
+				dma_state_next(3) <= '1';
+			else
+				dma_state_next(3) <= '0';
+				xdl_or_blitter_notify := true;
+			end if;
+			dma_state_next(2 downto 0) <= "010";
+		end if;
+	when "0010" | "1010" =>
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			if dma_state_reg(3) = '1' then
+				memac_data_next <= vram_data_in;
+				memac_request_complete_next <= '1';
+			end if;
+			if (xdl_ov_tlive_reg = '1') and (xdl_ov_lo_reg = '0') then
+				vram_op_next <= "01";
+				vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
+				xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
+			else
+				xdl_or_blitter_notify := true;
+			end if;
+			dma_state_next <= "0011";
+		end if;
+	when "0011" =>
+		memac_request_complete_next <= '0';
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			if (xdl_ov_tlive_reg = '1') then
+				if xdl_ov_text_reg = '1' then
+					xdl_char_attr_next <= vram_data_in;
+				else
+					-- pixels 2,3
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= '0';
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= '0';
+					if xdl_ov_hi_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= "0000" & vram_data_in(7 downto 4);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= "0000" & vram_data_in(3 downto 0);
+						if vram_data_in(7 downto 4) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
+						end if;
+						if vram_data_in(3 downto 0) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
+						end if;
+					elsif xdl_ov_lo_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+1);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+1);
+					else
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= vram_data_in;
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= vram_data_in;
+						if vram_data_in = x"00" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
+						end if;
+					end if;
+				end if;
+			end if;
+			if (memac_request_reg = "11") then
+				vram_op_next <= "11";
+				vram_data_next <= memac_data_in;
+				if memac_check_reg(0) = '1' then
+					vram_addr_next <= mems_reg(6 downto 0) & memac_address(11 downto 0);
+					case memc_reg(1 downto 0) is
+					when "00" =>
+						null;
+					when "01" =>
+						vram_addr_next(12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(0);
+					when "10" =>
+						vram_addr_next(13 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(1 downto 0);
+					when "11" =>
+						vram_addr_next(14 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(2 downto 0);
+					end case;
+				else -- memac_check_b = '1'
+					vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);
+				end if;
+				dma_state_next(3) <= '1';
+			else 
+				dma_state_next(3) <= '0';
+				xdl_or_blitter_notify := true;
+			end if;
+			dma_state_next(2 downto 0) <= "100";
+		end if;
+	when "0100" | "1100"=>
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			if dma_state_reg(3) = '1' then
+				memac_request_complete_next <= '1';
+			end if;
+			dma_state_next <= "0101";
+			if (xdl_ov_tlive_reg = '1') then
+				vram_op_next <= "01";
+				if xdl_ov_text_reg = '1' then
+					vram_addr_next(18 downto 11) <= xdl_chbase_reg;
+					vram_addr_next(10 downto 3) <= xdl_char_code_reg;
+					vram_addr_next(2 downto 0) <= std_logic_vector(xdl_ov_vcount_reg);
+				else
+					vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
+					xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
+				end if;
+			else
+				xdl_or_blitter_notify := true;
+			end if;
 		end if;
 	when "0101" =>
 		memac_request_complete_next <= '0';
-		if (xdl_ov_tlive_reg = '1') then
-			if (xdl_ov_text_reg = '1') then
-				for pi in 0 to 7 loop
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(7) <= not(vram_data_in(7-pi));
-					if (xdl_char_attr_reg(7) = '0') and (vram_data_in(7-pi) = '0') then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(6 downto 0) <= (others => '0');
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+pi) <= not(no_trans_reg);
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			if (xdl_ov_tlive_reg = '1') then
+				if (xdl_ov_text_reg = '1') then
+					for pi in 0 to 7 loop
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(7) <= not(vram_data_in(7-pi));
+						if (xdl_char_attr_reg(7) = '0') and (vram_data_in(7-pi) = '0') then
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(6 downto 0) <= (others => '0');
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+pi) <= not(no_trans_reg);
+						else
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(6 downto 0) <= xdl_char_attr_reg(6 downto 0);
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+pi) <= '0';
+						end if;
+					end loop;
+					if xdl_pixel_buffer_windex_reg = 8 then
+						xdl_pixel_buffer_windex_next <= 0;
 					else
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+pi)(6 downto 0) <= xdl_char_attr_reg(6 downto 0);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+pi) <= '0';
-					end if;
-				end loop;
-				if xdl_pixel_buffer_windex_reg = 8 then
-					xdl_pixel_buffer_windex_next <= 0;
-				else
-					xdl_pixel_buffer_windex_next <= 8;
-				end if;
-			else
-				-- pixels 4,5
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= '0';
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= '0';
-				if xdl_ov_hi_reg = '1' then
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= "0000" & vram_data_in(7 downto 4);
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+5) <= "0000" & vram_data_in(3 downto 0);
-					if vram_data_in(7 downto 4) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= not(no_trans_reg);
-					end if;
-					if vram_data_in(3 downto 0) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= not(no_trans_reg);
+						xdl_pixel_buffer_windex_next <= 8;
 					end if;
 				else
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= vram_data_in;
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+5) <= vram_data_in;
-					if vram_data_in = x"00" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= not(no_trans_reg);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= not(no_trans_reg);
+					-- pixels 4,5
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= '0';
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= '0';
+					if xdl_ov_hi_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= "0000" & vram_data_in(7 downto 4);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+5) <= "0000" & vram_data_in(3 downto 0);
+						if vram_data_in(7 downto 4) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= not(no_trans_reg);
+						end if;
+						if vram_data_in(3 downto 0) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= not(no_trans_reg);
+						end if;
+					else
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= vram_data_in;
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+5) <= vram_data_in;
+						if vram_data_in = x"00" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= not(no_trans_reg);
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= not(no_trans_reg);
+						end if;
 					end if;
 				end if;
 			end if;
-		end if;
-		xdl_or_blitter_notify := true;
-		dma_state_next <= "0110";
-	when "0110" =>
-		if (xdl_ov_tlive_reg = '1') and (xdl_ov_text_reg = '0') and (xdl_ov_lo_reg = '0') then
-			vram_op_next <= "01";
-			vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
-			xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
-		else
 			xdl_or_blitter_notify := true;
+			dma_state_next <= "0110";
 		end if;
-		dma_state_next <= "0111";
+	when "0110" =>
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			if (xdl_ov_tlive_reg = '1') and (xdl_ov_text_reg = '0') and (xdl_ov_lo_reg = '0') then
+				vram_op_next <= "01";
+				vram_addr_next <= std_logic_vector(xdl_ov_fetch_reg);
+				xdl_ov_fetch_next <= xdl_ov_fetch_reg + 1;
+			else
+				xdl_or_blitter_notify := true;
+			end if;
+			dma_state_next <= "0111";
+		end if;
 	when "0111" =>
-		if xdl_ov_tlive_reg = '1' then
-			if xdl_ov_text_reg = '0' then
-				-- pixels 6,7
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= '0';
-				xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= '0';
-				if xdl_ov_hi_reg = '1' then
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= "0000" & vram_data_in(7 downto 4);
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= "0000" & vram_data_in(3 downto 0);
-					if vram_data_in(7 downto 4) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			if xdl_ov_tlive_reg = '1' then
+				if xdl_ov_text_reg = '0' then
+					-- pixels 6,7
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= '0';
+					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= '0';
+					if xdl_ov_hi_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= "0000" & vram_data_in(7 downto 4);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= "0000" & vram_data_in(3 downto 0);
+						if vram_data_in(7 downto 4) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
+						end if;
+						if vram_data_in(3 downto 0) = x"0" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
+						end if;
+					elsif xdl_ov_lo_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+4);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+5);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+4);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+5);
+					else
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= vram_data_in;
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= vram_data_in;
+						if vram_data_in = x"00" then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
+						end if;
 					end if;
-					if vram_data_in(3 downto 0) = x"0" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
+					if xdl_pixel_buffer_windex_reg = 8 then
+						xdl_pixel_buffer_windex_next <= 0;
+					else
+						xdl_pixel_buffer_windex_next <= 8;
 					end if;
-				elsif xdl_ov_lo_reg = '1' then
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+4);
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+5);
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+4);
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+5);
-				else
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= vram_data_in;
-					xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= vram_data_in;
-					if vram_data_in = x"00" then
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
-					end if;
-				end if;
-				if xdl_pixel_buffer_windex_reg = 8 then
-					xdl_pixel_buffer_windex_next <= 0;
-				else
-					xdl_pixel_buffer_windex_next <= 8;
 				end if;
 			end if;
+			xdl_or_blitter_notify := true;
+			dma_state_next <= "1101";
 		end if;
-		xdl_or_blitter_notify := true;
-		dma_state_next <= "1111";
+	when "1101" =>
+		if (vram_op_reg(0) = '0') or (vram_request_complete = '1') then
+			vram_op_next(0) <= '0';
+			-- Additional MEMAC request check, in case the regular CPU one was pushed out by DMA
+			-- access from the previous cycle, or in case we have DMA request flood to speed up things
+			if memac_request_reg(0) = '1' then
+				vram_op_next <= "01";
+				if memac_check_reg(0) = '1' then
+					vram_addr_next <= mems_reg(6 downto 0) & memac_address(11 downto 0);
+					case memc_reg(1 downto 0) is
+					when "00" =>
+						null;
+					when "01" =>
+						vram_addr_next(12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(0);
+					when "10" =>
+						vram_addr_next(13 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(1 downto 0);
+					when "11" =>
+						vram_addr_next(14 downto 12) <= std_logic_vector(unsigned(memac_address(15 downto 12)) - unsigned(memc_reg(7 downto 4)))(2 downto 0);
+					end case;
+				else -- memac_check_b = '1'
+					vram_addr_next <= memb_reg(4 downto 0) & memac_address(13 downto 0);
+				end if;
+				if memac_request_reg(1) = '1' then
+					vram_op_next(1) <= '1';
+					vram_data_next <= memac_data_in;
+				end if;
+				dma_state_next <= "1110";
+			else
+				dma_state_next <= "1111";
+			end if;
+		end if;
+	when "1110" =>
+		if vram_request_complete = '1' then
+			vram_op_next(0) <= '0';
+			if memac_request_reg(1) = '0' then
+				memac_data_next <= vram_data_in;
+			end if;
+			memac_request_complete_next <= '1';
+			dma_state_next <= "1111";
+		end if;
+	when "1111" =>		--
+		memac_request_complete_next <= '0';
 	when others =>
-		vram_op_next <= "00";
 	end case;
 
 	if (vsync = '1') then
@@ -1604,7 +1579,7 @@ begin
 	end if;
 
 	xdl_map_buffer_wren <= '0';
-	if xdl_pending_reg = '1' then
+	if (xdl_pending_reg = '1') and (vram_request_complete = '1') then
 		xdl_pending_next <= '0';
 		case xdl_read_state_reg is
 			when 2 => xdl_cmd_next(7 downto 0) <= vram_data_in;
@@ -1729,7 +1704,7 @@ begin
 		blitter_pending_next <= not(blitter_vram_wren);
 	end if;
 
-	if clock_shift(cycle_length-1) = '1' then
+	if enable_179 = '1' then
 		dma_state_next <= "0000";
 	end if;
 end process;
