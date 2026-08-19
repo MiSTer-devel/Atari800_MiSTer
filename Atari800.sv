@@ -73,7 +73,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXX              
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXX             
 
 
 `include "build_id.v" 
@@ -138,6 +138,7 @@ localparam CONF_STR = {
 	"HCP3O[113],PAL rate Hz,49.86,50;",
 	"P3O[62:61],Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
+	"DBP3O[114],GTIA xcolor,Off,On;",
 	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
 	"dBP3O[63],Fix VBXE NTSC bug,Disabled,Enabled;",
 	"dBP3FC2,ACT,VBXE Palette;",
@@ -622,6 +623,7 @@ atari800top atari800top
 
 	.PAL(pal_video),
 	.CLIP_SIDES(status[34]),
+	.GTIA_XCOLOR(status[114] & ~menu_vbxe),
 	.VGA_VS(VSync_o),
 	.VGA_HS(HSync_o),
 	.VGA_B(Bo),

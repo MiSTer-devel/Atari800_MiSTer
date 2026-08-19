@@ -180,6 +180,7 @@ ENTITY atari800core IS
 		EMU_FLASH_SLAVE : out std_logic;
 		PAL :  in STD_LOGIC;
 		CLIP_SIDES : in STD_LOGIC;
+		GTIA_XCOLOR : in STD_LOGIC;
 		ROM_IN_RAM : in std_logic;
 		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0);
 		HALT : in std_logic;
@@ -255,7 +256,7 @@ signal GTIA_PF0_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF1_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF2_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF3_OUT : std_logic_vector(7 downto 0);
-signal GTIA_XCOLOR : std_logic;
+signal VBXE_XCOLOR : std_logic;
 signal GTIA_PALETTE : std_logic_vector(1 downto 0);
 
 -- GTIA PALETTE
@@ -587,7 +588,7 @@ PORT MAP(
 	ov_palette => VBXE_OV_PALETTE,
 	ov_pixel => VBXE_OV_PIXEL,
 	ov_pixel_active => VBXE_OV_PIXEL_ACTIVE,
-	xcolor => GTIA_XCOLOR,
+	xcolor => VBXE_XCOLOR,
 	VSYNC => GTIA_VSYNC,
 	GTIA_HPOS => GTIA_HPOS
 );
@@ -752,7 +753,7 @@ PORT MAP(CLK => CLK,
 		 VBXE_OV_PIXEL => VBXE_OV_PIXEL,
 		 VBXE_OV_PIXEL_ACTIVE => VBXE_OV_PIXEL_ACTIVE,
 		 PALETTE_out => GTIA_PALETTE,
-		 XCOLOR => GTIA_XCOLOR,
+		 XCOLOR_IN => GTIA_XCOLOR or VBXE_XCOLOR,
 		 GTIA_VSYNC => GTIA_VSYNC,
 		 HPOS_OUT => GTIA_HPOS,
 

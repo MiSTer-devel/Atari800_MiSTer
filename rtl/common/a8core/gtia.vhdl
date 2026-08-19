@@ -40,7 +40,7 @@ PORT
 	
 	-- VBXE
 	VBXE_SWITCH : in std_logic := '0';
-	XCOLOR : in std_logic := '0';
+	XCOLOR_IN : in std_logic := '0';
 	COLOUR_CLOCK_VBXE : in std_logic := '0';
 	GTIA_HIGHRES_OUT : out std_logic;
 	GTIA_HIGHRES_IN : in std_logic := '0';
@@ -464,6 +464,7 @@ ARCHITECTURE vhdl OF gtia IS
 	-- visible region (no collision detection outside this)
 	signal visible_live : std_logic;
 	signal invisible_clip : std_logic;
+	signal invisible_clip_delayed : std_logic;
 	
 	-- antic input decode
 	signal an_prev3_next : std_logic_vector(2 downto 0);
@@ -547,6 +548,7 @@ ARCHITECTURE vhdl OF gtia IS
 	signal GTIA_PF2 : std_logic_vector(7 downto 0);
 	signal GTIA_ACTIVE_HR : std_logic_vector(1 downto 0);
 	signal GTIA_HIGHRES : std_logic;
+	signal xcolor : std_logic;
 
 	signal interlace_switch_count_reg : integer range 0 to 15;
 	signal interlace_switch_count_next : integer range 0 to 15;
@@ -860,7 +862,7 @@ begin
 	
 		
 	-- decode antic input
-	process (AN, COLOUR_CLOCK, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, prior6_prev_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, invisible_clip, clip_sides, hpos_reg)
+	process (AN, COLOUR_CLOCK, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, prior6_prev_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, clip_sides, hpos_reg)
 	begin	
 		hblank_next <= hblank_reg;
 		reset_counter <= '0';
@@ -1142,15 +1144,19 @@ begin
 	begin		
 		invisible_clip <= '0';
 		
-		if (unsigned(hpos_reg) <= to_unsigned(45,8)) then
+		if unsigned(hpos_reg) < to_unsigned(45,8) then
 			invisible_clip <= clip_sides;
 		end if;
 		
-		if (unsigned(hpos_reg) > to_unsigned(215,8)) then
+		if unsigned(hpos_reg) > to_unsigned(212,8) then
 			invisible_clip <= clip_sides;
 		end if;		
 	end process;
 	
+	clip_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>invisible_clip,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>invisible_clip_delayed);	
+
 	-- generate hsync and csync, and also vsync_half
 	process(hpos_reg, hsync_reg, hsync_end, csync_reg, csync_end, burst_reg, burst_end, vsync_reg, vsync_next, vsync_half_reg)
 	begin
@@ -1324,12 +1330,14 @@ begin
 	priority_rules : gtia_priority
 		port map(clk=>clk, colour_enable=>colour_clock, prior=>prior_delayed_reg,p0=>active_pm0_live,p1=>active_pm1_live,p2=>active_pm2_live,p3=>active_pm3_live,pf0=>active_pf0_live,pf1=>active_pf1_live,pf2=>active_pf2_live,pf3=>active_pf3_live,bk=>active_bk_live,p0_out=>set_p0,p1_out=>set_p1,p2_out=>set_p2,p3_out=>set_p3,pf0_out=>set_pf0,pf1_out=>set_pf1,pf2_out=>set_pf2,pf3_out=>set_pf3,bk_out=>set_bk);	
 
+	xcolor <= XCOLOR_IN or (not(VBXE_SWITCH) and gractl_reg(4));
+
 	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg,
 		colbk_snap_reg,colpf3_snap_reg,colpm0_snap_reg,colpm1_snap_reg,colpm2_snap_reg,colpm3_snap_reg, colour_clock, COLOUR_REG, 
 		highres_reg,gtia_active_hr,gtia_highres,active_hr_prev,active_bk_valid_prev,active_bk_modify_prev,colour_saved_reg,ov_palette_reg,pf_palette_reg,
 		set_bk_prev,set_pf0_prev,set_pf1_prev,set_pf2_prev,set_pf3_prev,set_p0_prev,set_p1_prev,set_p2_prev,set_p3_prev,
 		colour_clock_highres,colour_clock_vbxe,vbxe_pf_palette,vbxe_ov_palette,vbxe_ov_pixel,vbxe_ov_pixel_active,xcolor,gtia_pf0,gtia_pf1,gtia_pf2,
-		palette_reg, visible_live, invisible_clip, active_bk_modify_next, active_bk_valid_next, gractl_reg, gtia_prior_reg)
+		palette_reg, visible_live, invisible_clip_delayed, active_bk_modify_next, active_bk_valid_next, gractl_reg, gtia_prior_reg)
 	variable ignore_bk_check : boolean := false;
 	begin
 		-- This is much uglier than the previous version where the pair of highres pixels
@@ -1435,7 +1443,7 @@ begin
 					if (gtia_active_hr(1) = '1') and (set_bk = '0' or ignore_bk_check) then
 						colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
 						colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
-						if (xcolor or gractl_reg(4)) = '1' then
+						if xcolor = '1' then
 							colour_next(7 downto 4) <= GTIA_PF1(7 downto 4);
 							colour_saved_next(7 downto 4) <= GTIA_PF1(7 downto 4);
 							gtia_prior_next(6 downto 5) <= "01";
@@ -1445,7 +1453,7 @@ begin
 					if (active_hr_prev(0) = '1') and (set_bk_prev = '0' or ignore_bk_check) then
 						colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
 						colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
-						if (xcolor or gractl_reg(4)) = '1' then
+						if xcolor = '1' then
 							colour_next(7 downto 4) <= GTIA_PF1(7 downto 4);
 							colour_saved_next(7 downto 4) <= GTIA_PF1(7 downto 4);
 							gtia_prior_next(6 downto 5) <= "01";
@@ -1454,7 +1462,7 @@ begin
 				end if;
 			end if;				
 			
-			if invisible_clip = '1' then
+			if invisible_clip_delayed = '1' then
 				colour_saved_next <= X"00";
 				colour_next <= X"00";
 			end if;			
