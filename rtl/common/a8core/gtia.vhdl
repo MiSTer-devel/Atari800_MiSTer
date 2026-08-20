@@ -32,15 +32,15 @@ PORT
 	
 	PAL : IN STD_LOGIC;
 	CLIP_SIDES : IN STD_LOGIC;
+	GTIA_XCOLOR : in std_logic := '0';
 	
 	-- ANTIC interface
 	COLOUR_CLOCK : in std_logic;
 	COLOUR_CLOCK_HIGHRES : in std_logic;
 	AN : IN STD_LOGIC_VECTOR(2 downto 0);
 	
-	-- VBXE
-	VBXE_SWITCH : in std_logic := '0';
-	XCOLOR_IN : in std_logic := '0';
+	-- VBXE, all optional to be connected
+	VBXE_XCOLOR : in std_logic := '0';
 	COLOUR_CLOCK_VBXE : in std_logic := '0';
 	GTIA_HIGHRES_OUT : out std_logic;
 	GTIA_HIGHRES_IN : in std_logic := '0';
@@ -48,8 +48,8 @@ PORT
 	GTIA_ACTIVE_HR_IN : in std_logic_vector(1 downto 0) := "00";
 	GTIA_PRIOR : out std_logic_vector(7 downto 0);
 	GTIA_PRIOR_RAW : out std_logic_vector(7 downto 0);
-	gtia_vsync : out std_logic;
-	hpos_out : out std_logic_vector(7 downto 0);
+	GTIA_VSYNC : out std_logic;
+	GTIA_HPOS : out std_logic_vector(7 downto 0);
 	GTIA_PF0_OUT : out std_logic_vector(7 downto 0);
 	GTIA_PF1_OUT : out std_logic_vector(7 downto 0);
 	GTIA_PF2_OUT : out std_logic_vector(7 downto 0);
@@ -338,7 +338,8 @@ ARCHITECTURE vhdl OF gtia IS
 	signal prior_delayed2_reg : std_logic_vector(7 downto 6);
 	signal prior_snap_next : std_logic_vector(7 downto 0);	
 	signal prior_snap_reg : std_logic_vector(7 downto 0);	
-	
+	signal prior6_prev : std_logic;	
+
 	signal vdelay_next : std_logic_vector(7 downto 0);
 	signal vdelay_reg : std_logic_vector(7 downto 0);
 
@@ -400,27 +401,7 @@ ARCHITECTURE vhdl OF gtia IS
 	signal set_pf2 : std_logic;
 	signal set_pf3 : std_logic;
 	signal set_bk : std_logic;	
-	signal set_p0_prev : std_logic;
-	signal set_p1_prev : std_logic;
-	signal set_p2_prev : std_logic;
-	signal set_p3_prev : std_logic;
-	signal set_pf0_prev : std_logic;
-	signal set_pf1_prev : std_logic;
-	signal set_pf2_prev : std_logic;
-	signal set_pf3_prev : std_logic;
-	signal set_bk_prev : std_logic;	
-	signal set_p0_prev_next : std_logic;
-	signal set_p1_prev_next : std_logic;
-	signal set_p2_prev_next : std_logic;
-	signal set_p3_prev_next : std_logic;
-	signal set_pf0_prev_next : std_logic;
-	signal set_pf1_prev_next : std_logic;
-	signal set_pf2_prev_next : std_logic;
-	signal set_pf3_prev_next : std_logic;
-	signal set_bk_prev_next : std_logic;
-	signal prior6_prev_reg : std_logic;
-	signal prior6_prev_next : std_logic;
-	
+
 	-- ouput/sync
 	signal COLOUR_NEXT : std_logic_vector(7 downto 0);
 	signal COLOUR_REG : std_logic_vector(7 downto 0);
@@ -432,8 +413,6 @@ ARCHITECTURE vhdl OF gtia IS
 	signal OV_PALETTE_REG : std_logic_vector(1 downto 0);
 	signal PF_PALETTE_NEXT : std_logic_vector(1 downto 0);
 	signal PF_PALETTE_REG : std_logic_vector(1 downto 0);
-	signal GTIA_PRIOR_NEXT : std_logic_vector(7 downto 0);
-	signal GTIA_PRIOR_REG : std_logic_vector(7 downto 0);
 	
 	signal vsync_next : std_logic;
 	signal vsync_reg : std_logic;
@@ -463,9 +442,13 @@ ARCHITECTURE vhdl OF gtia IS
 	
 	-- visible region (no collision detection outside this)
 	signal visible_live : std_logic;
-	signal invisible_clip : std_logic;
-	signal invisible_clip_delayed : std_logic;
-	
+	signal invisible_live_reg : std_logic;
+	signal invisible_live_next : std_logic;
+	signal invisible_live_adj : std_logic;
+
+	signal invisible_clip : std_logic;	
+	signal invisible_clip_adj : std_logic;
+
 	-- antic input decode
 	signal an_prev3_next : std_logic_vector(2 downto 0);
 	signal an_prev3_reg : std_logic_vector(2 downto 0);	
@@ -476,14 +459,8 @@ ARCHITECTURE vhdl OF gtia IS
 	
 	signal active_bk_modify_next : std_logic_vector(7 downto 0);
 	signal active_bk_modify_reg : std_logic_vector(7 downto 0);
-	signal active_bk_modify_prev : std_logic_vector(7 downto 0);
-	signal active_bk_modify_prev_next : std_logic_vector(7 downto 0);
 	signal active_bk_valid_next : std_logic_vector(7 downto 0);
 	signal active_bk_valid_reg : std_logic_vector(7 downto 0);
-	signal active_bk_valid_prev : std_logic_vector(7 downto 0);
-	signal active_bk_valid_prev_next : std_logic_vector(7 downto 0);
-	signal active_hr_prev : std_logic_vector(1 downto 0);
-	signal active_hr_prev_next : std_logic_vector(1 downto 0);
 	signal active_bk_live : std_logic;
 	signal active_pf0_live : std_logic;
 	signal active_pf1_live : std_logic;
@@ -510,6 +487,49 @@ ARCHITECTURE vhdl OF gtia IS
 	signal highres_next : std_logic;
 	signal highres_reg : std_logic;
 	
+	signal set_bk_delayed : std_logic;
+	signal set_pf0_delayed : std_logic;
+	signal set_pf1_delayed : std_logic;
+	signal set_pf2_delayed : std_logic;
+	signal set_pf3_delayed : std_logic;
+	signal set_p0_delayed : std_logic;
+	signal set_p1_delayed : std_logic;
+	signal set_p2_delayed : std_logic;
+	signal set_p3_delayed : std_logic;
+
+	signal set_bk_adj : std_logic;
+	signal set_pf0_adj : std_logic;
+	signal set_pf1_adj : std_logic;
+	signal set_pf2_adj : std_logic;
+	signal set_pf3_adj : std_logic;
+	signal set_p0_adj : std_logic;
+	signal set_p1_adj : std_logic;
+	signal set_p2_adj : std_logic;
+	signal set_p3_adj : std_logic;
+
+	signal colpf0_adj : std_logic_vector(7 downto 0);
+	signal colpf1_adj : std_logic_vector(7 downto 0);
+	signal colpf2_adj : std_logic_vector(7 downto 0);
+	signal colpf3_adj : std_logic_vector(7 downto 0);
+	signal colpm0_adj : std_logic_vector(7 downto 0);
+	signal colpm1_adj : std_logic_vector(7 downto 0);
+	signal colpm2_adj : std_logic_vector(7 downto 0);
+	signal colpm3_adj : std_logic_vector(7 downto 0);
+	signal colbk_adj : std_logic_vector(7 downto 0);
+
+	signal gtia_active_hr_delayed : std_logic_vector(1 downto 0);
+	signal gtia_active_hr_adj : std_logic_vector(1 downto 0);
+
+	signal active_bk_modify_delayed : std_logic_vector(7 downto 0);
+	signal active_bk_modify_adj : std_logic_vector(7 downto 0);
+
+	signal active_bk_valid_delayed : std_logic_vector(7 downto 0);
+	signal active_bk_valid_adj : std_logic_vector(7 downto 0);
+
+	signal gtia_prior_reg : std_logic_vector(7 downto 0);
+	signal gtia_prior_next : std_logic_vector(7 downto 0);
+	signal gtia_prior_adj : std_logic_vector(7 downto 0);
+
 	-- horizontal position counter
 	signal hpos_reg : std_logic_vector(7 downto 0);
 	signal reset_counter : std_logic;
@@ -615,7 +635,6 @@ begin
 			PALETTE_REG <= (OTHERS=>'0');
 			OV_PALETTE_REG <= (OTHERS=>'0');
 			PF_PALETTE_REG <= (OTHERS=>'0');
-			GTIA_PRIOR_REG <= (OTHERS=>'0');
 			
 			csync_reg <= '0';
 			vsync_reg <= '0';
@@ -683,19 +702,9 @@ begin
 			 prior_snap_reg <= (others=>'0');
 
 			hpos_alt_reg <= '0';
-			active_hr_prev <= (others => '0');
-			active_bk_modify_prev <= (others => '0');
-			active_bk_valid_prev <= (others => '0');
-			set_bk_prev <= '0';
-			set_pf0_prev <= '0';
-			set_pf1_prev <= '0';
-			set_pf2_prev <= '0';
-			set_pf3_prev <= '0';
-			set_p0_prev <= '0';
-			set_p1_prev <= '0';
-			set_p2_prev <= '0';
-			set_p3_prev <= '0';
-			prior6_prev_reg <= '0';
+
+			invisible_live_reg <= '0';
+			gtia_prior_reg <= (others => '0');
 
 			field_reg <= '0';
 			interlace_reg <= '0';
@@ -752,7 +761,6 @@ begin
 			PALETTE_REG <= PALETTE_NEXT;
 			OV_PALETTE_REG <= OV_PALETTE_NEXT;
 			PF_PALETTE_REG <= PF_PALETTE_NEXT;
-			GTIA_PRIOR_REG <= GTIA_PRIOR_NEXT;
 			
 			csync_reg <= csync_next;
 			vsync_reg <= vsync_next;
@@ -820,19 +828,9 @@ begin
 			prior_snap_reg <=  prior_snap_next;
 
 			hpos_alt_reg <= hpos_alt_next;
-			active_hr_prev <= active_hr_prev_next;
-			active_bk_modify_prev <= active_bk_modify_prev_next;
-			active_bk_valid_prev <= active_bk_valid_prev_next;
-			set_bk_prev <= set_bk_prev_next;
-			set_pf0_prev <= set_pf0_prev_next;
-			set_pf1_prev <= set_pf1_prev_next;
-			set_pf2_prev <= set_pf2_prev_next;
-			set_pf3_prev <= set_pf3_prev_next;
-			set_p0_prev <= set_p0_prev_next;
-			set_p1_prev <= set_p1_prev_next;
-			set_p2_prev <= set_p2_prev_next;
-			set_p3_prev <= set_p3_prev_next;
-			prior6_prev_reg <= prior6_prev_next;
+
+			invisible_live_reg <= invisible_live_next;
+			gtia_prior_reg <= gtia_prior_next;
 
 			field_reg <= field_next;
 			interlace_reg <= interlace_next;
@@ -862,7 +860,7 @@ begin
 	
 		
 	-- decode antic input
-	process (AN, COLOUR_CLOCK, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, prior6_prev_reg, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, visible_live, clip_sides, hpos_reg)
+	process (AN, COLOUR_CLOCK, an_prev_reg, an_prev2_reg, an_prev3_reg, hblank_reg, vsync_reg, highres_reg, odd_scanline_reg, prior_delayed_reg, prior_delayed2_reg, prior6_prev, hpos_alt_reg, active_p0_live, active_p1_live, active_p2_live, active_p3_live, active_m0_live, active_m1_live, active_m2_live, active_m3_live, active_pf3_collision_live, active_bk_modify_reg, active_bk_modify_next, active_bk_valid_reg, active_hr_reg, hpos_reg)
 	begin	
 		hblank_next <= hblank_reg;
 		reset_counter <= '0';
@@ -900,8 +898,6 @@ begin
 		active_pm2_live <= '0';
 		active_pm3_live <= '0';
 		
-		prior6_prev_next <= prior6_prev_reg;
-		
 		if (COLOUR_CLOCK = '1') then	
 			visible_live <= '1';
 			vsync_next <= '0';
@@ -909,7 +905,6 @@ begin
 			an_prev_next <= an;
 			an_prev2_next <= an_prev_reg;
 			an_prev3_next <= an_prev2_reg;
-			prior6_prev_next <= prior_delayed_reg(6);
 			
 			active_pm0_live <= active_p0_live or (active_m0_live and not(prior_delayed_reg(4)));
 			active_pm1_live <= active_p1_live or (active_m1_live and not(prior_delayed_reg(4)));
@@ -946,7 +941,7 @@ begin
 				case prior_delayed_reg(7 downto 6) is
 					when "00" => 
 						-- normal mode
-						if prior6_prev_reg = '1' then
+						if prior6_prev = '1' then
 							active_bk_live <= not(an_prev_reg(2)) and not(an_prev_reg(1)) and not(an_prev_reg(0));
 							active_pf0_live <= an_prev_reg(2) and not(an_prev_reg(1)) and not(an_prev_reg(0));
 							active_pf1_live <= an_prev_reg(2) and not(an_prev_reg(1)) and an_prev_reg(0);
@@ -1152,11 +1147,15 @@ begin
 			invisible_clip <= clip_sides;
 		end if;		
 	end process;
-	
-	clip_delay : delay_line
-	generic map (COUNT=>1)
-	port map(clk=>clk,sync_reset=>'0',data_in=>invisible_clip,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>invisible_clip_delayed);	
 
+	process(invisible_live_reg, visible_live, colour_clock)
+	begin
+		invisible_live_next <= invisible_live_reg;
+		if colour_clock = '1' then
+			invisible_live_next <= not(visible_live);
+		end if;
+	end process;
+	
 	-- generate hsync and csync, and also vsync_half
 	process(hpos_reg, hsync_reg, hsync_end, csync_reg, csync_end, burst_reg, burst_end, vsync_reg, vsync_next, vsync_half_reg)
 	begin
@@ -1330,107 +1329,125 @@ begin
 	priority_rules : gtia_priority
 		port map(clk=>clk, colour_enable=>colour_clock, prior=>prior_delayed_reg,p0=>active_pm0_live,p1=>active_pm1_live,p2=>active_pm2_live,p3=>active_pm3_live,pf0=>active_pf0_live,pf1=>active_pf1_live,pf2=>active_pf2_live,pf3=>active_pf3_live,bk=>active_bk_live,p0_out=>set_p0,p1_out=>set_p1,p2_out=>set_p2,p3_out=>set_p3,pf0_out=>set_pf0,pf1_out=>set_pf1,pf2_out=>set_pf2,pf3_out=>set_pf3,bk_out=>set_bk);	
 
-	xcolor <= XCOLOR_IN or (not(VBXE_SWITCH) and gractl_reg(4));
+	-- For VBXE display we need to do things more often, and with a slight phase shift (one highres clock)
 
-	process(set_p0,set_p1,set_p2,set_p3,set_pf0,set_pf1,set_pf2,set_pf3,set_bk,colbk_delayed_reg, colpf0_delayed_reg, colpf1_delayed_reg, colpf2_delayed_reg, colpf3_delayed_reg, colpm0_delayed_reg, colpm1_delayed_reg, colpm2_delayed_reg, colpm3_delayed_reg,
-		colbk_snap_reg,colpf3_snap_reg,colpm0_snap_reg,colpm1_snap_reg,colpm2_snap_reg,colpm3_snap_reg, colour_clock, COLOUR_REG, 
-		highres_reg,gtia_active_hr,gtia_highres,active_hr_prev,active_bk_valid_prev,active_bk_modify_prev,colour_saved_reg,ov_palette_reg,pf_palette_reg,
-		set_bk_prev,set_pf0_prev,set_pf1_prev,set_pf2_prev,set_pf3_prev,set_p0_prev,set_p1_prev,set_p2_prev,set_p3_prev,
-		colour_clock_highres,colour_clock_vbxe,vbxe_pf_palette,vbxe_ov_palette,vbxe_ov_pixel,vbxe_ov_pixel_active,xcolor,gtia_pf0,gtia_pf1,gtia_pf2,
-		palette_reg, visible_live, invisible_clip_delayed, active_bk_modify_next, active_bk_valid_next, gractl_reg, gtia_prior_reg)
+	clip_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>invisible_clip,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>invisible_clip_adj);	
+
+	visible_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>invisible_live_reg,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>invisible_live_adj);	
+
+	set_bk_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_bk,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_bk_delayed);	
+
+	set_pf0_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_pf0,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_pf0_delayed);	
+
+	set_pf1_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_pf1,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_pf1_delayed);	
+
+	set_pf2_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_pf2,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_pf2_delayed);	
+
+	set_pf3_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_pf3,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_pf3_delayed);	
+
+	set_p0_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_p0,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_p0_delayed);	
+
+	set_p1_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_p1,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_p1_delayed);	
+
+	set_p2_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_p2,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_p2_delayed);	
+
+	set_p3_delay : delay_line
+	generic map (COUNT=>1)
+	port map(clk=>clk,sync_reset=>'0',data_in=>set_p3,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>set_p3_delayed);	
+
+	active_bk_modify_delay : wide_delay_line
+	generic map (COUNT=>1, WIDTH =>8)
+	port map(clk=>clk,sync_reset=>'0',data_in=>active_bk_modify_next,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>active_bk_modify_delayed);	
+
+	active_bk_valid_delay : wide_delay_line
+	generic map (COUNT=>1, WIDTH =>8)
+	port map(clk=>clk,sync_reset=>'0',data_in=>active_bk_valid_next,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>active_bk_valid_delayed);	
+
+	gtia_active_hr_delay : wide_delay_line
+	generic map (COUNT=>1, WIDTH =>2)
+	port map(clk=>clk,sync_reset=>'0',data_in=>gtia_active_hr,enable=>colour_clock_highres,reset_n=>reset_n,data_out=>gtia_active_hr_delayed);	
+
+	set_bk_adj <= set_bk when colour_clock = '1' else set_bk_delayed;
+	set_pf0_adj <= set_pf0 when colour_clock = '1' else set_pf0_delayed;
+	set_pf1_adj <= set_pf1 when colour_clock = '1' else set_pf1_delayed;
+	set_pf2_adj <= set_pf2 when colour_clock = '1' else set_pf2_delayed;
+	set_pf3_adj <= set_pf3 when colour_clock = '1' else set_pf3_delayed;
+	set_p0_adj <= set_p0 when colour_clock = '1' else set_p0_delayed;
+	set_p1_adj <= set_p1 when colour_clock = '1' else set_p1_delayed;
+	set_p2_adj <= set_p2 when colour_clock = '1' else set_p2_delayed;
+	set_p3_adj <= set_p3 when colour_clock = '1' else set_p3_delayed;
+
+	colbk_adj <= colbk_snap_reg when colour_clock = '1' else colbk_delayed_reg;
+	colpf0_adj <= colpf0_snap_reg when colour_clock = '1' else colpf0_delayed_reg;
+	colpf1_adj <= colpf1_snap_reg when colour_clock = '1' else colpf1_delayed_reg;
+	colpf2_adj <= colpf2_snap_reg when colour_clock = '1' else colpf2_delayed_reg;
+	colpf3_adj <= colpf3_snap_reg when colour_clock = '1' else colpf3_delayed_reg;
+	colpm0_adj <= colpm0_snap_reg when colour_clock = '1' else colpm0_delayed_reg;
+	colpm1_adj <= colpm1_snap_reg when colour_clock = '1' else colpm1_delayed_reg;
+	colpm2_adj <= colpm2_snap_reg when colour_clock = '1' else colpm2_delayed_reg;
+	colpm3_adj <= colpm3_snap_reg when colour_clock = '1' else colpm3_delayed_reg;
+
+	active_bk_modify_adj <= active_bk_modify_next when colour_clock = '1' else active_bk_modify_delayed;
+	active_bk_valid_adj <= active_bk_valid_next when colour_clock = '1' else active_bk_valid_delayed;
+	gtia_active_hr_adj <= gtia_active_hr when colour_clock = '1' else gtia_active_hr_delayed;
+	gtia_prior_adj <= set_bk_adj & (set_pf2_adj or set_pf3_adj) & set_pf1_adj & set_pf0_adj & set_p3_adj & set_p2_adj & set_p1_adj & set_p0_adj;
+
+	xcolor <= (GTIA_XCOLOR or gractl_reg(4)) when colour_clock_vbxe = '0' else VBXE_XCOLOR;
+
+	process(set_p0_adj,set_p1_adj,set_p2_adj,set_p3_adj,set_pf0_adj,set_pf1_adj,set_pf2_adj,set_pf3_adj,set_bk_adj,
+		colbk_adj,colpf0_adj,colpf1_adj,colpf2_adj,colpf3_adj,colpm0_adj,colpm1_adj,colpm2_adj,colpm3_adj,
+		colour_clock,colour_reg, 
+		highres_reg,gtia_active_hr_adj,gtia_prior_adj,gtia_highres,colour_saved_reg,ov_palette_reg,pf_palette_reg,
+		colour_clock_highres,colour_clock_vbxe,vbxe_pf_palette,vbxe_ov_palette,vbxe_ov_pixel,vbxe_ov_pixel_active,xcolor,gtia_pf0,gtia_pf1,gtia_pf2,gtia_prior_reg,
+		palette_reg,invisible_live_adj,invisible_clip_adj,active_bk_modify_adj,active_bk_valid_adj,gractl_reg)
 	variable ignore_bk_check : boolean := false;
+	variable colour : std_logic_vector(7 downto 0);
 	begin
-		-- This is much uglier than the previous version where the pair of highres pixels
-		-- were handled in one go (most likely like the original hardware) on the lowres colour clock,
-		-- but for VBXE we need to do it (ANTIC highres) pixel by pixel, because VBXE may wish
-		-- to change colours at this resolution. Interestingly, this is probably not necessary
-		-- for handling the local CCR <-> highres switches made by VBXE.
-		-- What adds to the ugliness is that the information about the pair of highres pixels
-		-- is split over the lowres colour clock, one pixel comes before the clock, and one after.
 
 		colour_next <= colour_reg;
 		colour_saved_next <= colour_saved_reg;
+
 		palette_next <= palette_reg;
 		ov_palette_next <= ov_palette_reg;
 		pf_palette_next <= pf_palette_reg;
-		active_hr_prev_next <= active_hr_prev;
-		active_bk_modify_prev_next <= active_bk_modify_prev;
-		active_bk_valid_prev_next <= active_bk_valid_prev;
-		set_bk_prev_next <= set_bk_prev;
-		set_pf0_prev_next <= set_pf0_prev;
-		set_pf1_prev_next <= set_pf1_prev;
-		set_pf2_prev_next <= set_pf2_prev;
-		set_pf3_prev_next <= set_pf3_prev;
-		set_p0_prev_next <= set_p0_prev;
-		set_p1_prev_next <= set_p1_prev;
-		set_p2_prev_next <= set_p2_prev;
-		set_p3_prev_next <= set_p3_prev;
 		gtia_prior_next <= gtia_prior_reg;
 
-		if (colour_clock_highres = '1') then 
-			if (colour_clock = '1') then 
-				gtia_prior_next <= set_bk & (set_pf2 or set_pf3) & set_pf1 & set_pf0 & set_p3 & set_p2 & set_p1 & set_p0;
-				colour_next <= (
-					((colbk_snap_reg(7 downto 1)&(xcolor and colbk_snap_reg(0)) or active_bk_modify_next) and active_bk_valid_next and (set_bk &set_bk &set_bk &set_bk &set_bk &set_bk &set_bk& set_bk)) or
-					(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0) ) or
-					(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1) ) or
-					(GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0)) and (set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2) ) or
-					((colpf3_snap_reg(7 downto 1)&(xcolor and colpf3_snap_reg(0)) or active_bk_modify_next) and (set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3) ) or
-					(colpm0_snap_reg(7 downto 1)&(xcolor and colpm0_snap_reg(0)) and (set_p0 &set_p0 &set_p0 &set_p0 &set_p0 &set_p0 &set_p0& set_p0)) or
-					(colpm1_snap_reg(7 downto 1)&(xcolor and colpm1_snap_reg(0)) and (set_p1 &set_p1 &set_p1 &set_p1 &set_p1 &set_p1 &set_p1& set_p1)) or
-					(colpm2_snap_reg(7 downto 1)&(xcolor and colpm2_snap_reg(0)) and (set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2& set_p2)) or
-					(colpm3_snap_reg(7 downto 1)&(xcolor and colpm3_snap_reg(0)) and (set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3& set_p3))
-					);
-				colour_saved_next <= (
-					((colbk_snap_reg(7 downto 1)&(xcolor and colbk_snap_reg(0)) or active_bk_modify_next) and active_bk_valid_next and (set_bk &set_bk &set_bk &set_bk &set_bk &set_bk &set_bk& set_bk)) or
-					(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0&set_pf0) ) or
-					(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1&set_pf1) ) or
-					(GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0)) and (set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2&set_pf2) ) or
-					((colpf3_snap_reg(7 downto 1)&(xcolor and colpf3_snap_reg(0)) or active_bk_modify_next) and (set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3&set_pf3) ) or
-					(colpm0_snap_reg(7 downto 1)&(xcolor and colpm0_snap_reg(0)) and (set_p0 &set_p0 &set_p0 &set_p0 &set_p0 &set_p0 &set_p0& set_p0)) or
-					(colpm1_snap_reg(7 downto 1)&(xcolor and colpm1_snap_reg(0)) and (set_p1 &set_p1 &set_p1 &set_p1 &set_p1 &set_p1 &set_p1& set_p1)) or
-					(colpm2_snap_reg(7 downto 1)&(xcolor and colpm2_snap_reg(0)) and (set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2 &set_p2& set_p2)) or
-					(colpm3_snap_reg(7 downto 1)&(xcolor and colpm3_snap_reg(0)) and (set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3 &set_p3& set_p3))
-					);
-				active_hr_prev_next <= gtia_active_hr;
-				active_bk_modify_prev_next <= active_bk_modify_next;
-				active_bk_valid_prev_next <= active_bk_valid_next;
-				set_bk_prev_next <= set_bk;
-				set_pf0_prev_next <= set_pf0;
-				set_pf1_prev_next <= set_pf1;
-				set_pf2_prev_next <= set_pf2;
-				set_pf3_prev_next <= set_pf3;
-				set_p0_prev_next <= set_p0;
-				set_p1_prev_next <= set_p1;
-				set_p2_prev_next <= set_p2;
-				set_p3_prev_next <= set_p3;
-			else
-				gtia_prior_next <= set_bk_prev & (set_pf2_prev or set_pf3_prev) & set_pf1_prev & set_pf0_prev & set_p3_prev & set_p2_prev & set_p1_prev & set_p0_prev;
-				colour_next <= (
-					((colbk_delayed_reg(7 downto 1)&(xcolor and colbk_delayed_reg(0)) or active_bk_modify_prev) and active_bk_valid_prev and (set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev& set_bk_prev)) or
-					(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev) ) or
-					(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev) ) or
-					(GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0)) and (set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev) ) or
-					((colpf3_delayed_reg(7 downto 1)&(xcolor and colpf3_delayed_reg(0)) or active_bk_modify_prev) and (set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev) ) or
-					(colpm0_delayed_reg(7 downto 1)&(xcolor and colpm0_delayed_reg(0)) and (set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev& set_p0_prev)) or
-					(colpm1_delayed_reg(7 downto 1)&(xcolor and colpm1_delayed_reg(0)) and (set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev& set_p1_prev)) or
-					(colpm2_delayed_reg(7 downto 1)&(xcolor and colpm2_delayed_reg(0)) and (set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev& set_p2_prev)) or
-					(colpm3_delayed_reg(7 downto 1)&(xcolor and colpm3_delayed_reg(0)) and (set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev& set_p3_prev))
-					);
-				colour_saved_next <= (
-					((colbk_delayed_reg(7 downto 1)&(xcolor and colbk_delayed_reg(0)) or active_bk_modify_prev) and active_bk_valid_prev and (set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev &set_bk_prev& set_bk_prev)) or
-					(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev&set_pf0_prev) ) or
-					(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev&set_pf1_prev) ) or
-					(GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0)) and (set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev&set_pf2_prev) ) or
-					((colpf3_delayed_reg(7 downto 1)&(xcolor and colpf3_delayed_reg(0)) or active_bk_modify_prev) and (set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev&set_pf3_prev) ) or
-					(colpm0_delayed_reg(7 downto 1)&(xcolor and colpm0_delayed_reg(0)) and (set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev &set_p0_prev& set_p0_prev)) or
-					(colpm1_delayed_reg(7 downto 1)&(xcolor and colpm1_delayed_reg(0)) and (set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev &set_p1_prev& set_p1_prev)) or
-					(colpm2_delayed_reg(7 downto 1)&(xcolor and colpm2_delayed_reg(0)) and (set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev &set_p2_prev& set_p2_prev)) or
-					(colpm3_delayed_reg(7 downto 1)&(xcolor and colpm3_delayed_reg(0)) and (set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev &set_p3_prev& set_p3_prev))
-					);
-			end if;
+		if colour_clock_highres = '1' then 
+			gtia_prior_next <= gtia_prior_adj;
+			colour :=
+				((colbk_adj(7 downto 1)&(xcolor and colbk_adj(0)) or active_bk_modify_adj) and active_bk_valid_adj and (set_bk_adj&set_bk_adj&set_bk_adj&set_bk_adj&set_bk_adj&set_bk_adj&set_bk_adj&set_bk_adj)) or
+				(GTIA_PF0(7 downto 1)&(xcolor and GTIA_PF0(0)) and (set_pf0_adj&set_pf0_adj&set_pf0_adj&set_pf0_adj&set_pf0_adj&set_pf0_adj&set_pf0_adj&set_pf0_adj)) or
+				(GTIA_PF1(7 downto 1)&(xcolor and GTIA_PF1(0)) and (set_pf1_adj&set_pf1_adj&set_pf1_adj&set_pf1_adj&set_pf1_adj&set_pf1_adj&set_pf1_adj&set_pf1_adj)) or
+				(GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0)) and (set_pf2_adj&set_pf2_adj&set_pf2_adj&set_pf2_adj&set_pf2_adj&set_pf2_adj&set_pf2_adj&set_pf2_adj)) or
+				((colpf3_adj(7 downto 1)&(xcolor and colpf3_adj(0)) or active_bk_modify_adj) and (set_pf3_adj&set_pf3_adj&set_pf3_adj&set_pf3_adj&set_pf3_adj&set_pf3_adj&set_pf3_adj&set_pf3_adj)) or
+				(colpm0_adj(7 downto 1)&(xcolor and colpm0_adj(0)) and (set_p0_adj&set_p0_adj&set_p0_adj&set_p0_adj&set_p0_adj&set_p0_adj&set_p0_adj&set_p0_adj)) or
+				(colpm1_adj(7 downto 1)&(xcolor and colpm1_adj(0)) and (set_p1_adj&set_p1_adj&set_p1_adj&set_p1_adj&set_p1_adj&set_p1_adj&set_p1_adj&set_p1_adj)) or
+				(colpm2_adj(7 downto 1)&(xcolor and colpm2_adj(0)) and (set_p2_adj&set_p2_adj&set_p2_adj&set_p2_adj&set_p2_adj&set_p2_adj&set_p2_adj&set_p2_adj)) or
+				(colpm3_adj(7 downto 1)&(xcolor and colpm3_adj(0)) and (set_p3_adj&set_p3_adj&set_p3_adj&set_p3_adj&set_p3_adj&set_p3_adj&set_p3_adj&set_p3_adj));
+			colour_next <= colour;
+			colour_saved_next <= colour;
 
-			-- finally high-res mode overrides the luma
+			-- high-res mode overrides the luma
 			ignore_bk_check := false;
 			if gtia_highres = '1' then
 				if highres_reg = '0' then
@@ -1439,36 +1456,24 @@ begin
 					gtia_prior_next(7 downto 4) <= "0100";
 					ignore_bk_check := true;
 				end if;
-				if colour_clock = '1' then
-					if (gtia_active_hr(1) = '1') and (set_bk = '0' or ignore_bk_check) then
-						colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
-						colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
-						if xcolor = '1' then
-							colour_next(7 downto 4) <= GTIA_PF1(7 downto 4);
-							colour_saved_next(7 downto 4) <= GTIA_PF1(7 downto 4);
-							gtia_prior_next(6 downto 5) <= "01";
-						end if;
-					end if;
-				else 
-					if (active_hr_prev(0) = '1') and (set_bk_prev = '0' or ignore_bk_check) then
-						colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
-						colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
-						if xcolor = '1' then
-							colour_next(7 downto 4) <= GTIA_PF1(7 downto 4);
-							colour_saved_next(7 downto 4) <= GTIA_PF1(7 downto 4);
-							gtia_prior_next(6 downto 5) <= "01";
-						end if;
+				if (gtia_active_hr_adj(to_integer(unsigned'('0' & colour_clock))) = '1') and (set_bk_adj = '0' or ignore_bk_check) then
+					colour_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
+					colour_saved_next(3 downto 0) <= GTIA_PF1(3 downto 1)&(xcolor and GTIA_PF1(0));
+					if xcolor = '1' then
+						colour_next(7 downto 4) <= GTIA_PF1(7 downto 4);
+						colour_saved_next(7 downto 4) <= GTIA_PF1(7 downto 4);
+						gtia_prior_next(6 downto 5) <= "01";
 					end if;
 				end if;
 			end if;				
 			
-			if invisible_clip_delayed = '1' then
+			if (invisible_clip_adj or invisible_live_adj) = '1' then
 				colour_saved_next <= X"00";
 				colour_next <= X"00";
 			end if;			
 		end if;
 
-		if (colour_clock_vbxe = '1') then
+		if colour_clock_vbxe = '1' then
 			palette_next <= VBXE_PF_PALETTE;
 			if colour_clock_highres = '1' then
 				ov_palette_next <= VBXE_OV_PALETTE;
@@ -1530,7 +1535,7 @@ begin
 			p2pl_next <= (others=>'0');
 			p3pl_next <= (others=>'0');
 		else
-			if (visible_live = '1' and colour_clock = '1') then
+			if visible_live = '1' then
 				m0pl_next <= m0pl_reg or (active_m0_live&active_m0_live&active_m0_live&active_m0_live and active_p3_live&active_p2_live&active_p1_live&active_p0_live);
 				m1pl_next <= m1pl_reg or (active_m1_live&active_m1_live&active_m1_live&active_m1_live and active_p3_live&active_p2_live&active_p1_live&active_p0_live);
 				m2pl_next <= m2pl_reg or (active_m2_live&active_m2_live&active_m2_live&active_m2_live and active_p3_live&active_p2_live&active_p1_live&active_p0_live);
@@ -1877,11 +1882,14 @@ begin
 	prior_longer_delay : wide_delay_line
 		generic map (COUNT=>2, WIDTH=>2)
 		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(7 downto 6),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>prior_delayed2_reg(7 downto 6));
+
+	prior6_delay : delay_line
+		generic map (COUNT=>1)
+		port map(clk=>clk,sync_reset=>'0',data_in=>prior_delayed_reg(6),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>prior6_prev);
 		
 	colbk_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
 		port map(clk=>clk,sync_reset=>'0',data_in=>colbk_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colbk_delayed_reg(7 downto 0));
---	colbk_delayed_reg <= colbk_snap_reg;
 
 	colpm0_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
@@ -1895,10 +1903,6 @@ begin
 	colpm3_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
 		port map(clk=>clk,sync_reset=>'0',data_in=>colpm3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm3_delayed_reg(7 downto 0));
---	colpm0_delayed_reg <= colpm0_snap_reg;
---	colpm1_delayed_reg <= colpm1_snap_reg;
---	colpm2_delayed_reg <= colpm2_snap_reg;
---	colpm3_delayed_reg <= colpm3_snap_reg;
 
 	colpf0_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
@@ -1912,10 +1916,6 @@ begin
 	colpf3_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
 		port map(clk=>clk,sync_reset=>'0',data_in=>colpf3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf3_delayed_reg(7 downto 0));
---	colpf0_delayed_reg <= colpf0_snap_reg;
---	colpf1_delayed_reg <= colpf1_snap_reg;
---	colpf2_delayed_reg <= colpf2_snap_reg;
---	colpf3_delayed_reg <= colpf3_snap_reg;
 
 	hposp0_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)
@@ -2110,24 +2110,25 @@ begin
 
 	GTIA_HIGHRES_OUT <= highres_reg;
 	GTIA_ACTIVE_HR_OUT <= active_hr_reg;
+	GTIA_PRIOR_RAW <= gtia_prior_adj;
 	GTIA_PRIOR <= gtia_prior_next;
-	GTIA_PRIOR_RAW <= set_bk & (set_pf2 or set_pf3) & set_pf1 & set_pf0 & set_p3 & set_p2 & set_p1 & set_p0 when colour_clock = '1' else
-			set_bk_prev & (set_pf2_prev or set_pf3_prev) & set_pf1_prev & set_pf0_prev & set_p3_prev & set_p2_prev & set_p1_prev & set_p0_prev;
-	GTIA_PF0_OUT <= colpf0_delayed_reg when (colour_clock_highres = '1') and (colour_clock = '0') else colpf0_snap_reg;
-	GTIA_PF1_OUT <= colpf1_delayed_reg when (colour_clock_highres = '1') and (colour_clock = '0') else colpf1_snap_reg;
-	GTIA_PF2_OUT <= colpf2_delayed_reg when (colour_clock_highres = '1') and (colour_clock = '0') else colpf2_snap_reg;
-	GTIA_PF3_OUT <= colpf3_delayed_reg when (colour_clock_highres = '1') and (colour_clock = '0') else colpf3_snap_reg;
+
+	GTIA_PF0_OUT <= colpf0_adj;
+	GTIA_PF1_OUT <= colpf1_adj;
+	GTIA_PF2_OUT <= colpf2_adj;
+	GTIA_PF3_OUT <= colpf3_adj;
+
 	PALETTE_out <= palette_reg;
-	gtia_vsync <= vsync_reg and not(vsync_next);
-	hpos_out <= hpos_reg;
+	GTIA_VSYNC <= vsync_reg and not(vsync_next);
+	GTIA_HPOS <= hpos_reg;
 	interlace <= interlace_enable and interlace_reg;
 	interlace_field <= interlace_enable and field_reg;
 
-	GTIA_PF0 <= GTIA_PF0_IN when VBXE_SWITCH='1' else colpf0_delayed_reg when (colour_clock_highres = '1') and (colour_clock = '0') else colpf0_snap_reg;
-	GTIA_PF1 <= GTIA_PF1_IN when VBXE_SWITCH='1' else colpf1_delayed_reg when (colour_clock_highres = '1') and (colour_clock = '0') else colpf1_snap_reg;
-	GTIA_PF2 <= GTIA_PF2_IN when VBXE_SWITCH='1' else colpf2_delayed_reg when (colour_clock_highres = '1') and (colour_clock = '0') else colpf2_snap_reg;
-	GTIA_HIGHRES <= GTIA_HIGHRES_IN when VBXE_SWITCH='1' else highres_reg;
-	GTIA_ACTIVE_HR <= GTIA_ACTIVE_HR_IN when VBXE_SWITCH='1' else active_hr_reg;
+	GTIA_PF0 <= GTIA_PF0_IN when colour_clock_vbxe='1' else colpf0_adj;
+	GTIA_PF1 <= GTIA_PF1_IN when colour_clock_vbxe='1' else colpf1_adj;
+	GTIA_PF2 <= GTIA_PF2_IN when colour_clock_vbxe='1' else colpf2_adj;
+	GTIA_HIGHRES <= GTIA_HIGHRES_IN when colour_clock_vbxe='1' else highres_reg;
+	GTIA_ACTIVE_HR <= GTIA_ACTIVE_HR_IN when colour_clock_vbxe='1' else active_hr_reg;
 
 	-- special for MISTER
 	hblank<=hblank_reg;
