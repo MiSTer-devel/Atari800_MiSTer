@@ -10,7 +10,8 @@ port (
 	data_in: in std_logic_vector(7 downto 0);
 	wr_en: in std_logic;
 	data_out: out std_logic_vector(7 downto 0);
-	rtc_in: in std_logic_vector(64 downto 0)
+	rtc_in : in std_logic_vector(64 downto 0);
+	clk_conf : in std_logic_vector(2 downto 0) := "000"
 );
 end DS1305Redux;
 
@@ -153,10 +154,19 @@ end process;
 
 process(clk)
 	variable clk_counter : integer := 0;
+	variable clk_core : integer := 0;
 begin
 	if rising_edge(clk) then
 		seconds_tick <= '0';
-		if clk_counter = 28636364 then
+		case clk_conf is
+			when "100" => clk_core := 28375152;
+			when "101" => clk_core := 28454400;
+			when "000" => clk_core := 28636364;
+			when "001" => clk_core := 28644608;
+			when "010" => clk_core := 28673280;
+			when others => null;
+		end case;
+		if clk_counter = clk_core then
 			seconds_tick <= '1';
 			clk_counter := 0;
 		else

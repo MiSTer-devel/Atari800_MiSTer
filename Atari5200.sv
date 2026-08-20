@@ -69,7 +69,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X    XXXXX       XXX  XXXXXXXXXX   X     X              XX X     
+// X    XXXXX       XXXXXXXXXXXXXXX   X     X              XX X     
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -79,6 +79,7 @@ localparam CONF_STR = {
 	"-;",
 	"O79,CPU Speed,1x,2x,4x,8x,16x;",
 	"-;",
+	"OKL,NTSC rate Hz,59.92,59.94,60.0;",
 	"OMN,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"OHJ,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OV,NTSC artifacting,No,Yes;",
@@ -100,7 +101,7 @@ localparam CONF_STR = {
 	"V,v",`BUILD_DATE
 };
 
-////////////////////   CLOCKS   ///////////////////
+//////////////////// (Video) CLOCKS ///////////////////
 
 wire locked;
 wire clk_sys;
@@ -114,10 +115,76 @@ pll pll
 	.outclk_0(clk_sys),
 	.outclk_1(clk_mem),
 	.outclk_2(clk_vdo),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll),
 	.locked(locked)
 );
 
+wire [63:0] reconfig_to_pll;
+wire [63:0] reconfig_from_pll;
+wire        cfg_waitrequest;
+reg         cfg_write;
+reg   [5:0] cfg_address;
+reg  [31:0] cfg_data;
+
+pll_cfg pll_cfg
+(
+	.mgmt_clk(CLK_50M),
+	.mgmt_reset(0),
+	.mgmt_waitrequest(cfg_waitrequest),
+	.mgmt_read(0),
+	.mgmt_readdata(),
+	.mgmt_write(cfg_write),
+	.mgmt_address(cfg_address),
+	.mgmt_writedata(cfg_data),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll)
+);
+
+always @(posedge CLK_50M) begin : cfg_block
+	reg [1:0] vcnf = 2'b00, vcnf_prev = 2'b00;
+	reg [2:0] state = 0;
+
+	vcnf <= ntsc_hz;
+	vcnf_prev <= vcnf;
+
+	cfg_write <= 0;
+	if(vcnf_prev != vcnf) state <= 1;
+
+	if(!cfg_waitrequest) begin
+		if(state) state <= state+1'd1;
+		case(state)
+			1: begin
+				cfg_address <= 0;
+				cfg_data <= 0;
+				cfg_write <= 1;
+			end
+			3: begin
+				cfg_address <= 7;
+				case(vcnf_prev)
+					2'b00: cfg_data <= 702813244;
+					2'b01: cfg_data <= 714143711;
+					2'b10: cfg_data <= 753550208;
+					default: cfg_data <= 0;
+				endcase
+				cfg_write <= 1;
+			end
+			5: begin
+				cfg_address <= 2;
+				cfg_data <= 0;
+				cfg_write <= 1;
+			end
+		endcase
+	end
+end
+
 wire reset = RESET;
+wire areset;
+
+reg [1:0] ntsc_hz = 0;
+
+always @(posedge clk_sys) if(areset) ntsc_hz <= status[21:20];
+
 
 //////////////////   HPS I/O   ///////////////////
 wire [20:0] joy_0;
@@ -226,6 +293,7 @@ atari5200top atari5200top
 	.CLK(clk_sys),
 	.CLK_SDRAM(clk_mem),
 	.RESET_N(~reset),
+	.ARESET(areset),
 
 	.SDRAM_BA(SDRAM_BA),
 	.SDRAM_nRAS(SDRAM_nRAS),
