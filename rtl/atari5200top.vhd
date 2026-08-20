@@ -18,6 +18,7 @@ PORT
 	CLK        : IN  STD_LOGIC;
 	CLK_SDRAM  : IN  STD_LOGIC;
 	RESET_N    : IN  STD_LOGIC;
+	ARESET     : OUT  STD_LOGIC;
 
 	VGA_VS     : OUT STD_LOGIC;
 	VGA_HS     : OUT STD_LOGIC;
@@ -265,6 +266,7 @@ RAM_DATA <= x"FFFFFF"&ROM_DATA  when SDRAM_ADDR(24 downto 14) = "00111000001"  e
 
 SDRAM_READY <= SDRAM_RESET_N;
 areset_n <= (SDRAM_RESET_N and not(reset_atari));
+ARESET <= not(areset_n);
 
 process(clk)
 	variable old_reset : std_logic := '1';

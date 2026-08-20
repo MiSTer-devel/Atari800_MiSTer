@@ -73,7 +73,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   X                 
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXX             
 
 
 `include "build_id.v" 
@@ -134,8 +134,11 @@ localparam CONF_STR = {
 	"P3,Video;",
 	"P3-;",
 	"P3O[5],Video mode,PAL,NTSC;",
+	"hCP3O[112:111],NTSC rate Hz,59.92,59.94,60;",
+	"HCP3O[113],PAL rate Hz,49.86,50;",
 	"P3O[62:61],Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
+	"DBP3O[114],GTIA xcolor,Off,On;",
 	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
 	"dBP3O[63],Fix VBXE NTSC bug,Disabled,Enabled;",
 	"dBP3FC2,ACT,VBXE Palette;",
@@ -202,7 +205,9 @@ localparam CONF_STR = {
 	"V,v",`BUILD_DATE
 };
 
-////////////////////   CLOCKS   ///////////////////
+//////////////////// (Video) CLOCKS ///////////////////
+
+wire [2:0] video_hz_config = pal_video ? {2'b10,pal_hz} : {1'b0,ntsc_hz};
 
 wire locked;
 wire clk_sys;
@@ -216,8 +221,70 @@ pll pll
 	.outclk_0(clk_sys),
 	.outclk_1(clk_mem),
 	.outclk_2(clk_vdo),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll),
 	.locked(locked)
 );
+
+wire [63:0] reconfig_to_pll;
+wire [63:0] reconfig_from_pll;
+wire        cfg_waitrequest;
+reg         cfg_write;
+reg   [5:0] cfg_address;
+reg  [31:0] cfg_data;
+
+pll_cfg pll_cfg
+(
+	.mgmt_clk(CLK_50M),
+	.mgmt_reset(0),
+	.mgmt_waitrequest(cfg_waitrequest),
+	.mgmt_read(0),
+	.mgmt_readdata(),
+	.mgmt_write(cfg_write),
+	.mgmt_address(cfg_address),
+	.mgmt_writedata(cfg_data),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll)
+);
+
+always @(posedge CLK_50M) begin : cfg_block
+	reg [2:0] vcnf = 3'b000, vcnf_prev = 3'b000;
+	reg [2:0] state = 0;
+
+	vcnf <= video_hz_config;
+	vcnf_prev <= vcnf;
+
+	cfg_write <= 0;
+	if(vcnf_prev != vcnf) state <= 1;
+
+	if(!cfg_waitrequest) begin
+		if(state) state <= state+1'd1;
+		case(state)
+			1: begin
+				cfg_address <= 0;
+				cfg_data <= 0;
+				cfg_write <= 1;
+			end
+			3: begin
+				cfg_address <= 7;
+				case(vcnf_prev)
+					3'b100: cfg_data <= 343806291;
+					3'b101: cfg_data <= 452723913;
+					3'b000: cfg_data <= 702813244;
+					3'b001: cfg_data <= 714143711;
+					3'b010: cfg_data <= 753550208;
+					default: cfg_data <= 0;
+				endcase
+				cfg_write <= 1;
+			end
+			5: begin
+				cfg_address <= 2;
+				cfg_data <= 0;
+				cfg_write <= 1;
+			end
+		endcase
+	end
+end
 
 wire reset = RESET;
 
@@ -402,6 +469,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(8)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.status_menumask({
+		menu_ntsc, // C
 		menu_vbxe, // B
 		pokeymax_enable & (pokeymax_covox_restrict | pokeymax_sid_restrict), // A
 		pokeymax_enable & pokeymax_psg_restrict, // 9
@@ -453,7 +521,8 @@ hps_ext hps_ext
 	.cart2_select(cart2_select),
 	.atari_status1(atari_status1),
 	.atari_status2(atari_status2),
-	
+	.atari_status3(atari_status3),
+
 	.uart_addr(uart_addr),
 	.uart_enable(uart_enable),
 	.uart_wr(uart_wr),
@@ -554,6 +623,7 @@ atari800top atari800top
 
 	.PAL(pal_video),
 	.CLIP_SIDES(status[34]),
+	.GTIA_XCOLOR(status[114] & ~menu_vbxe),
 	.VGA_VS(VSync_o),
 	.VGA_HS(HSync_o),
 	.VGA_B(Bo),
@@ -575,6 +645,7 @@ atari800top atari800top
 	.WARM_RESET_MENU(status[39]),
 	.COLD_RESET_MENU(status[40] | buttons[1]),
 	.RTC(rtc),
+	.CLK_CONF(video_hz_config),
 	.VBXE_MODE({status[63],status[60:59]}),
 	.VBXE_PALETTE_RGB(vbxe_palette_rgb_out),
 	.VBXE_PALETTE_INDEX(vbxe_palette_index),
@@ -747,12 +818,16 @@ reg [7:0] drivesmodepbi = 0;
 reg [2:0] bootpbi = 0;
 reg [2:0] ram_config = 0;
 reg pal_video = 0;
+reg pal_hz = 0;
+reg [1:0] ntsc_hz = 0;
 
 wire [15:0] atari_status1;
 wire [15:0] atari_status2;
+wire [15:0] atari_status3;
 wire [2:0] atari_hotkeys;
 assign atari_status1 = {~status[38], 4'b0000, status[12:10], modepbi & ~xex_loader_mode, status[57], os800_16k, ~status[41], mode800, atari_hotkeys};
 assign atari_status2 = {tape_fifo_full, tape_fifo_empty, tape_active, tape_slow, splashpbi, bootpbi, drivesmodepbi};
+assign atari_status3 = {13'b0000000000000, video_hz_config};
 
 always @(posedge clk_sys) if(areset) begin
 	mode800 <= menu_mode800;
@@ -763,6 +838,8 @@ always @(posedge clk_sys) if(areset) begin
 	drivesmodepbi <= status[51:44];
 	ram_config <= (menu_mode800 ? status[37:35] : status[15:13]);
 	pal_video <= ~menu_ntsc;
+	pal_hz <= status[113];
+	ntsc_hz <= status[112:111];
 end
 
 reg pbi_rom_loaded = 0;

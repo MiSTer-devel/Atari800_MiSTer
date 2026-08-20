@@ -37,6 +37,7 @@ module hps_ext
 	output reg  [7:0] cart2_select,
 	input      [15:0] atari_status1,
 	input      [15:0] atari_status2,
+	input      [15:0] atari_status3,
 	
 	// Pokey SIO bridge
 	output reg  [4:0] uart_addr,
@@ -102,7 +103,8 @@ localparam REG_SPACE_FORCE = 14;
 // (well, for Flash request check it will be reset by reading)
 localparam REG_ATARI_STATUS1 = 1;
 localparam REG_ATARI_STATUS2 = 2;
-localparam REG_ATARI_FLASH = 3;
+localparam REG_ATARI_STATUS3 = 3;
+localparam REG_ATARI_FLASH = 4;
 
 reg [15:0] io_dout;
 reg        dout_en = 0;
@@ -185,6 +187,7 @@ always@(posedge clk_sys) begin
 					case(io_din[15:8])
 						REG_ATARI_STATUS1: io_dout <= atari_status1;
 						REG_ATARI_STATUS2: io_dout <= atari_status2;
+						REG_ATARI_STATUS3: io_dout <= atari_status3;
 						REG_ATARI_FLASH: begin
 							io_dout <= {11'b0, emu_cart_trigger, flash_save, emu_flash_autosave, flash_slave, flash_request};
 							flash_request <= 0;

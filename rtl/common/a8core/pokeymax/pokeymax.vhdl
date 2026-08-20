@@ -13,8 +13,6 @@ PORT (
 
 	ENABLE_179 : in std_logic;
 	ENABLE_179_DOUBLE : in std_logic;
-	CLOCK_SHIFT : in std_logic_vector(15 downto 0);
-	VBXE_MEMAC_ACTIVE : in std_logic;
 	ADDR : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 	DATA_IN : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 	REQUEST : IN STD_LOGIC;
@@ -194,7 +192,6 @@ signal SAMPLE_AUDIO_IN_SIGNED : SIGNED_AUDIO_TYPE(3 downto 0);
 signal FANCY_ENABLE : std_logic;
 
 signal SAMPLE_IRQ : std_logic;
-signal SAMPLE_RAM_REQUEST_RAW : std_logic;
 
 -- config
 -- regs
@@ -604,7 +601,7 @@ PORT MAP(
 	AUDIO_IN3 => SAMPLE_AUDIO_IN_SIGNED(3),
 
 	RAM_ADDR => SAMPLE_RAM_ADDRESS,
-	RAM_REQUEST => SAMPLE_RAM_REQUEST_RAW,
+	RAM_REQUEST => SAMPLE_RAM_REQUEST,
 	RAM_READY => SAMPLE_RAM_READY,
 	RAM_WRITE_ENABLE => SAMPLE_RAM_WRITE_ENABLE,
 	RAM_DATA => SAMPLE_RAM_READ_DATA,
@@ -617,12 +614,6 @@ PORT MAP(
 );
 
 ADPCM_STEP_VALUE <= std_logic_vector(adpcm_step(unsigned(ADPCM_STEP_ADDR)));
-
--- TODO There is currently no software for sample engine that works
--- with VBXE, so this is (a) impossible to test, (b) say whether it's at all needed.
--- SID playing with VBXE active seems to work without a hitch and without any hacks of this sort.
-
-SAMPLE_RAM_REQUEST <= SAMPLE_RAM_REQUEST_RAW and (not(VBXE_MEMAC_ACTIVE) or or_reduce(CLOCK_SHIFT(11 downto 4)));
 
 enable_1mhz_clock_div : entity work.enable_divider
 generic map (COUNT=>28)
