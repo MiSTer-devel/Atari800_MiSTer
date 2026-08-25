@@ -1137,7 +1137,7 @@ end generate;
 		RAM_ADDR(13 downto 0) <= addr_next(13 downto 0);
 		RAM_ADDR(18 downto 14) <= extended_bank(4 downto 0);
 
-		if (memac_check = '1') and not((emu_cart_enable = '1') and emu_cart_address_enable) then
+		if memac_check = '1' then
 			MEMORY_DATA_INT(7 DOWNTO 0) <= memac_data_read;
 			memac_chip_select <= start_request;
 			request_complete <= memac_request_complete;
@@ -1193,11 +1193,13 @@ end generate;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';
+					memac_chip_select <= '0';
 					VBXE_SOFT_RESET <= write_enable_next and addr_next(7);
 
 				when X"D1" =>
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';	
+					memac_chip_select <= '0';
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					-- PBI BIOS rom emulation
@@ -1221,6 +1223,7 @@ end generate;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';
+					memac_chip_select <= '0';
 
 				-- PIA
 				when X"D3" =>
@@ -1235,6 +1238,7 @@ end generate;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';
+					memac_chip_select <= '0';
 					
 				-- ANTIC
 				when X"D4" =>
@@ -1244,11 +1248,13 @@ end generate;
 					request_complete <= '1';
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';					
+					memac_chip_select <= '0';
 
 				-- CART_CONFIG -- TODO - wait for n cycles (for now non-turbo mode should work?)
 				when X"D5" =>
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';	
+					memac_chip_select <= '0';
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 
@@ -1289,9 +1295,9 @@ end generate;
 					end if;
 
 				when X"D6"|X"D7"	=>
+					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					if addr_next(8 downto 2) = "0000000" then
 						D6_WR_ENABLE <= write_enable_next;
-						MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					elsif (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
 						VBXE_WRITE_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= VBXE_DATA;
@@ -1299,6 +1305,7 @@ end generate;
 					end if;
 					sdram_chip_select <= '0';
 					ram_chip_select <= '0';	
+					memac_chip_select <= '0';
 					request_complete <= '1';
 										
 				-- SELF TEST ROM 0x5000->0x57ff and XE RAM
@@ -1308,7 +1315,8 @@ end generate;
 					if (portb(7) = '0' and portb(0) = '1' and extended_self_test = '1') then
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';	
-						
+						memac_chip_select <= '0';
+
 						if (rom_in_ram = '1') then
 							MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
 						else
@@ -1342,6 +1350,7 @@ end generate;
 						-- remap to SDRAM
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';
+						memac_chip_select <= '0';
 						request_complete <= '1';
 						MEMORY_DATA_INT(7 downto 0) <= x"ff";
 						if (emu_cart_address_enable) then
@@ -1367,6 +1376,7 @@ end generate;
 						-- remap to SDRAM
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';
+						memac_chip_select <= '0';
 						request_complete <= '1';
 						MEMORY_DATA_INT(7 downto 0) <= x"ff";
 						if (emu_cart_address_enable) then
@@ -1384,6 +1394,7 @@ end generate;
 						if (atari800mode = '0' and basic_reg = '1') then
 							sdram_chip_select <= '0';
 							ram_chip_select <= '0';							
+							memac_chip_select <= '0';
 							--request_complete <= ROM_REQUEST_COMPLETE;
 							--MEMORY_DATA_INT(7 downto 0) <= ROM_DATA;
 							--rom_request <= start_request;					
@@ -1422,12 +1433,14 @@ end generate;
 							request_complete <= sdram_request_COMPLETE;
 							sdram_chip_select <= start_request;
 							ram_chip_select <= '0';
+							memac_chip_select <= '0';
 						end if;
 					end if;
 					
 					if (atari800mode='1' or (portb(0) = '1' and pbi_mpd='0')) then
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';																		
+						memac_chip_select <= '0';
 						--request_complete <= ROM_REQUEST_COMPLETE;
 						--MEMORY_DATA_INT(7 downto 0) <= ROM_DATA;
 						--rom_request <= start_request;					
@@ -1460,6 +1473,7 @@ end generate;
 					if (ram_c000='0') then
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';																		
+						memac_chip_select <= '0';
 						--request_complete <= ROM_REQUEST_COMPLETE;
 						--MEMORY_DATA_INT(7 downto 0) <= ROM_DATA;
 						--rom_request <= start_request;					
@@ -1493,6 +1507,7 @@ end generate;
 					if (atari800mode='1' or portb(0) = '1') then
 						sdram_chip_select <= '0';
 						ram_chip_select <= '0';																		
+						memac_chip_select <= '0';
 						--request_complete <= ROM_REQUEST_COMPLETE;
 						--MEMORY_DATA_INT(7 downto 0) <= ROM_DATA;
 						--rom_request <= start_request;					
@@ -1531,6 +1546,7 @@ end generate;
 			if (freezer_enable = '1' and freezer_disable_atari) then
 				sdram_chip_select <= '0';
 				ram_chip_select <= '0';
+				memac_chip_select <= '0';
 				case freezer_access_type is
 				when "01" => -- direct data access
 					MEMORY_DATA_INT(7 downto 0) <= freezer_dout;

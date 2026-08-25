@@ -1762,10 +1762,6 @@ begin
 		end if;
 	end process;
 	
---	enable_179_delay : delay_line
---		generic map (COUNT=>1)
---		port map(clk=>clk,sync_reset=>'0',data_in=>enable_179,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>enable_179_adj);
-
 	-- delays...
 	process(enable_179,
 		hposp0_snap_reg,
@@ -1867,12 +1863,6 @@ begin
 		end if;
 	end process;
 
-		-- TODO - needs more attention ... 
-		-- The prior behaviour here in real hardware is all over the place...
-		-- THESE CAN TAKE MUCH LESS SPACE - only need to store per CPU cycle, not per colour clock original
---	prior_short_delay : wide_delay_line
---		generic map (COUNT=>2, WIDTH=>6)
---		port map(clk=>clk,sync_reset=>'0',data_in=>prior_snap_reg(5 downto 0),enable=>COLOUR_CLOCK,reset_n=>reset_n,data_out=>prior_delayed_reg(5 downto 0));
 	prior_delayed_reg(5 downto 0) <= prior_snap_reg(5 downto 0);
 
 	prior_long_delay : wide_delay_line
@@ -1889,33 +1879,33 @@ begin
 		
 	colbk_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colbk_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colbk_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colbk_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colbk_delayed_reg);
 
 	colpm0_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm0_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm0_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm0_delayed_reg);
 	colpm1_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm1_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm1_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm1_delayed_reg);
 	colpm2_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm2_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm2_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm2_delayed_reg);
 	colpm3_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpm3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm3_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpm3_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpm3_delayed_reg);
 
 	colpf0_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf0_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf0_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf0_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf0_delayed_reg);
 	colpf1_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf1_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf1_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf1_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf1_delayed_reg);
 	colpf2_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf2_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf2_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf2_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf2_delayed_reg);
 	colpf3_delay : wide_delay_line
 		generic map (COUNT=>1, WIDTH=>8)
-		port map(clk=>clk,sync_reset=>'0',data_in=>colpf3_snap_reg(7 downto 0),enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf3_delayed_reg(7 downto 0));
+		port map(clk=>clk,sync_reset=>'0',data_in=>colpf3_snap_reg,enable=>COLOUR_CLOCK_HIGHRES,reset_n=>reset_n,data_out=>colpf3_delayed_reg);
 
 	hposp0_delay : wide_delay_line
 		generic map (COUNT=>3, WIDTH=>8)

@@ -566,7 +566,6 @@ PORT MAP(
 	memac_data_out => memac_data_read,
 	memac_request => memac_request,
 	memac_request_complete => memac_request_complete,
-	memac_dma_address => dma_addr,
 	irq_n => VBXE_IRQ_N,
 	video_clock_antic_lowres => ANTIC_COLOUR_CLOCK_OUT,
 	video_clock_antic_highres => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
