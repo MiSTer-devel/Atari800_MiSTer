@@ -1,4 +1,4 @@
-DEPTH = 256;
+DEPTH = 1024;
 WIDTH = 7;
 ADDRESS_RADIX = HEX;
 DATA_RADIX = BIN;
@@ -261,5 +261,7 @@ fc : 1111111;
 fd : 1111111;
 fe : 1111111;
 ff : 1111111;
+
+[100..3ff] : 0000000;
 
 END;

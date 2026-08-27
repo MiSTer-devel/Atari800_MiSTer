@@ -73,7 +73,7 @@ wire [5:0] CPU_SPEEDS[8] ='{6'd1,6'd2,6'd4,6'd8,6'd16,6'd0,6'd0,6'd0};
 //                                      1         1         1
 // 6     7         8         9          0         1         2
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXX             
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXX            
 
 
 `include "build_id.v" 
@@ -141,6 +141,7 @@ localparam CONF_STR = {
 	"DBP3O[114],GTIA xcolor,Off,On;",
 	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
 	"dBP3O[63],Fix VBXE NTSC bug,Disabled,Enabled;",
+	"dBP3O[115],VBXE Blitter,Normal,Turbo;",
 	"dBP3FC2,ACT,VBXE Palette;",
 	"P3-;",
 	"P3O[23:22],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
@@ -646,7 +647,7 @@ atari800top atari800top
 	.COLD_RESET_MENU(status[40] | buttons[1]),
 	.RTC(rtc),
 	.CLK_CONF(video_hz_config),
-	.VBXE_MODE({status[63],status[60:59]}),
+	.VBXE_MODE({status[115],status[63],status[60:59]}),
 	.VBXE_PALETTE_RGB(vbxe_palette_rgb_out),
 	.VBXE_PALETTE_INDEX(vbxe_palette_index),
 	.VBXE_PALETTE_COLOR(vbxe_palette_color),
