@@ -1611,13 +1611,10 @@ begin
 	end if;
 
 	xdl_read_required := false;
-	if xdl_or_blitter_notify then
-		if memac_serviced_reg = '1' then
-			xdl_or_blitter_notify := false;
-			memac_serviced_next <= '0';
-		end if;
+	if memac_serviced_reg = '1' and xdl_or_blitter_notify then
+		memac_serviced_next <= '0';
 	end if;
-	if xdl_or_blitter_notify then
+	if memac_serviced_reg = '0' and xdl_or_blitter_notify then
 		if xdl_read_state_reg > 0 and xdl_read_state_reg < 24 then
 			xdl_read_state_next <= xdl_read_state_reg + 1;
 		end if;
