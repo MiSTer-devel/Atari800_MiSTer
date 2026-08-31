@@ -1450,7 +1450,7 @@ begin
 			-- high-res mode overrides the luma
 			ignore_bk_check := false;
 			if gtia_highres = '1' then
-				if highres_reg = '0' then
+				if highres_reg = '0' and (set_p0_adj or set_p1_adj or set_p2_adj or set_p3_adj) = '0' then
 					colour_next <= GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0));
 					colour_saved_next <= GTIA_PF2(7 downto 1)&(xcolor and GTIA_PF2(0));
 					gtia_prior_next(7 downto 4) <= "0100";

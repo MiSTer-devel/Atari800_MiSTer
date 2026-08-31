@@ -249,7 +249,7 @@ signal xdl_map_fetch_init_next : unsigned(18 downto 0);
 signal xdl_map_read_count_reg : unsigned(7 downto 0); -- integer range 0 to 172;
 signal xdl_map_read_count_next : unsigned(7 downto 0); -- integer range 0 to 172;
 
-type xdl_map_buffer_type is array(0 to 171) of std_logic_vector(7 downto 0);
+type xdl_map_buffer_type is array(0 to 255) of std_logic_vector(7 downto 0);
 signal xdl_map_buffer : xdl_map_buffer_type;
 
 signal xdl_map_buffer_data_in_reg : std_logic_vector(7 downto 0);
@@ -1471,7 +1471,6 @@ begin
 				if xdl_cmd_reg(15) = '0' then
 					xdl_read_state_next <= 1;
 				else
-					xdl_active_next <= '0'; -- XDL vanishes for the rest of the screen
 					xdl_map_active_next <= '0';
 					xdl_ov_active_next <= '0';
 				end if;
