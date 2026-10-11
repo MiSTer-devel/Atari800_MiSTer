@@ -42,6 +42,7 @@ port (
 	reset_n : in std_logic;
 	power_reset : in std_logic := '0';
 	pal : in std_logic := '1';
+	interlace_field_on : in std_logic := '0';
 	addr : in std_logic_vector(4 downto 0); -- 32 registers based at $D640/$D740
 	data_in: in std_logic_vector(7 downto 0); -- for register write
 	wr_en : in std_logic; -- reading or writing registers?
@@ -1548,8 +1549,12 @@ begin
 	if (vsync = '1') then
 		if pal = '1' then
 			xdl_vdelay_next <= 42;
-		elsif ver_127 = '1' then -- VBXE core 1.27 fixed the NTSC bug
-			xdl_vdelay_next <= 12;
+		elsif ver_127 = '1' then -- VBXE core 1.27 fixed the NTSC bug, but has a new one when interlace hack is on
+			if interlace_field_on = '1' then
+				xdl_vdelay_next <= 11;
+			else
+				xdl_vdelay_next <= 12;
+			end if;
 		else
 			-- Account for the PAL/NTSC bug in the original implementation
 			-- This is purposely 1 scanline too low

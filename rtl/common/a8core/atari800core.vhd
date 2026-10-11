@@ -355,6 +355,9 @@ signal memac_request_complete : std_logic;
 
 signal VBXE_IRQ_N : std_logic;
 
+signal gtia_interlace : std_logic;
+signal gtia_interlace_field : std_logic;
+
 -- PBI
 SIGNAL PBI_ADDR_INT : std_logic_vector(15 downto 0);
 
@@ -549,6 +552,7 @@ PORT MAP(
 	POWER_RESET => POWER_RESET,
 	SOFT_RESET => VBXE_SOFT_RESET,
 	PAL => PAL,
+	INTERLACE_FIELD_ON => gtia_interlace and not(gtia_interlace_field),
 	ADDR => PBI_ADDR_INT(4 DOWNTO 0),
 	DATA_IN => WRITE_DATA(7 DOWNTO 0),
 	WR_EN => VBXE_WRITE_ENABLE,
@@ -784,8 +788,8 @@ PORT MAP(CLK => CLK,
 		 HBLANK => open,
 		 VBLANK => open,
 		 interlace_enable => interlace_enable,
-		 interlace => interlace,
-		 interlace_field => interlace_field,
+		 interlace => gtia_interlace,
+		 interlace_field => gtia_interlace_field,
 		 BURST => VIDEO_BURST,
 		 START_OF_FIELD => VIDEO_START_OF_FIELD,
 		 ODD_LINE => VIDEO_ODD_LINE,
@@ -795,7 +799,10 @@ PORT MAP(CLK => CLK,
 -- Both negated and non-negated works, but technically it should be negated (or?)
 GTIA_SOUND <= not(CONSOL_OUT(3));
 
-	-- colour palette
+interlace <= gtia_interlace;
+interlace_field <= gtia_interlace_field;
+
+-- colour palette
 
 gen_palette_none : if palette=0 generate
 	VIDEO_B_GTIA <= COLOUR;
