@@ -52,7 +52,6 @@ module hps_ext
 	output reg        tape_reset,
 	
 	// Emulated cart Flash ping to save
-	// TODO also config bit for auto saving to pass on to Main
 	input             emu_flash_request,
 	input             emu_flash_slave,
 	input             emu_flash_autosave,

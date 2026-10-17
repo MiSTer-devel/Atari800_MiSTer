@@ -7,6 +7,7 @@ use IEEE.STD_LOGIC_MISC.all;
 use work.AudioTypes.all;
 
 ENTITY pokeymax IS
+GENERIC ( version : string := "DEVELOPR" );
 PORT (
 	CLK : IN STD_LOGIC;
 	RESET_N : IN STD_LOGIC;
@@ -128,8 +129,6 @@ signal	readreq_s : std_logic;
 signal	writereq_s : std_logic;
 signal	CLOCK_ENABLE_1MHZ : std_logic;
 signal	CLOCK_ENABLE_2MHZ : std_logic;
-signal	INIT_COMPLETE_REG : std_logic;
-signal	INIT_COMPLETE_NEXT : std_logic;
 
 -- SID
 signal SID_CLK_ENABLE : std_logic;
@@ -261,6 +260,13 @@ signal SID2_ROM_ADDRESS : std_logic_vector(16 downto 0);
 signal SID2_ROM_REQUEST : std_logic;
 signal SID2_ROM_READY : std_logic;
 signal SID2_ROM_READ_DATA : std_logic_vector(31 downto 0);
+
+function getByte(a : string; x : integer) return std_logic_vector is
+	variable ret : std_logic_vector(7 downto 0);
+begin
+	ret := std_logic_vector(to_unsigned(character'pos(a(x)), 8));
+	return ret;
+end function getByte;
 
 function adpcm_step(x: unsigned(6 downto 0)) return unsigned is
 begin
@@ -752,72 +758,72 @@ port map
 
 -- Configuration
 
-process(clk,reset_n)
+process(clk)
 begin
-	if (reset_n='0') then
-		INIT_COMPLETE_REG <= '0';
+	if rising_edge(clk) then
+		if reset_n = '0' then
+			DETECT_RIGHT_REG <= INIT_CONFIG(1);
+			IRQ_EN_REG <= INIT_CONFIG(14);
+			CHANNEL_MODE_REG <= INIT_CONFIG(12);
+			SATURATE_REG <= INIT_CONFIG(13);
+			POST_DIVIDE_REG <= INIT_CONFIG(7 downto 4);
+			GTIA_ENABLE_REG <= INIT_CONFIG(9 downto 8);
+			ADC_VOLUME_REG <= INIT_CONFIG(11 downto 10);
+			--SIO_DATA_VOLUME_REG <= "10"; -- 0=silent,1=quieter,2=normal,3=louder
 
-		DETECT_RIGHT_REG <= '1';
-		IRQ_EN_REG <= '0';
-		CHANNEL_MODE_REG <= '0';
-		SATURATE_REG <= '1';
-		POST_DIVIDE_REG <= "1010"; -- 1/2 5v, 3/4 1v
-		GTIA_ENABLE_REG <= "11"; -- external only
-		ADC_VOLUME_REG <= "10"; -- 0=silent,1=1x,2=2x,3=4x
-		--SIO_DATA_VOLUME_REG <= "10"; -- 0=silent,1=quieter,2=normal,3=louder
-		CONFIG_ENABLE_REG <= '0';
-		VERSION_LOC_REG <= (others=>'0');
-		PAL_REG <= '1';
+			PSG_FREQ_REG <= INIT_CONFIG(27 downto 26);
+			PSG_STEREOMODE_REG <= INIT_CONFIG(32 downto 31);
+			PSG_PROFILESEL_REG <= INIT_CONFIG(29 downto 28);
+			PSG_ENVELOPE16_REG <= INIT_CONFIG(30);
 
-		PSG_FREQ_REG <= "00"; --2MHz
-		PSG_STEREOMODE_REG <= "01"; --Polish
-		PSG_PROFILESEL_REG <= "00"; --Simple log
-		PSG_ENVELOPE16_REG <= '0'; --32 step
-		PSG_PROFILE_READY_REG <= '0';
+			SID_FILTER1_REG <= INIT_CONFIG(22 downto 20);
+			SID_FILTER2_REG <= INIT_CONFIG(25 downto 23);
 
-		SID_FILTER1_REG <= "010"; -- 0=8580,1=6581,2=digifix
-		SID_FILTER2_REG <= "010"; -- 0=8580,1=6581,2=digifix
+			RESTRICT_CAPABILITY_REG <= INIT_CONFIG(19 downto 15);
+			CHANNEL_EN_REG <= INIT_CONFIG(3 downto 2);
 
-		RESTRICT_CAPABILITY_REG <= (others=>'1');
-		CHANNEL_EN_REG <= (others=>'1');
+			MIX_SEL1_REG <= INIT_CONFIG(35 downto 33);
+			MIX_SEL2_REG <= INIT_CONFIG(38 downto 36);
 
-		MIXER_SIGNED_REG(0) <= to_signed(0,16);
-		MIXER_SIGNED_REG(1) <= to_signed(0,16);
-		MIXER_SIGNED_REG(2) <= to_signed(0,16);
-		MIXER_SIGNED_REG(3) <= to_signed(0,16);
-		MIX_SEL1_REG <= (others=>'0');
-		MIX_SEL2_REG <= (others=>'0');
-	elsif rising_edge(clk) then
-		INIT_COMPLETE_REG <= INIT_COMPLETE_NEXT;
+			CONFIG_ENABLE_REG <= '0';
+			VERSION_LOC_REG <= (others=>'0');
+			PAL_REG <= '1';
 
-		DETECT_RIGHT_REG <= DETECT_RIGHT_NEXT;
-		IRQ_EN_REG <= IRQ_EN_NEXT;
-		CHANNEL_MODE_REG <= CHANNEL_MODE_NEXT;
-		SATURATE_REG <= SATURATE_NEXT;
-		POST_DIVIDE_REG <= POST_DIVIDE_NEXT;
-		GTIA_ENABLE_REG <= GTIA_ENABLE_NEXT;
-		ADC_VOLUME_REG <= ADC_VOLUME_NEXT;
-		--SIO_DATA_VOLUME_REG <= SIO_DATA_VOLUME_NEXT;
-		CONFIG_ENABLE_REG <= CONFIG_ENABLE_NEXT;
-		VERSION_LOC_REG <= VERSION_LOC_NEXT;
-		PAL_REG <= PAL_NEXT;
+			PSG_PROFILE_READY_REG <= '0';
 
-		PSG_FREQ_REG <= PSG_FREQ_NEXT;
-		PSG_STEREOMODE_REG <= PSG_STEREOMODE_NEXT;
-		PSG_PROFILESEL_REG <= PSG_PROFILESEL_NEXT;
-		PSG_ENVELOPE16_REG <= PSG_ENVELOPE16_NEXT;
-		PSG_PROFILE_READY_REG <= PSG_PROFILE_READY_NEXT;
+			MIXER_SIGNED_REG(0) <= to_signed(0,16);
+			MIXER_SIGNED_REG(1) <= to_signed(0,16);
+			MIXER_SIGNED_REG(2) <= to_signed(0,16);
+			MIXER_SIGNED_REG(3) <= to_signed(0,16);
+		else
+			DETECT_RIGHT_REG <= DETECT_RIGHT_NEXT;
+			IRQ_EN_REG <= IRQ_EN_NEXT;
+			CHANNEL_MODE_REG <= CHANNEL_MODE_NEXT;
+			SATURATE_REG <= SATURATE_NEXT;
+			POST_DIVIDE_REG <= POST_DIVIDE_NEXT;
+			GTIA_ENABLE_REG <= GTIA_ENABLE_NEXT;
+			ADC_VOLUME_REG <= ADC_VOLUME_NEXT;
+			--SIO_DATA_VOLUME_REG <= SIO_DATA_VOLUME_NEXT;
+			CONFIG_ENABLE_REG <= CONFIG_ENABLE_NEXT;
+			VERSION_LOC_REG <= VERSION_LOC_NEXT;
+			PAL_REG <= PAL_NEXT;
 
-		SID_FILTER1_REG <= SID_FILTER1_NEXT;
-		SID_FILTER2_REG <= SID_FILTER2_NEXT;
+			PSG_FREQ_REG <= PSG_FREQ_NEXT;
+			PSG_STEREOMODE_REG <= PSG_STEREOMODE_NEXT;
+			PSG_PROFILESEL_REG <= PSG_PROFILESEL_NEXT;
+			PSG_ENVELOPE16_REG <= PSG_ENVELOPE16_NEXT;
+			PSG_PROFILE_READY_REG <= PSG_PROFILE_READY_NEXT;
 
-		RESTRICT_CAPABILITY_REG <= RESTRICT_CAPABILITY_NEXT;
-		CHANNEL_EN_REG <= CHANNEL_EN_NEXT;
+			SID_FILTER1_REG <= SID_FILTER1_NEXT;
+			SID_FILTER2_REG <= SID_FILTER2_NEXT;
 
-		MIXER_SIGNED_REG <= MIXER_SIGNED_NEXT;
-		MIX_SEL1_REG <= MIX_SEL1_NEXT;
-		MIX_SEL2_REG <= MIX_SEL2_NEXT;
+			RESTRICT_CAPABILITY_REG <= RESTRICT_CAPABILITY_NEXT;
+			CHANNEL_EN_REG <= CHANNEL_EN_NEXT;
 
+			MIXER_SIGNED_REG <= MIXER_SIGNED_NEXT;
+			MIX_SEL1_REG <= MIX_SEL1_NEXT;
+			MIX_SEL2_REG <= MIX_SEL2_NEXT;
+		end if;
 	end if;
 end process;
 
@@ -963,8 +969,7 @@ process(CONFIG_WRITE_ENABLE, WRITE_DATA, addr_decoded4,
 	RESTRICT_CAPABILITY_REG,
 	CHANNEL_EN_REG,
 	MIX_SEL1_REG, MIX_SEL2_REG,
-	PAL_REG,
-	INIT_COMPLETE_REG,INIT_CONFIG
+	PAL_REG
 )
 begin
 	SATURATE_NEXT <= SATURATE_REG;
@@ -999,33 +1004,7 @@ begin
 	MIX_SEL1_NEXT <= MIX_SEL1_REG;
 	MIX_SEL2_NEXT <= MIX_SEL2_REG;
 
-	INIT_COMPLETE_NEXT <= INIT_COMPLETE_REG;
-
-	if INIT_COMPLETE_REG = '0' then
-		INIT_COMPLETE_NEXT <= '1';
-		DETECT_RIGHT_NEXT <= INIT_CONFIG(1);
-		IRQ_EN_NEXT <= INIT_CONFIG(14);
-		CHANNEL_MODE_NEXT <= INIT_CONFIG(12);
-		SATURATE_NEXT <= INIT_CONFIG(13);
-		POST_DIVIDE_NEXT <= INIT_CONFIG(7 downto 4);
-		GTIA_ENABLE_NEXT <= INIT_CONFIG(9 downto 8);
-		ADC_VOLUME_NEXT <= INIT_CONFIG(11 downto 10);
-		--SIO_DATA_VOLUME_NEXT <= "10";
-
-		PSG_FREQ_NEXT <= INIT_CONFIG(27 downto 26);
-		PSG_STEREOMODE_NEXT <= INIT_CONFIG(32 downto 31);
-		PSG_PROFILESEL_NEXT <= INIT_CONFIG(29 downto 28);
-		PSG_ENVELOPE16_NEXT <= INIT_CONFIG(30);
-
-		SID_FILTER1_NEXT <= INIT_CONFIG(22 downto 20);
-		SID_FILTER2_NEXT <= INIT_CONFIG(25 downto 23);
-
-		RESTRICT_CAPABILITY_NEXT <= INIT_CONFIG(19 downto 15);
-		CHANNEL_EN_NEXT <= INIT_CONFIG(3 downto 2);
-
-		MIX_SEL1_NEXT <= INIT_CONFIG(35 downto 33);
-		MIX_SEL2_NEXT <= INIT_CONFIG(38 downto 36);
-	elsif (CONFIG_WRITE_ENABLE='1') then
+	if (CONFIG_WRITE_ENABLE='1') then
 		if (addr_decoded4(0)='1') then
 			SATURATE_NEXT <= WRITE_DATA(0);
 			CHANNEL_MODE_NEXT <= WRITE_DATA(2);
@@ -1137,26 +1116,7 @@ begin
 	end if;
 
 	if (addr_decoded4(4)='1') then
-		-- version -> 31MiSTer
-		case VERSION_LOC_REG(2 downto 0) is
-			when "000" =>
-				CONFIG_DO <= x"33";
-			when "001" =>
-				CONFIG_DO <= x"31";
-			when "010" =>
-				CONFIG_DO <= x"4D";
-			when "011" =>
-				CONFIG_DO <= x"69";
-			when "100" =>
-				CONFIG_DO <= x"53";
-			when "101" =>
-				CONFIG_DO <= x"54";
-			when "110" =>
-				CONFIG_DO <= x"65";
-			when "111" =>
-				CONFIG_DO <= x"72";
-			when others =>
-		end case;
+		CONFIG_DO <= getByte(version, to_integer(unsigned(version_loc_reg))+1);
 	end if;
 
 	if (addr_decoded4(5)='1') then

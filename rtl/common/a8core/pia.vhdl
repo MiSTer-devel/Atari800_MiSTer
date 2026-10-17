@@ -115,8 +115,8 @@ ARCHITECTURE vhdl OF pia IS
 	
 	signal read_ora : std_logic;
 	signal read_orb : std_logic;
-	
-	signal write_ora : std_logic;
+
+--	signal write_ora : std_logic;
 	signal write_orb : std_logic;
 
 	signal ca1_edge_next : std_logic;
@@ -215,14 +215,14 @@ begin
 		porta_control_next(5 downto 0) <= porta_control_reg(5 downto 0);
 		portb_control_next(5 downto 0) <= portb_control_reg(5 downto 0);
 		
-		write_ora <= '0';
+--		write_ora <= '0';
 		write_orb <= '0';
 		
 		if (wr_en = '1') then
 			if(addr_decoded(0) = '1') then
 				if (porta_control_reg(2) = '1') then
 					porta_output_next <= cpu_data_in;
-					write_ora <= '1';
+--					write_ora <= '1';
 				else
 					porta_direction_next <= cpu_data_in;
 				end if;
@@ -287,7 +287,7 @@ begin
 	
 	-- irq handing
 	-- TODO REVIEW, this stuff is complicated! I think Atari does not need it anyway...
-	process (irqa_reg, porta_control_next, porta_control_reg, read_ora, write_ora, ca2_output_reg, CA1_SYNC, CA1_reg, ca2_in_SYNC, ca2_reg, ca1_edge_reg, ca2_edge_reg, ENABLE_ORIG)
+	process (irqa_reg, porta_control_next, porta_control_reg, read_ora, ca2_output_reg, CA1_SYNC, CA1_reg, ca2_in_SYNC, ca2_reg, ca1_edge_reg, ca2_edge_reg, ENABLE_ORIG)
 		variable irqa_next_proposed : std_logic_vector(1 downto 0);
 	begin
 		irqa_next_proposed(1) := irqa_reg(1) and not(read_ora);

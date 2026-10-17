@@ -49,6 +49,7 @@ component cpu_65xx is
 		we : out std_logic;
 		
 		debugOpcode : out unsigned(7 downto 0);
+		debugJam : out std_logic;
 		debugPc : out unsigned(15 downto 0);
 		debugA : out unsigned(7 downto 0);
 		debugX : out unsigned(7 downto 0);
@@ -61,12 +62,12 @@ end component;
 	signal CPU_ENABLE: std_logic; -- Apply Antic HALT and throttle
 		
 	-- Support for Peter's core (NMI patch applied)
-	signal debugOpcode : unsigned(7 downto 0);
-	signal debugPc : unsigned(15 downto 0);
-	signal debugA : unsigned(7 downto 0);
-	signal debugX : unsigned(7 downto 0);
-	signal debugY : unsigned(7 downto 0);
-	signal debugS : unsigned(7 downto 0);
+--	signal debugOpcode : unsigned(7 downto 0);
+--	signal debugPc : unsigned(15 downto 0);
+--	signal debugA : unsigned(7 downto 0);
+--	signal debugX : unsigned(7 downto 0);
+--	signal debugY : unsigned(7 downto 0);
+--	signal debugS : unsigned(7 downto 0);
 	signal di_unsigned : unsigned(7 downto 0);
    signal do_unsigned : unsigned(7 downto 0);
 	signal addr_unsigned : unsigned(15 downto 0);
@@ -98,12 +99,20 @@ BEGIN
 			q=>do_unsigned,
 			addr=>addr_unsigned,
 			WE=>WE,
-			debugOpcode => debugOpcode,
-			debugPc => debugPc,
-			debugA => debugA,
-			debugX => debugX,
-			debugY => debugY,
-			debugS => debugS
+--			debugOpcode => debugOpcode,
+--			debugPc => debugPc,
+--			debugA => debugA,
+--			debugX => debugX,
+--			debugY => debugY,
+--			debugS => debugS
+			debugOpcode => open,
+			debugJam => open,
+			debugPc => open,
+			debugA => open,
+			debugX => open,
+			debugY => open,
+			debugS => open,
+			debug_flags => open
 		);
 		CPU_ENABLE_RESET <= CPU_ENABLE or reset;
 		not_rdy <= not(rdy) and not(we);

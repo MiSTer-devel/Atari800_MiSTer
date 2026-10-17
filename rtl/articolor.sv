@@ -62,7 +62,7 @@ module articolor
 	input  [7:0] r_in,  g_in,  b_in,
 	input        hbl_in, vbl_in, hs_in, vs_in,
 
-	output reg [7:0] r_out, g_out, b_out,
+	output reg [31:0] r_out, g_out, b_out,
 	output reg       hbl_out, vbl_out, hs_out, vs_out
 );
 
@@ -103,9 +103,9 @@ always @(posedge clk) begin
 		hs[1]  <= hs[0];
 		vs[1]  <= vs[0];
 
-		r_out  <= r_d[1];
-		g_out  <= g_d[1];
-		b_out  <= b_d[1];
+		r_out  <= {24'h0,r_d[1]};
+		g_out  <= {24'h0,g_d[1]};
+		b_out  <= {24'h0,b_d[1]};
 		hbl_out<= hbl[1];
 		vbl_out<= vbl[1];
 		hs_out <= hs[1];
@@ -116,27 +116,27 @@ always @(posedge clk) begin
 				if (colorset) begin
 					// Set 1
 					if (r_d[0] > r_d[1]) begin
-						{_tout, r_out} <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A1C1_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A1C1_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A1C1_B) >> 8;
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A1C1_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A1C1_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A1C1_B) >> 8;
 					end
 					else begin
-						{_tout, r_out} <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A1C1_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A1C1_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A1C1_B) >> 8;
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A1C1_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A1C1_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A1C1_B) >> 8;
 					end
 				end
 				else begin
 					// Set 2
 					if (r_d[0] > r_d[1]) begin
-						{_tout, r_out} <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A2C1_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A2C1_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A2C1_B) >> 8;
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A2C1_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A2C1_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A2C1_B) >> 8;
 					end
 					else begin
-						{_tout, r_out} <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A2C1_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A2C1_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A2C1_B) >> 8;
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A2C1_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A2C1_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A2C1_B) >> 8;
 					end
 				end
 			end
@@ -144,27 +144,27 @@ always @(posedge clk) begin
 				if (colorset) begin
 					// Set 1
 					if (r_d[0] > r_d[1]) begin
-						{_tout, r_out} <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A1C2_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A1C2_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A1C2_B) >> 8;
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A1C2_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A1C2_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A1C2_B) >> 8;
 					end
 					else begin
-						{_tout, r_out} <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A1C2_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A1C2_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A1C2_B) >> 8;
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A1C2_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A1C2_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A1C2_B) >> 8;
 					end
 				end
 				else begin
 					// Set 2
 					if (r_d[0] > r_d[1]) begin
-						{_tout, r_out} <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A2C2_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A2C2_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A2C2_B) >> 8;
+						r_out <= ((255 - r_d[0] + r_d[1]) * r_d[0] + (r_d[0] - r_d[1]) * `A2C2_R) >> 8;
+						g_out <= ((255 - g_d[0] + g_d[1]) * g_d[0] + (g_d[0] - g_d[1]) * `A2C2_G) >> 8;
+						b_out <= ((255 - b_d[0] + b_d[1]) * b_d[0] + (b_d[0] - b_d[1]) * `A2C2_B) >> 8;
 					end
 					else begin
-						{_tout, r_out} <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A2C2_R) >> 8;
-						{_tout, g_out} <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A2C2_G) >> 8;
-						{_tout, b_out} <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A2C2_B) >> 8;
+						r_out <= ((255 - r_d[1] + r_d[0]) * r_d[1] + (r_d[1] - r_d[0]) * `A2C2_R) >> 8;
+						g_out <= ((255 - g_d[1] + g_d[0]) * g_d[1] + (g_d[1] - g_d[0]) * `A2C2_G) >> 8;
+						b_out <= ((255 - b_d[1] + b_d[0]) * b_d[1] + (b_d[1] - b_d[0]) * `A2C2_B) >> 8;
 					end
 				end
 

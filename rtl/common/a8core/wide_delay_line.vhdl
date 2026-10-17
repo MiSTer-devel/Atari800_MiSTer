@@ -44,7 +44,11 @@ BEGIN
 		shift_next <= shift_reg;
 				
 		if (enable = '1') then
-			shift_next <= data_in&shift_reg(COUNT-1 downto 1);
+			if COUNT > 1 then
+				shift_next <= data_in&shift_reg(COUNT-1 downto 1);
+			else
+				shift_next(0) <= data_in;
+			end if;
 		end if;		
 		
 		if (sync_reset = '1') then

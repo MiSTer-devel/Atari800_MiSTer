@@ -14,6 +14,7 @@ set_global_assignment -name VHDL_FILE rtl/common/a8core/enable_divider.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia_palette.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia_player.vhdl
+set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia_priority_store.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/gtia_priority.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/irq_glue.vhdl
 set_global_assignment -name VHDL_FILE rtl/common/a8core/pbi_rom.vhdl
