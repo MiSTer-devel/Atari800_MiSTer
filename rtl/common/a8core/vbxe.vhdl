@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------
--- (c) 2025 Wojciech Mostowski, firstname.lastname at gmail.com
+-- (c) 2026 Wojciech Mostowski, firstname.lastname at gmail.com
 --
 -- The main part of VBXE: memory DMA, MEMAC, XDL processing, image output.
 --
@@ -24,17 +24,25 @@ use IEEE.STD_LOGIC_MISC.ALL;
 
 entity VBXE is
 generic ( 
-	cycle_length : integer := 16 -- Currently unused, but leave just in case
+	cycle_length : integer := 16; -- Currently unused, but leave just in case
+	atmap_bram : boolean := true;
+	palette_path : string := "rtl/vbxe/"
 );
 port (
 	clk : in std_logic;
 	enable : in std_logic;
-	ntsc_fix : in std_logic := '0';
+	ver_127 : in std_logic := '0';
 	turbo : in std_logic := '0';
+	gtia_clip_in : in std_logic := '0';
+	gtia_clip_out : out std_logic;
+	gtia_xcolor_in : in std_logic := '0';
+	gtia_xcolor_out : out std_logic;
 	soft_reset : in std_logic;
 	enable_179 : in std_logic; -- Original Atari speed (based on Antic enable, always active)
 	reset_n : in std_logic;
+	power_reset : in std_logic := '0';
 	pal : in std_logic := '1';
+	interlace_field_on : in std_logic := '0';
 	addr : in std_logic_vector(4 downto 0); -- 32 registers based at $D640/$D740
 	data_in: in std_logic_vector(7 downto 0); -- for register write
 	wr_en : in std_logic; -- reading or writing registers?
@@ -70,7 +78,8 @@ port (
 	gtia_active_hr : in std_logic_vector(1 downto 0);
 	gtia_active_hr_mod : out std_logic_vector(1 downto 0);
 	gtia_prior : in std_logic_vector(7 downto 0);
-	gtia_prior_raw : in std_logic_vector(7 downto 0);
+	gtia_prior_mod : out std_logic_vector(9 downto 0);
+	gtia_prior_raw : in std_logic_vector(9 downto 0);
 	gtia_pf0 : in std_logic_vector(7 downto 0);
 	gtia_pf1 : in std_logic_vector(7 downto 0);
 	gtia_pf2 : in std_logic_vector(7 downto 0);
@@ -249,9 +258,6 @@ signal xdl_map_fetch_init_next : unsigned(18 downto 0);
 signal xdl_map_read_count_reg : unsigned(7 downto 0); -- integer range 0 to 172;
 signal xdl_map_read_count_next : unsigned(7 downto 0); -- integer range 0 to 172;
 
-type xdl_map_buffer_type is array(0 to 255) of std_logic_vector(7 downto 0);
-signal xdl_map_buffer : xdl_map_buffer_type;
-
 signal xdl_map_buffer_data_in_reg : std_logic_vector(7 downto 0);
 signal xdl_map_buffer_data_in_next : std_logic_vector(7 downto 0);
 signal xdl_map_buffer_data_out : std_logic_vector(31 downto 0);
@@ -336,6 +342,18 @@ signal xdl_vcount_next : integer range 0 to 255;
 
 signal xcolor_reg : std_logic;
 signal xcolor_next : std_logic;
+signal xcolor2_reg : std_logic;
+signal xcolor2_next : std_logic;
+signal clip_reg : std_logic;
+signal clip_next : std_logic;
+signal gtia_palette_reg : std_logic_vector(1 downto 0);
+signal gtia_palette_next : std_logic_vector(1 downto 0);
+signal gtia_pfeat_reg : std_logic := '0';
+signal gtia_pfeat_next : std_logic;
+signal gtia_xcolor_reg : std_logic := '0';
+signal gtia_xcolor_next : std_logic;
+signal gtia_clip_reg : std_logic := '0';
+signal gtia_clip_next : std_logic;
 signal no_trans_reg : std_logic;
 signal no_trans_next : std_logic;
 signal trans15_reg : std_logic;
@@ -365,33 +383,34 @@ process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_pri
 	xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,xdl_pixel_sindex_reg,
 	p0_reg,p1_reg,p2_reg,p3_reg,xdl_map_buffer_index_reg,coldetect_reg,colclear,gtia_hpos,xdl_map_active_reg,
 	xdl_mapscr_h_reg,xdl_ov_active_reg,xdl_ovscr_h_reg,video_clock_antic_highres,xdl_ov_live_reg,
-	colmask_reg,no_trans_reg,trans15_reg,video_clock_vbxe)
-	variable flip_23 : boolean;
+	colmask_reg,no_trans_reg,trans15_reg,video_clock_vbxe,video_clock_antic_lowres,xcolor_reg,xcolor2_reg,ver_127)
 	variable ov_prior : std_logic_vector(7 downto 0);
-	variable gtia_prior_adj : std_logic_vector(7 downto 0);
+	variable flip_23 : boolean;
+	variable flip_21 : boolean;
+	variable gtia_active_hr_adj : std_logic_vector(1 downto 0);
+	variable gtia_highres_adj : std_logic;
 begin
 	xdl_map_buffer_index_next <= xdl_map_buffer_index_reg;
 	xdl_map_sindex_next <= xdl_map_sindex_reg;
 	xdl_pixel_sindex_next <= xdl_pixel_sindex_reg;
 	coldetect_next <= coldetect_reg;
-	gtia_highres_mod <= gtia_highres;
-	gtia_active_hr_mod <= gtia_active_hr;
 	map_pf0 <= gtia_pf0;
 	map_pf1 <= gtia_pf1;
 	map_pf2 <= gtia_pf2;
-	xdl_pf_palette <= "00";
-	xdl_ov_palette <= "00";
+	xdl_pf_palette <= xdl_pf_pal_reg;
+	xdl_ov_palette <= xdl_ov_pal_reg;
 	xdl_ov_pixel <= (others => '0');
 	xdl_ov_pixel_active <= '0';
-	gtia_prior_adj := gtia_prior;
+	gtia_prior_mod <= gtia_prior_raw;
+	gtia_highres_adj := gtia_highres;
+	gtia_active_hr_adj := gtia_active_hr;
 	ov_prior := x"00";
 	flip_23 := false;
+	flip_21 := false;
 	if colclear = '1' then
 		coldetect_next <= (others => '0');
 	end if;
 	if (xdl_active_reg = '1') and (enable = '1') then
-		xdl_pf_palette <= xdl_pf_pal_reg;
-		xdl_ov_palette <= xdl_ov_pal_reg;
 		ov_prior := xdl_gp_reg;
 		if (gtia_hpos = x"10") then -- arbitrary, as long as it's before anything gets displayed
 			if (xdl_map_active_reg = '1') then
@@ -407,57 +426,71 @@ begin
 			end if;
 		end if;
 		if xdl_map_live_reg = '1' then
-			map_pf0 <= xdl_map_buffer_data_out(31 downto 24);
-			map_pf1 <= xdl_map_buffer_data_out(23 downto 16);
-			if (gtia_highres xor xdl_map_buffer_data_out(2)) = '1' then
+			map_pf1 <= xdl_map_buffer_data_out(15 downto 8);
+			map_pf2 <= xdl_map_buffer_data_out(23 downto 16);
+			if xdl_map_buffer_data_out(26) = '1' then
+				gtia_prior_mod(9) <= '1';
+				if gtia_highres = '0' then
+					-- change from lowres to highres
+					gtia_highres_adj := '1';
+					gtia_prior_mod(8 downto 4) <= "00100"; -- TODO new XCOLOR here
+					if gtia_prior_raw(4) = '1' then
+						gtia_active_hr_adj := "01";
+					elsif gtia_prior_raw(5) = '1' then
+						gtia_active_hr_adj := "10";
+					elsif (gtia_prior_raw(6) or gtia_prior_raw(7)) = '1' then
+						gtia_active_hr_adj := "11";
+					elsif gtia_prior_raw(8) = '1' then
+						gtia_active_hr_adj := "00";
+					end if;
+				else
+					-- change from highres to lowres
+					gtia_highres_adj := '0';
+					-- gtia_active_hr_adj := "00"; -- not needed really...
+					case gtia_active_hr is
+					when "00" =>
+						gtia_prior_mod(7 downto 4) <= "0001"; -- PF0
+					when "01" =>
+						gtia_prior_mod(7 downto 4) <= "0010"; -- PF1
+					when "10" => 
+						gtia_prior_mod(7 downto 4) <= "0100"; -- PF2
+					when "11" => 
+						gtia_prior_mod(7 downto 4) <= "1000"; -- PF3
+					end case;
+				end if;
+			end if;
+			if gtia_highres_adj = '0' then
+				map_pf0 <= xdl_map_buffer_data_out(7 downto 0);
+			else
+				gtia_prior_mod(9) <= '1';
 				case xdl_map_wd_reg(4 downto 3) is
 				when "00" =>
-				if xdl_map_buffer_data_out(31-to_integer(xdl_map_sindex_reg(2 downto 0))) = '1' then
+				if xdl_map_buffer_data_out(7-to_integer(xdl_map_sindex_reg(2 downto 0))) = '1' then
 					flip_23 := true;
 				end if;
 				when "01" =>
-				if xdl_map_buffer_data_out(31-to_integer(xdl_map_sindex_reg(3 downto 1))) = '1' then
+				if xdl_map_buffer_data_out(7-to_integer(xdl_map_sindex_reg(3 downto 1))) = '1' then
 					flip_23 := true;
 				end if;
 				when others =>
-				if xdl_map_buffer_data_out(31-to_integer(xdl_map_sindex_reg(4 downto 2))) = '1' then
+				if xdl_map_buffer_data_out(7-to_integer(xdl_map_sindex_reg(4 downto 2))) = '1' then
 					flip_23 := true;
 				end if;
 				end case;
-				if gtia_highres = '0' then
-					gtia_highres_mod <= '1';
-					if gtia_prior_raw(4) = '1' then
-						gtia_active_hr_mod <= "01";
-					elsif gtia_prior_raw(5) = '1' then
-						gtia_active_hr_mod <= "10";
-					elsif gtia_prior_raw(6) = '1' then
-						gtia_active_hr_mod <= "11";
-					elsif gtia_prior_raw(7) = '1' then
-						gtia_active_hr_mod <= "00";
+				if flip_23 then
+					gtia_prior_mod(6) <= '0'; -- PF2
+					if ver_127 = '1' and xcolor2_reg = '1' then
+						gtia_prior_mod(4) <= '1'; -- PF0
+						flip_21 := true;
+					else
+						gtia_prior_mod(7) <= '1'; -- PF3
 					end if;
 				end if;
 			end if;
-			if flip_23 then
-				map_pf2 <= gtia_pf3;
-			else
-				map_pf2 <= xdl_map_buffer_data_out(15 downto 8);
-				if (gtia_highres and xdl_map_buffer_data_out(2)) = '1' then
-					gtia_active_hr_mod <= "00";
-					case gtia_active_hr is
-					when "00" =>
-						map_pf2 <= xdl_map_buffer_data_out(31 downto 24);
-						gtia_prior_adj(6 downto 4) := "001";
-					when "01" =>
-						map_pf2 <= xdl_map_buffer_data_out(23 downto 16);
-						gtia_prior_adj(6 downto 4) := "010";
-					when "10" => null;
-					when "11" => map_pf2 <= gtia_pf3;
-					end case;
-				end if;  
-			end if;
-			xdl_pf_palette <= xdl_map_buffer_data_out(7 downto 6);
-			xdl_ov_palette <= xdl_map_buffer_data_out(5 downto 4);
-			case xdl_map_buffer_data_out(1 downto 0) is
+
+			xdl_pf_palette <= xdl_map_buffer_data_out(31 downto 30);
+			xdl_ov_palette <= xdl_map_buffer_data_out(29 downto 28);
+			case xdl_map_buffer_data_out(25 downto 24) is
 				when "00" => ov_prior := p0_reg;
 				when "01" => ov_prior := p1_reg;
 				when "10" => ov_prior := p2_reg;
@@ -465,20 +498,24 @@ begin
 			end case;
 			if (video_clock_antic_highres = '1') then
 				if xdl_map_sindex_reg = xdl_map_wd_reg then
+					if xdl_map_buffer_index_reg = to_unsigned(42,6) and ver_127 = '1' then
+						xdl_map_buffer_index_next <= "000000";
+					else
+						xdl_map_buffer_index_next <= xdl_map_buffer_index_reg + 1;
+					end if;
 					xdl_map_sindex_next <= "00000";
-					xdl_map_buffer_index_next <= xdl_map_buffer_index_reg + 1;
 				else
 					xdl_map_sindex_next <= xdl_map_sindex_reg + 1;
 				end if;
 			end if;
 		end if;
 		
-		if (xdl_ov_live_reg = '1') and (or_reduce(gtia_prior_adj and ov_prior) = '1') then
+		if (xdl_ov_live_reg = '1') and (or_reduce(gtia_prior and ov_prior) = '1') then
 			xdl_ov_pixel <= xdl_pixels_reg(xdl_pixel_sindex_reg);
 			xdl_ov_pixel_active <= not(xdl_ptrans_reg(xdl_pixel_sindex_reg));
 			if xdl_ptrans_reg(xdl_pixel_sindex_reg) = '0' then
 				if colmask_reg(to_integer(unsigned(xdl_pixels_reg(xdl_pixel_sindex_reg)(7 downto 5)))) = '1' then
-					coldetect_next <= coldetect_reg or ((xdl_map_buffer_data_out(3) and xdl_map_active_reg) & gtia_prior_adj(6 downto 0));
+					coldetect_next <= coldetect_reg or ((xdl_map_buffer_data_out(27) and xdl_map_active_reg) & gtia_prior(6 downto 0));
 				end if;
 			end if;
 			if (no_trans_reg = '0') and (trans15_reg = '1') and (xdl_pixels_reg(xdl_pixel_sindex_reg)(3 downto 0) = x"F") then
@@ -493,6 +530,24 @@ begin
 			end if;
 		end if;
 	end if;
+
+    if gtia_highres_adj = '1' and xcolor_reg = '1' and gtia_active_hr_adj(to_integer(unsigned'('0' & video_clock_antic_lowres))) = '1' then
+		gtia_prior_mod(9) <= '1';
+        gtia_prior_mod(5) <= '1'; -- PF1
+		if flip_23 then
+			if flip_21 then
+				gtia_prior_mod(4) <= '0'; -- PF0
+			else
+				gtia_prior_mod(7) <= '0'; -- PF3
+			end if;
+		else
+			gtia_prior_mod(6) <= '0'; -- PF2
+		end if;
+    end if;
+
+	gtia_active_hr_mod <= gtia_active_hr_adj;
+	gtia_highres_mod <= gtia_highres_adj;
+
 end process;
 
 xcolor <= xcolor_reg;
@@ -500,6 +555,8 @@ ov_palette <= xdl_ov_palette;
 pf_palette <= xdl_pf_palette;
 ov_pixel <= xdl_ov_pixel;
 ov_pixel_active <= xdl_ov_pixel_active;
+gtia_xcolor_out <= xcolor2_reg;
+gtia_clip_out <= clip_reg;
 
 irq_n <= not(enable and blitter_irqen_reg and blitter_irq);
 
@@ -508,6 +565,7 @@ port map (
 	clk => clk,
 	reset_n => reset_n,
 	soft_reset => soft_reset,
+	ver_127 => ver_127,
 	blitter_enable => blitter_enable,
 	blitter_start_request => blitter_request(0),
 	blitter_stop_request => blitter_request(1),
@@ -607,7 +665,7 @@ cb_data_in <= VBXE_UPLOAD_PALETTE_COLOR when VBXE_UPLOAD_PALETTE_RGB(2) = '1' el
 color_index_out <= (palette_get_index & palette_get_color);
 
 colors0_r: entity work.dpram
-generic map(10,7,"rtl/vbxe/pal_r.mif")
+generic map(10,7,palette_path&"pal_r.mif")
 port map
 (
 	clock => clk,
@@ -619,7 +677,7 @@ port map
 );
 
 colors0_g: entity work.dpram
-generic map(10,7,"rtl/vbxe/pal_g.mif")
+generic map(10,7,palette_path&"pal_g.mif")
 port map
 (
 	clock => clk,
@@ -631,7 +689,7 @@ port map
 );
 
 colors0_b: entity work.dpram
-generic map(10,7,"rtl/vbxe/pal_b.mif")
+generic map(10,7,palette_path&"pal_b.mif")
 port map
 (
 	clock => clk,
@@ -643,8 +701,9 @@ port map
 );
 
 -- write registers
-process(addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg, trans15_reg, no_trans_reg,
-	blitter_addr_reg, blitter_status, blitter_irqen_reg, xdl_enabled_reg, xcolor_reg, pal, xdl_addr_reg, p0_reg, p1_reg, p2_reg, p3_reg, colmask_reg)
+process(reset_n, addr, wr_en, soft_reset, data_in, csel_reg, psel_reg, cr_reg, cg_reg, cb_reg, cb_request_reg, memc_reg, mems_reg, memb_reg, trans15_reg, no_trans_reg,
+	blitter_addr_reg, blitter_status, blitter_irqen_reg, xdl_enabled_reg, xcolor_reg, pal, xdl_addr_reg, p0_reg, p1_reg, p2_reg, p3_reg, colmask_reg,
+	xcolor2_reg, clip_reg, gtia_xcolor_in, gtia_xcolor_reg, gtia_clip_in, gtia_clip_reg, gtia_palette_reg, gtia_pfeat_reg, ver_127, power_reset)
 begin
 		csel_next <= csel_reg;
 		psel_next <= psel_reg;
@@ -663,6 +722,12 @@ begin
 		blitter_irqc <= '0';
 		xdl_enabled_next <= xdl_enabled_reg;
 		xcolor_next <= xcolor_reg;
+		xcolor2_next <= xcolor2_reg;
+		clip_next <= clip_reg;
+		gtia_palette_next <= gtia_palette_reg;
+		gtia_pfeat_next <= gtia_pfeat_reg;
+		gtia_clip_next <= gtia_clip_reg;
+		gtia_xcolor_next <= gtia_xcolor_reg;
 		trans15_next <= trans15_reg;
 		no_trans_next <= no_trans_reg;
 		xdl_addr_next <= xdl_addr_reg;
@@ -678,6 +743,9 @@ begin
 				when "00000" =>
 					xdl_enabled_next <= data_in(0);
 					xcolor_next <= data_in(1);
+					if ver_127 = '1' then -- TODO protect bit? 
+						xcolor2_next <= '0';
+					end if;
 					no_trans_next <= data_in(2);
 					trans15_next <= data_in(3);
 				when "00001" =>
@@ -704,6 +772,14 @@ begin
 					colmask_next <= data_in;
 				when "01010" => -- $4A collision clear
 					colclear <= '1';
+				when "01011" => -- $4B 1.27 features
+					if ver_127 = '1' then
+						gtia_palette_next <= data_in(1 downto 0);
+						xcolor_next <= data_in(4);
+						xcolor2_next <= data_in(3);
+						clip_next <= data_in(5);
+						gtia_pfeat_next <= data_in(7);
+					end if;
 				-- Blitter
 				when "10000" => -- $50 bl_adr0
 					blitter_addr_next(7 downto 0) <= data_in;
@@ -742,7 +818,6 @@ begin
 		end if;
 		if soft_reset = '1' then
 			xdl_enabled_next <= '0';
-			xcolor_next <= '0';
 			no_trans_next <= '0';
 			trans15_next <= '0';
 			memc_next(3 downto 2) <= "00";
@@ -750,21 +825,44 @@ begin
 			memb_next(7 downto 6) <= "00";
 			blitter_irqen_next <= '0';
 			blitter_request <= "00";
-			colclear <= '1';
-			colmask_next <= (others => '0');
+			if gtia_pfeat_reg = '0' then
+				gtia_palette_next <= "00";
+				xcolor_next <= '0';
+				xcolor2_next <= gtia_xcolor_in;
+				clip_next <= gtia_clip_in;
+			end if;
+		end if;
+
+		if gtia_clip_in /= gtia_clip_reg then
+			clip_next <= gtia_clip_in;
+			gtia_clip_next <= gtia_clip_in;
+		end if;
+		if gtia_xcolor_in /= gtia_xcolor_reg then
+			xcolor2_next <= gtia_xcolor_in;
+			gtia_xcolor_next <= gtia_xcolor_in;
+		end if;
+
+		if power_reset = '1' then
+			gtia_pfeat_next <= '0';
 		end if;
 end process;
 
 -- Read registers
-process(addr, memc_reg, mems_reg, blitter_status, blitter_collision, blitter_irq, blitter_irqen_reg, coldetect_reg)
+process(addr, memc_reg, mems_reg, blitter_status, blitter_collision, blitter_irq, blitter_irqen_reg, coldetect_reg,
+	gtia_pfeat_reg, clip_reg, xcolor_reg, xcolor2_reg, gtia_palette_reg, ver_127)
 begin
+	data_out <= X"FF";
 	case addr is
 		when "00000" => -- $40 core version -> FX
 			data_out <= X"10";
 		when "00001" => -- $41 minor version
-			data_out <= X"26";
+			data_out <= "0010011"&ver_127;
 		when "01010" => -- $4A raster collision detection
 			data_out <= coldetect_reg;
+		when "01011" => -- $4B 1.27 features
+			if ver_127 = '1' then
+				data_out <= gtia_pfeat_reg & '0' & clip_reg & xcolor_reg & xcolor2_reg & '0' & gtia_palette_reg;
+			end if;
 		when "10000" => -- $50 collision_code
 			data_out <= blitter_collision;
 		when "10011" => -- $53 blitter busy
@@ -777,187 +875,205 @@ begin
 		when "11111" => -- $5F memac_banksel
 			data_out <= mems_reg;
 		when others =>
-			data_out <= X"FF";
 	end case;
 end process;
 
-process(clk, reset_n)
+process(clk)
 begin
-	if (reset_n = '0') then
-		csel_reg <= (others => 'U');
-		psel_reg <= (others => 'U');
-		cr_reg <= (others => 'U');
-		cg_reg <= (others => 'U');
-		cb_reg <= (others => 'U');
-		cb_request_reg <= '0';
-		p0_reg <= (others => '0'); -- TODO what is the default here? Altirra sets this to 0?
-		p1_reg <= (others => '0');
-		p2_reg <= (others => '0');
-		p3_reg <= (others => '0');
-		memc_reg <= "UUUU00UU";
-		mems_reg <= "0UUUUUUU";
-		memb_reg <= "00UUUUUU";
-		dma_state_reg <= "1111";
---		dma_wait_reg <= 0;
+	if rising_edge(clk) then
+		if (reset_n = '0') then
+			cb_request_reg <= '0';
+			memc_reg(3 downto 2) <= "00";
+			mems_reg(7) <= '0';
+			memb_reg(7 downto 6) <= "00";
+			dma_state_reg <= "1111";
+			-- dma_wait_reg <= 0;
 
-		memac_request_reg <= "00";
-		memac_pending_reg <= '0';
-		memac_serviced_reg <= '0';
-		vram_pending_reg <= '0';
-		blitter_addr_reg <= (others => 'U');
-		blitter_irqen_reg <= '0';
-		blitter_vram_data_in_reg <= (others => 'U'); 
-		blitter_pending_reg <= '0';
-		xdl_addr_reg <= (others => 'U');
-		xdl_fetch_reg <= (others => 'U');
-		xdl_enabled_reg <= '0';
-		xdl_pending_reg <= '0';
-		xdl_cmd_reg <= (others => '0');
-		xdl_read_state_reg <= 0;
+			memac_request_reg <= "00";
+			memac_pending_reg <= '0';
+			memac_serviced_reg <= '0';
+			vram_pending_reg <= '0';
+			blitter_irqen_reg <= '0';
+			blitter_pending_reg <= '0';
+			xdl_enabled_reg <= '0';
+			xdl_pending_reg <= '0';
+			xdl_cmd_reg <= (others => '0');
+			xdl_read_state_reg <= 0;
 
-		xdl_active_reg <= '0';
-		xdl_cmd_reg <= (others => '0');
-		xdl_rptl_reg <= (others => '0');
-		xdl_ovaddr_reg <= (others => '0');
-		xdl_ovaddr_step_reg <= (others => '0');
-		xdl_ovscr_h_reg <= "000";
-		xdl_ovscr_v_reg <= "000";
-		xdl_chbase_reg <= (others => '0');
-		xdl_mapaddr_reg <= (others => '0');
-		xdl_mapaddr_step_reg <= (others => '0');
-		xdl_mapscr_h_reg <= "00000";
-		xdl_mapscr_v_reg <= "00000";
-		xdl_map_wd_reg <= "00000";
-		xdl_map_ht_reg <= "00000";
-		xdl_ov_size_reg <= "00";
-		xdl_ov_pal_reg <= "00";
-		xdl_pf_pal_reg <= "00";
-		xdl_gp_reg <= (others => '1');
+			xdl_active_reg <= '0';
+			xdl_cmd_reg <= (others => '0');
+			xdl_rptl_reg <= (others => '0');
+			xdl_ovaddr_reg <= (others => '0');
+			xdl_ovaddr_step_reg <= (others => '0');
+			xdl_ovscr_h_reg <= "000";
+			xdl_ovscr_v_reg <= "000";
+			xdl_chbase_reg <= (others => '0');
+			xdl_mapaddr_reg <= (others => '0');
+			xdl_mapaddr_step_reg <= (others => '0');
+			xdl_mapscr_h_reg <= "00000";
+			xdl_mapscr_v_reg <= "00000";
+			xdl_map_wd_reg <= "00000";
+			xdl_map_ht_reg <= "00000";
+			xdl_ov_size_reg <= "00";
+			xdl_ov_pal_reg <= "00";
+			xdl_pf_pal_reg <= "00";
+			xdl_gp_reg <= (others => '1');
 
-		xdl_map_vcount_reg <= "00000";
-		xdl_map_read_reg <= '0';
-		xdl_map_active_reg <= '0';
-		xdl_map_fetch_reg <= (others => '0');
-		xdl_map_fetch_init_reg <= (others => '0');
-		xdl_map_read_count_reg <= (others => '0');
-		xdl_map_buffer_index_reg <= (others => '0');
-		xdl_map_sindex_reg <= "00000";
-		xdl_map_buffer_data_in_reg <= (others => '0');
-		xdl_map_live_reg <= '0';
-		xdl_vdelay_reg <= 0;
-		xcolor_reg <= '0';
-		no_trans_reg <= '0';
-		trans15_reg <= '0';
-		xdl_ov_active_reg <= '0';
-		xdl_ov_live_reg <= '0';
-		xdl_ov_tlive_reg <= '0';
-		xdl_ov_vcount_reg <= "000";
-		xdl_ov_fetch_reg <= (others => '0');
-		xdl_ov_fetch_init_reg <= (others => '0');
-		xdl_ov_text_reg <= '0';
-		xdl_ov_hi_reg <= '0';
-		xdl_ov_lo_reg <= '0';
+			xdl_map_vcount_reg <= "00000";
+			xdl_map_read_reg <= '0';
+			xdl_map_active_reg <= '0';
+			xdl_map_fetch_reg <= (others => '0');
+			xdl_map_fetch_init_reg <= (others => '0');
+			xdl_map_read_count_reg <= (others => '0');
+			xdl_map_buffer_index_reg <= (others => '0');
+			xdl_map_sindex_reg <= "00000";
+			xdl_map_buffer_data_in_reg <= (others => '0');
+			xdl_map_live_reg <= '0';
+			xdl_vdelay_reg <= 0;
+			if gtia_pfeat_reg = '0' then
+				xcolor_reg <= '0';
+				xcolor2_reg <= gtia_xcolor_in;
+				clip_reg <= gtia_clip_in;
+				gtia_palette_reg <= "00";
+			end if;
+			no_trans_reg <= '0';
+			trans15_reg <= '0';
+			xdl_ov_active_reg <= '0';
+			xdl_ov_live_reg <= '0';
+			xdl_ov_tlive_reg <= '0';
+			xdl_ov_vcount_reg <= "000";
+			xdl_ov_fetch_reg <= (others => '0');
+			xdl_ov_fetch_init_reg <= (others => '0');
+			xdl_ov_text_reg <= '0';
+			xdl_ov_hi_reg <= '0';
+			xdl_ov_lo_reg <= '0';
 
-		xdl_pixel_sindex_reg <= 0;
-		xdl_pixel_buffer_windex_reg <= 0;
-		xdl_pixels_reg <= (others => (others => '0'));
-		xdl_ptrans_reg <= (others => '0');
-		xdl_char_code_reg <= (others => '0');
-		xdl_char_attr_reg <= (others => '0');
-		xdl_vcount_reg <= 0;
+			xdl_pixel_sindex_reg <= 0;
+			xdl_pixel_buffer_windex_reg <= 0;
+			xdl_pixels_reg <= (others => (others => '0'));
+			xdl_ptrans_reg <= (others => '0');
+			xdl_char_code_reg <= (others => '0');
+			xdl_char_attr_reg <= (others => '0');
+			xdl_vcount_reg <= 0;
 
-		colmask_reg <= (others => '0');
-		coldetect_reg <= (others => '0');
+		else
+			csel_reg <= csel_next;
+			psel_reg <= psel_next;
+			cr_reg <= cr_next;
+			cg_reg <= cg_next;
+			cb_reg <= cb_next;
+			cb_request_reg <= cb_request_next;
+			memc_reg <= memc_next;
+			mems_reg <= mems_next;
+			memb_reg <= memb_next;
+			p0_reg <= p0_next;
+			p1_reg <= p1_next;
+			p2_reg <= p2_next;
+			p3_reg <= p3_next;
 
-	elsif rising_edge(clk) then
-		csel_reg <= csel_next;
-		psel_reg <= psel_next;
-		cr_reg <= cr_next;
-		cg_reg <= cg_next;
-		cb_reg <= cb_next;
-		cb_request_reg <= cb_request_next;
-		memc_reg <= memc_next;
-		mems_reg <= mems_next;
-		memb_reg <= memb_next;
-		p0_reg <= p0_next;
-		p1_reg <= p1_next;
-		p2_reg <= p2_next;
-		p3_reg <= p3_next;
+			dma_state_reg <= dma_state_next;
+			-- dma_wait_reg <= dma_wait_next;
+			memac_request_reg <= memac_request_next;
+			memac_pending_reg <= memac_pending_next;
+			memac_serviced_reg <= memac_serviced_next;
+			vram_pending_reg <= vram_pending_next;
+			blitter_addr_reg <= blitter_addr_next;
+			blitter_irqen_reg <= blitter_irqen_next;
+			blitter_vram_data_in_reg <= blitter_vram_data_in_next;
+			blitter_pending_reg <= blitter_pending_next;
+			xdl_addr_reg <= xdl_addr_next;
+			xdl_fetch_reg <= xdl_fetch_next;
+			xdl_enabled_reg <= xdl_enabled_next;
+			xdl_pending_reg <= xdl_pending_next;
+			xdl_cmd_reg <= xdl_cmd_next;
+			xdl_read_state_reg <= xdl_read_state_next;
 
-		dma_state_reg <= dma_state_next;
---		dma_wait_reg <= dma_wait_next;
-		memac_request_reg <= memac_request_next;
-		memac_pending_reg <= memac_pending_next;
-		memac_serviced_reg <= memac_serviced_next;
-		vram_pending_reg <= vram_pending_next;
-		blitter_addr_reg <= blitter_addr_next;
-		blitter_irqen_reg <= blitter_irqen_next;
-		blitter_vram_data_in_reg <= blitter_vram_data_in_next;
-		blitter_pending_reg <= blitter_pending_next;
-		xdl_addr_reg <= xdl_addr_next;
-		xdl_fetch_reg <= xdl_fetch_next;
-		xdl_enabled_reg <= xdl_enabled_next;
-		xdl_pending_reg <= xdl_pending_next;
-		xdl_cmd_reg <= xdl_cmd_next;
-		xdl_read_state_reg <= xdl_read_state_next;
+			xdl_active_reg <= xdl_active_next;
+			xdl_cmd_reg <= xdl_cmd_next;
+			xdl_rptl_reg <= xdl_rptl_next;
+			xdl_ovaddr_reg <= xdl_ovaddr_next;
+			xdl_ovaddr_step_reg <= xdl_ovaddr_step_next;
+			xdl_ovscr_h_reg <= xdl_ovscr_h_next;
+			xdl_ovscr_v_reg <= xdl_ovscr_v_next;
+			xdl_chbase_reg <= xdl_chbase_next;
+			xdl_mapaddr_reg <= xdl_mapaddr_next;
+			xdl_mapaddr_step_reg <= xdl_mapaddr_step_next;
+			xdl_mapscr_h_reg <= xdl_mapscr_h_next;
+			xdl_mapscr_v_reg <= xdl_mapscr_v_next;
+			xdl_map_wd_reg <= xdl_map_wd_next;
+			xdl_map_ht_reg <= xdl_map_ht_next;
+			xdl_ov_size_reg <= xdl_ov_size_next;
+			xdl_ov_pal_reg <= xdl_ov_pal_next;
+			xdl_pf_pal_reg <= xdl_pf_pal_next;
+			xdl_gp_reg <= xdl_gp_next;
 
-		xdl_active_reg <= xdl_active_next;
-		xdl_cmd_reg <= xdl_cmd_next;
-		xdl_rptl_reg <= xdl_rptl_next;
-		xdl_ovaddr_reg <= xdl_ovaddr_next;
-		xdl_ovaddr_step_reg <= xdl_ovaddr_step_next;
-		xdl_ovscr_h_reg <= xdl_ovscr_h_next;
-		xdl_ovscr_v_reg <= xdl_ovscr_v_next;
-		xdl_chbase_reg <= xdl_chbase_next;
-		xdl_mapaddr_reg <= xdl_mapaddr_next;
-		xdl_mapaddr_step_reg <= xdl_mapaddr_step_next;
-		xdl_mapscr_h_reg <= xdl_mapscr_h_next;
-		xdl_mapscr_v_reg <= xdl_mapscr_v_next;
-		xdl_map_wd_reg <= xdl_map_wd_next;
-		xdl_map_ht_reg <= xdl_map_ht_next;
-		xdl_ov_size_reg <= xdl_ov_size_next;
-		xdl_ov_pal_reg <= xdl_ov_pal_next;
-		xdl_pf_pal_reg <= xdl_pf_pal_next;
-		xdl_gp_reg <= xdl_gp_next;
+			xdl_map_vcount_reg <= xdl_map_vcount_next;
+			xdl_map_read_reg <= xdl_map_read_next;
+			xdl_map_active_reg <= xdl_map_active_next;
+			xdl_map_fetch_reg <= xdl_map_fetch_next;
+			xdl_map_fetch_init_reg <= xdl_map_fetch_init_next;
+			xdl_map_read_count_reg <= xdl_map_read_count_next;
+			xdl_map_buffer_index_reg <= xdl_map_buffer_index_next;
+			xdl_map_sindex_reg <= xdl_map_sindex_next;
+			xdl_map_buffer_data_in_reg <= xdl_map_buffer_data_in_next;
 
-		xdl_map_vcount_reg <= xdl_map_vcount_next;
-		xdl_map_read_reg <= xdl_map_read_next;
-		xdl_map_active_reg <= xdl_map_active_next;
-		xdl_map_fetch_reg <= xdl_map_fetch_next;
-		xdl_map_fetch_init_reg <= xdl_map_fetch_init_next;
-		xdl_map_read_count_reg <= xdl_map_read_count_next;
-		xdl_map_buffer_index_reg <= xdl_map_buffer_index_next;
-		xdl_map_sindex_reg <= xdl_map_sindex_next;
-		xdl_map_buffer_data_in_reg <= xdl_map_buffer_data_in_next;
+			xdl_map_live_reg <= xdl_map_live_next;
+			xdl_vdelay_reg <= xdl_vdelay_next;
+			xcolor_reg <= xcolor_next;
+			xcolor2_reg <= xcolor2_next;
+			clip_reg <= clip_next;
+			gtia_palette_reg <= gtia_palette_next;
+			gtia_pfeat_reg <= gtia_pfeat_next;
+			gtia_xcolor_reg <= gtia_xcolor_next;
+			gtia_clip_reg <= gtia_clip_next;
+			no_trans_reg <= no_trans_next;
+			trans15_reg <= trans15_next;
+			xdl_ov_active_reg <= xdl_ov_active_next;
+			xdl_ov_live_reg <= xdl_ov_live_next;
+			xdl_ov_tlive_reg <= xdl_ov_tlive_next;
+			xdl_ov_vcount_reg <= xdl_ov_vcount_next;
+			xdl_ov_fetch_reg <= xdl_ov_fetch_next;
+			xdl_ov_fetch_init_reg <= xdl_ov_fetch_init_next;
+			xdl_ov_text_reg <= xdl_ov_text_next;
+			xdl_ov_hi_reg <= xdl_ov_hi_next;
+			xdl_ov_lo_reg <= xdl_ov_lo_next;
 
-		xdl_map_live_reg <= xdl_map_live_next;
-		xdl_vdelay_reg <= xdl_vdelay_next;
-		xcolor_reg <= xcolor_next;
-		no_trans_reg <= no_trans_next;
-		trans15_reg <= trans15_next;
-		xdl_ov_active_reg <= xdl_ov_active_next;
-		xdl_ov_live_reg <= xdl_ov_live_next;
-		xdl_ov_tlive_reg <= xdl_ov_tlive_next;
-		xdl_ov_vcount_reg <= xdl_ov_vcount_next;
-		xdl_ov_fetch_reg <= xdl_ov_fetch_next;
-		xdl_ov_fetch_init_reg <= xdl_ov_fetch_init_next;
-		xdl_ov_text_reg <= xdl_ov_text_next;
-		xdl_ov_hi_reg <= xdl_ov_hi_next;
-		xdl_ov_lo_reg <= xdl_ov_lo_next;
+			xdl_pixel_sindex_reg <= xdl_pixel_sindex_next;
+			xdl_pixel_buffer_windex_reg <= xdl_pixel_buffer_windex_next;
+			xdl_pixels_reg <= xdl_pixels_next;
+			xdl_ptrans_reg <= xdl_ptrans_next;
 
-		xdl_pixel_sindex_reg <= xdl_pixel_sindex_next;
-		xdl_pixel_buffer_windex_reg <= xdl_pixel_buffer_windex_next;
-		xdl_pixels_reg <= xdl_pixels_next;
-		xdl_ptrans_reg <= xdl_ptrans_next;
+			xdl_char_code_reg <= xdl_char_code_next;
+			xdl_char_attr_reg <= xdl_char_attr_next;
+			xdl_vcount_reg <= xdl_vcount_next;
 
-		xdl_char_code_reg <= xdl_char_code_next;
-		xdl_char_attr_reg <= xdl_char_attr_next;
-		xdl_vcount_reg <= xdl_vcount_next;
-
-		colmask_reg <= colmask_next;
-		coldetect_reg <= coldetect_next;
+			colmask_reg <= colmask_next;
+			coldetect_reg <= coldetect_next;
+		end if;
 	end if;
 end process;
+
+map_buffer_bram : if atmap_bram generate 
+
+begin
+
+xdl_map_buffer: entity work.dpram_dif
+generic map (addr_width_a => 8, data_width_a => 8, addr_width_b => 6, data_width_b => 32)
+port map (clock => clk,
+	address_a => std_logic_vector(xdl_map_read_count_reg),
+	data_a => xdl_map_buffer_data_in_next,
+	wren_a => xdl_map_buffer_wren,
+	address_b => std_logic_vector(xdl_map_buffer_index_reg),
+	q_b => xdl_map_buffer_data_out);
+
+end generate;
+
+map_buffer_logic: if not(atmap_bram) generate
+
+type xdl_map_buffer_type is array(0 to 255) of std_logic_vector(7 downto 0);
+signal xdl_map_buffer : xdl_map_buffer_type;
+
+begin
 
 process(clk)
 begin
@@ -966,13 +1082,15 @@ begin
 			xdl_map_buffer(to_integer(xdl_map_read_count_reg)) <= xdl_map_buffer_data_in_next;
 		else
 			xdl_map_buffer_data_out <=
-			xdl_map_buffer(to_integer(xdl_map_buffer_index_reg & "00")) &
-			xdl_map_buffer(to_integer(xdl_map_buffer_index_reg & "01")) &
+			xdl_map_buffer(to_integer(xdl_map_buffer_index_reg & "11")) &
 			xdl_map_buffer(to_integer(xdl_map_buffer_index_reg & "10")) &
-			xdl_map_buffer(to_integer(xdl_map_buffer_index_reg & "11"));
+			xdl_map_buffer(to_integer(xdl_map_buffer_index_reg & "01")) &
+			xdl_map_buffer(to_integer(xdl_map_buffer_index_reg & "00"));
 		end if;
 	end if;
 end process;
+
+end generate;
 
 process(xdl_active_reg, video_clock_antic_lowres, xdl_ov_size_reg, gtia_hpos)
 begin
@@ -1088,7 +1206,7 @@ begin
 end process;
 
 -- VBXE DMA state machine
-process(enable_179,
+process(enable_179,soft_reset,
 	dma_state_reg, memac_pending_reg, vram_pending_reg,memac_serviced_reg,memac_request_next,memac_check_a,memac_address,memac_data_in,
 	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
 	blitter_status,blitter_pending_reg, xdl_ovscr_h_reg, xdl_ovscr_v_reg,
@@ -1098,7 +1216,7 @@ process(enable_179,
 	xdl_map_read_reg, xdl_map_fetch_reg, xdl_map_fetch_init_reg, xdl_map_read_count_reg, xdl_map_buffer_data_in_reg, xdl_vdelay_reg,
 	xdl_ov_vcount_reg, xdl_ov_fetch_reg, xdl_ov_fetch_init_reg, xdl_ov_hi_reg, xdl_ov_lo_reg, xdl_pixels_reg,
 	xdl_ptrans_reg, xdl_pixel_buffer_windex_reg, xdl_char_attr_reg, xdl_char_code_reg, no_trans_reg, xdl_vcount_reg, xdl_ov_tlive_reg, vsync, pal,
-	xdl_enabled_reg, xdl_field_end2, xdl_addr_reg, ntsc_fix, turbo)
+	xdl_enabled_reg, gtia_palette_reg, xdl_field_end2, xdl_addr_reg, ver_127, turbo, interlace_field_on)
 
 variable blitter_notify : boolean := false;
 variable xdl_or_blitter_notify : boolean := false;
@@ -1269,11 +1387,6 @@ begin
 						if vram_data_in(3 downto 0) = x"0" then
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
 						end if;
-					elsif xdl_ov_lo_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+1);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+1);
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= vram_data_in;
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= vram_data_in;
@@ -1281,6 +1394,12 @@ begin
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
 						end if;
+					end if;
+					if xdl_ov_lo_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+1);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+1);
 					end if;
 				end if;
 			end if;
@@ -1386,11 +1505,6 @@ begin
 						if vram_data_in(3 downto 0) = x"0" then
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
 						end if;
-					elsif xdl_ov_lo_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+4);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+5);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+4);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+5);
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= vram_data_in;
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= vram_data_in;
@@ -1398,6 +1512,12 @@ begin
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
 						end if;
+					end if;
+					if xdl_ov_lo_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+4);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+5);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+4);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+5);
 					end if;
 					if xdl_pixel_buffer_windex_reg = 8 then
 						xdl_pixel_buffer_windex_next <= 0;
@@ -1429,8 +1549,12 @@ begin
 	if (vsync = '1') then
 		if pal = '1' then
 			xdl_vdelay_next <= 42;
-		elsif ntsc_fix = '1' then
-			xdl_vdelay_next <= 12;
+		elsif ver_127 = '1' then -- VBXE core 1.27 fixed the NTSC bug, but has a new one when interlace hack is on
+			if interlace_field_on = '1' then
+				xdl_vdelay_next <= 11;
+			else
+				xdl_vdelay_next <= 12;
+			end if;
 		else
 			-- Account for the PAL/NTSC bug in the original implementation
 			-- This is purposely 1 scanline too low
@@ -1487,7 +1611,6 @@ begin
 			end if;
 		else
 			if xdl_vdelay_reg = 1 then
-				xdl_active_next <= xdl_enabled_reg;
 				xdl_rptl_next <= x"00";
 				xdl_fetch_next <= xdl_addr_reg;
 				xdl_ovscr_h_next <= "000";
@@ -1498,7 +1621,7 @@ begin
 				xdl_map_ht_next <= "00111";
 				xdl_ov_size_next <= "01";
 				xdl_ov_pal_next <= "01";
-				xdl_pf_pal_next <= "00";
+				xdl_pf_pal_next <= gtia_palette_reg;
 				xdl_gp_next <= (others => '1');
 				xdl_cmd_next <= (others => '0');
 				xdl_map_active_next <= '0';
@@ -1528,7 +1651,7 @@ begin
 			when 13 => xdl_mapaddr_next(7 downto 0) <= unsigned(vram_data_in);
 			when 14 => xdl_mapaddr_next(15 downto 8) <= unsigned(vram_data_in);
 			when 15 => xdl_mapaddr_next(18 downto 16) <= unsigned(vram_data_in(2 downto 0));
-			when 16 => xdl_mapaddr_step_next(7 downto 0) <= unsigned(vram_data_in);
+			when 16 => xdl_mapaddr_step_next(7 downto 0) <= unsigned(vram_data_in(7 downto 2))&"00";
 			when 17 => xdl_mapaddr_step_next(11 downto 8) <= unsigned(vram_data_in(3 downto 0));
 			when 18 => xdl_mapscr_h_next <= unsigned(vram_data_in(4 downto 0));
 			when 19 => xdl_mapscr_v_next <= unsigned(vram_data_in(4 downto 0));
@@ -1575,8 +1698,7 @@ begin
 				xdl_ov_vcount_next <= "111";
 			end if;
 		end if;
-		-- TODO Docs say forbidden for lowres & highres at the same time, but what does it mean? Altirra disables the mode altogether
-		if (xdl_cmd_reg(2) = '1') or ((xdl_cmd_reg(0) and xdl_cmd_reg(1)) = '1') or ((xdl_cmd_reg(12) and xdl_cmd_reg(13)) = '1') then
+		if (xdl_cmd_reg(2) = '1') or ((xdl_cmd_reg(0) and xdl_cmd_reg(1)) = '1') then
 			xdl_ov_active_next <= '0';
 		end if;
 	end if;
@@ -1668,6 +1790,12 @@ begin
 		-- If we are reading, we need to capture the data for the blitter
 		-- on the next cycle
 		blitter_pending_next <= not(blitter_vram_wren);
+	end if;
+
+	if soft_reset = '1' then
+		xdl_active_next <= '0';
+		xdl_ov_active_next <= '0';
+		xdl_map_active_next <= '0';
 	end if;
 
 	if enable_179 = '1' then

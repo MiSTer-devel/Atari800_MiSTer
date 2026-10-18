@@ -1298,7 +1298,7 @@ end generate;
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 					if addr_next(8 downto 2) = "0000000" then
 						D6_WR_ENABLE <= write_enable_next;
-					elsif (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 5) = "010") then
+					elsif (VBXE_SWITCH = '1') and (addr_next(8) = VBXE_REG_BASE) and (addr_next(7 downto 6) = "01") then
 						VBXE_WRITE_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= VBXE_DATA;
 						MEMORY_DATA_INT(15 downto 8) <= CACHE_VBXE_DATA;

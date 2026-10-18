@@ -111,7 +111,7 @@ wire clk_vdo;
 pll pll
 (
 	.refclk(CLK_50M),
-	.rst(0),
+	.rst(1'b0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_mem),
 	.outclk_2(clk_vdo),
@@ -130,9 +130,9 @@ reg  [31:0] cfg_data;
 pll_cfg pll_cfg
 (
 	.mgmt_clk(CLK_50M),
-	.mgmt_reset(0),
+	.mgmt_reset(1'b0),
 	.mgmt_waitrequest(cfg_waitrequest),
-	.mgmt_read(0),
+	.mgmt_read(1'b0),
 	.mgmt_readdata(),
 	.mgmt_write(cfg_write),
 	.mgmt_address(cfg_address),
@@ -257,15 +257,36 @@ hps_ext hps_ext
 
 	.set_reset(set_reset),
 	.set_pause(set_pause),
+	.set_freezer(),
+	.set_reset_rnmi(),
+	.set_option_force(),
+	.set_start_force(),
+	.set_space_force(),
+	.set_drive_led(),
+	.set_xex_loader_mode(),
 	.cart1_select(cart_select),
+	.cart2_select(),
 	.atari_status1(atari_status1),
-
-	.atari_status2(0),
-	.uart_data_read(0)
+	.atari_status2(16'h0),
+	.atari_status3(16'h0),
+	.uart_addr(),
+	.uart_enable(),
+	.uart_wr(),
+	.uart_data_read(16'h0),
+	.uart_data_write(),
+	.tape_data(),
+	.tape_data_wr(),
+	.tape_reset(),
+	.emu_flash_request(1'b0),
+	.emu_flash_slave(1'b0),
+	.emu_flash_autosave(1'b0),
+	.emu_flash_save(1'b0),
+	.emu_cart_trigger(1'b0)
 );
 
 
-wire [7:0] R,G,B,Ro,Go,Bo;
+wire [31:0] R,G,B;
+wire [7:0] Ro,Go,Bo;
 wire HBlank,VBlank,HBlank_o,VBlank_o;
 wire VSync, HSync, VSync_o, HSync_o;
 wire ce_pix;
@@ -286,8 +307,6 @@ assign AUDIO_L = (cpu_halt | reset) ? 16'b0000000000000000 : laudio;
 assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
-assign SDRAM_CKE = 1;
-
 atari5200top atari5200top
 (
 	.CLK(clk_sys),
@@ -304,6 +323,7 @@ atari5200top atari5200top
 	.SDRAM_nCS(SDRAM_nCS),
 	.SDRAM_DQMH(SDRAM_DQMH),
 	.SDRAM_DQML(SDRAM_DQML),
+	.SDRAM_CKE(SDRAM_CKE),
 
 	.ROM_ADDR(rom_addr),
 	.ROM_DATA(rom_data),
@@ -326,6 +346,7 @@ atari5200top atari5200top
 	.VGA_G(Go),
 	.VGA_R(Ro),
 	.VGA_PIXCE(ce_pix_raw),
+	.VGA_BLANK(),
 	.HBLANK(HBlank_o),
 	.VBLANK(VBlank_o),
 
@@ -431,7 +452,10 @@ video_mixer #(.GAMMA(1)) video_mixer
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 	.freeze_sync(),
-	.VGA_DE(vga_de)
+	.VGA_DE(vga_de),
+	.R(R[7:0]),
+	.G(G[7:0]),
+	.B(B[7:0])
 );
 
 //////////////////   ROM   ///////////////////

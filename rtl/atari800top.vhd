@@ -234,6 +234,9 @@ signal space_tmp : std_logic;
 signal warm_reset_request : std_logic;
 signal cold_reset_request : std_logic;
 signal tape_hold : std_logic;
+signal power_reset : std_logic;
+signal soft_reset : std_logic;
+signal halt_request : std_logic;
 
 signal tape_fsk_out : std_logic;
 signal tape_pwm_out : std_logic;
@@ -377,6 +380,7 @@ PORT MAP
 (
 	CLK => CLK,
 	RESET_N => areset_n,
+	POWER_RESET => power_reset,
 
 	VIDEO_VS => VGA_VS,
 	VIDEO_HS => VGA_HS,
@@ -465,7 +469,7 @@ PORT MAP
 	CLK_CONF => CLK_CONF,
 	VBXE_SWITCH => VBXE_MODE(0) or VBXE_MODE(1),
 	VBXE_REG_BASE => VBXE_MODE(1),
-	VBXE_NTSC_FIX => VBXE_MODE(2),
+	VBXE_VER_127 => VBXE_MODE(2),
 	VBXE_TURBO => VBXE_MODE(3),
 	VBXE_PALETTE_RGB => VBXE_PALETTE_RGB,
 	VBXE_PALETTE_INDEX => VBXE_PALETTE_INDEX,
@@ -555,7 +559,11 @@ PORT MAP
 
 joy <= joy1 or joy2 or joy3 or joy4;
 
-HOT_KEYS <= ps2_keys(16#111#) & (FKEYS(9) or cold_reset_request) & (FKEYS(8) or warm_reset_request);
+power_reset <= FKEYS(9) or cold_reset_request;
+soft_reset <= FKEYS(8) or warm_reset_request;
+halt_request <= ps2_keys(16#111#);
+
+HOT_KEYS <= halt_request & power_reset & soft_reset;
 
 pause_atari <= set_pause_in or OSD_PAUSE;
 reset_atari <= set_reset_in;

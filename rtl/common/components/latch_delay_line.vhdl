@@ -50,7 +50,11 @@ BEGIN
 		data_in_next <= data_in or data_in_reg;
 
 		if (enable = '1') then
-			shift_next <= (data_in or data_in_reg)&shift_reg(COUNT-1 downto 1);
+			if COUNT > 1 then
+				shift_next <= (data_in or data_in_reg)&shift_reg(COUNT-1 downto 1);
+			else
+				shift_next(0) <= (data_in or data_in_reg);
+			end if;
 			data_in_next <= '0';
 		end if;		
 		

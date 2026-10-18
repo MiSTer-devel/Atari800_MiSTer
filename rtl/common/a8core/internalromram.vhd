@@ -41,15 +41,6 @@ architecture vhdl of internalromram is
 
 begin
 
-process(clock,reset_n)
-begin
-	if (reset_n ='0') then
-		ram_request_reg <= '0';
-	elsif rising_edge(clock) then
-		ram_request_reg <= ram_request_next;
-	end if;
-end process;
-
 ROM_DATA <= (others=>'1');
 ROM_REQUEST_COMPLETE <= '1';
 
@@ -72,6 +63,16 @@ begin
 	);
 	ram_request_next <= ram_request and not(RAM_WR_ENABLE);
 	ram_request_complete <= ramwe_temp or ram_request_reg;
+
+	process(clock,reset_n)
+	begin
+		if (reset_n ='0') then
+			ram_request_reg <= '0';
+		elsif rising_edge(clock) then
+			ram_request_reg <= ram_request_next;
+		end if;
+	end process;
+
 end generate;
 
 gen_no_internal_ram : if internal_ram=0 generate

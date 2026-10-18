@@ -28,6 +28,7 @@ ENTITY atari800core IS
 	(
 		CLK :  IN  STD_LOGIC; -- cycle_length*1.79MHz
 		RESET_N : IN STD_LOGIC;
+		POWER_RESET : IN STD_LOGIC := '0';
 
 		-- VIDEO OUT - PAL/NTSC, original Atari timings approx (may be higher res)
 		VIDEO_VS :  OUT  STD_LOGIC;
@@ -194,7 +195,7 @@ ENTITY atari800core IS
 		CLK_CONF : IN STD_LOGIC_VECTOR(2 DOWNTO 0);
 		VBXE_SWITCH : IN STD_LOGIC;
 		VBXE_REG_BASE : IN STD_LOGIC;
-		VBXE_NTSC_FIX : IN STD_LOGIC;
+		VBXE_VER_127 : IN STD_LOGIC;
 		VBXE_TURBO : IN STD_LOGIC;
 		VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0);
 		VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0);
@@ -248,7 +249,8 @@ signal GTIA_HIGHRES_IN : std_logic;
 signal GTIA_ACTIVE_HR_OUT : std_logic_vector(1 downto 0);
 signal GTIA_ACTIVE_HR_IN : std_logic_vector(1 downto 0);
 signal GTIA_PRIOR : std_logic_vector(7 downto 0);
-signal GTIA_PRIOR_RAW : std_logic_vector(7 downto 0);
+signal GTIA_PRIOR_IN : std_logic_vector(9 downto 0);
+signal GTIA_PRIOR_RAW : std_logic_vector(9 downto 0);
 signal GTIA_HPOS : std_logic_vector(7 downto 0);
 signal GTIA_PF0_IN : std_logic_vector(7 downto 0);
 signal GTIA_PF1_IN : std_logic_vector(7 downto 0);
@@ -259,6 +261,8 @@ signal GTIA_PF2_OUT : std_logic_vector(7 downto 0);
 signal GTIA_PF3_OUT : std_logic_vector(7 downto 0);
 signal VBXE_XCOLOR : std_logic;
 signal GTIA_PALETTE : std_logic_vector(1 downto 0);
+signal CLIP_SIDES_GTIA : std_logic;
+signal XCOLOR_GTIA : std_logic;
 
 -- GTIA PALETTE
 signal VIDEO_R_GTIA : std_logic_vector(7 downto 0);
@@ -351,6 +355,9 @@ signal memac_request_complete : std_logic;
 
 signal VBXE_IRQ_N : std_logic;
 
+signal gtia_interlace : std_logic;
+signal gtia_interlace_field : std_logic;
+
 -- PBI
 SIGNAL PBI_ADDR_INT : std_logic_vector(15 downto 0);
 
@@ -440,6 +447,7 @@ PORT MAP(CLK => CLK,
 		 dma_address_out => ANTIC_ADDR);
 
 pokeym : entity work.pokeymax
+GENERIC MAP(version => "31MiSTer")
 PORT MAP(CLK => CLK,
 	RESET_N => RESET_N,
 	ENABLE_179 => ANTIC_ENABLE_179,
@@ -529,16 +537,22 @@ PORT MAP(
 );
 
 vbxe_board : entity work.VBXE
-GENERIC MAP ( cycle_length => cycle_length)
+GENERIC MAP ( cycle_length => cycle_length, atmap_bram => true)
 PORT MAP(
 	CLK => CLK,
 	ENABLE => VBXE_SWITCH,
-	NTSC_FIX => VBXE_NTSC_FIX,
+	VER_127 => VBXE_VER_127,
 	TURBO => VBXE_TURBO,
+	GTIA_CLIP_IN => CLIP_SIDES,
+	GTIA_CLIP_OUT => CLIP_SIDES_GTIA,
+	GTIA_XCOLOR_IN => GTIA_XCOLOR,
+	GTIA_XCOLOR_OUT => XCOLOR_GTIA,
 	ENABLE_179 => ANTIC_ENABLE_179, -- ENABLE_179_MEMWAIT,
 	RESET_N => RESET_N,
+	POWER_RESET => POWER_RESET,
 	SOFT_RESET => VBXE_SOFT_RESET,
 	PAL => PAL,
+	INTERLACE_FIELD_ON => gtia_interlace and not(gtia_interlace_field),
 	ADDR => PBI_ADDR_INT(4 DOWNTO 0),
 	DATA_IN => WRITE_DATA(7 DOWNTO 0),
 	WR_EN => VBXE_WRITE_ENABLE,
@@ -577,6 +591,7 @@ PORT MAP(
 	gtia_active_hr => GTIA_ACTIVE_HR_OUT,
 	gtia_active_hr_mod => GTIA_ACTIVE_HR_IN,
 	gtia_prior => GTIA_PRIOR,
+	gtia_prior_mod => GTIA_PRIOR_IN,
 	gtia_prior_raw => GTIA_PRIOR_RAW,
 	gtia_pf0 => GTIA_PF0_OUT,
 	gtia_pf1 => GTIA_PF1_OUT,
@@ -729,8 +744,8 @@ PORT MAP(CLK => CLK,
 		 CPU_ENABLE_ORIGINAL => ENABLE_179_MEMWAIT, -- for subsequent pmg fetches
 		 RESET_N => RESET_N,
 		 PAL => PAL,
-		 CLIP_SIDES => CLIP_SIDES,
-		 GTIA_XCOLOR => GTIA_XCOLOR,
+		 CLIP_SIDES => CLIP_SIDES_GTIA,
+		 GTIA_XCOLOR => XCOLOR_GTIA,
 		 ENABLE_179 => ANTIC_ENABLE_179,
 		 COLOUR_CLOCK => ANTIC_COLOUR_CLOCK_OUT,
 		 COLOUR_CLOCK_HIGHRES => ANTIC_HIGHRES_COLOUR_CLOCK_OUT,
@@ -741,6 +756,7 @@ PORT MAP(CLK => CLK,
 		 GTIA_ACTIVE_HR_OUT => GTIA_ACTIVE_HR_OUT,
 		 GTIA_ACTIVE_HR_IN => GTIA_ACTIVE_HR_IN,
 		 GTIA_PRIOR => GTIA_PRIOR,
+		 GTIA_PRIOR_IN => GTIA_PRIOR_IN,
 		 GTIA_PRIOR_RAW => GTIA_PRIOR_RAW,
 		 GTIA_PF0_OUT => GTIA_PF0_OUT,
 		 GTIA_PF1_OUT => GTIA_PF1_OUT,
@@ -772,8 +788,8 @@ PORT MAP(CLK => CLK,
 		 HBLANK => open,
 		 VBLANK => open,
 		 interlace_enable => interlace_enable,
-		 interlace => interlace,
-		 interlace_field => interlace_field,
+		 interlace => gtia_interlace,
+		 interlace_field => gtia_interlace_field,
 		 BURST => VIDEO_BURST,
 		 START_OF_FIELD => VIDEO_START_OF_FIELD,
 		 ODD_LINE => VIDEO_ODD_LINE,
@@ -783,7 +799,10 @@ PORT MAP(CLK => CLK,
 -- Both negated and non-negated works, but technically it should be negated (or?)
 GTIA_SOUND <= not(CONSOL_OUT(3));
 
-	-- colour palette
+interlace <= gtia_interlace;
+interlace_field <= gtia_interlace_field;
+
+-- colour palette
 
 gen_palette_none : if palette=0 generate
 	VIDEO_B_GTIA <= COLOUR;

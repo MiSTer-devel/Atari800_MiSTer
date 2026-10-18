@@ -44,6 +44,7 @@ ENTITY atari800core_simple_sdram is
 	(
 		CLK :  IN  STD_LOGIC; -- cycle_length*1.79MHz
 		RESET_N : IN STD_LOGIC;
+		POWER_RESET : IN STD_LOGIC := '0';
 
 		-- VIDEO OUT - PAL/NTSC, original Atari timings approx (may be higher res)
 		VIDEO_VS :  OUT  STD_LOGIC;
@@ -160,7 +161,7 @@ ENTITY atari800core_simple_sdram is
 		CLK_CONF : in std_logic_vector(2 downto 0);
 		VBXE_SWITCH : IN STD_LOGIC := '0';
 		VBXE_REG_BASE : IN STD_LOGIC := '0';
-		VBXE_NTSC_FIX : IN STD_LOGIC := '0';
+		VBXE_VER_127 : IN STD_LOGIC := '0';
 		VBXE_TURBO : IN STD_LOGIC := '0';
 		VBXE_PALETTE_RGB : IN STD_LOGIC_VECTOR(2 downto 0) := "000";
 		VBXE_PALETTE_INDEX : IN STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
@@ -421,6 +422,7 @@ PORT MAP
 (
 	CLK => CLK,
 	RESET_N => RESET_N,
+	POWER_RESET => POWER_RESET,
 
 	VIDEO_VS => VIDEO_VS,
 	VIDEO_HS => VIDEO_HS,
@@ -545,7 +547,7 @@ PORT MAP
 	CLK_CONF => CLK_CONF,
 	VBXE_SWITCH => VBXE_SWITCH,
 	VBXE_REG_BASE => VBXE_REG_BASE,
-	VBXE_NTSC_FIX => VBXE_NTSC_FIX,
+	VBXE_VER_127 => VBXE_VER_127,
 	VBXE_TURBO => VBXE_TURBO,
 	VBXE_PALETTE_RGB => VBXE_PALETTE_RGB,
 	VBXE_PALETTE_INDEX => VBXE_PALETTE_INDEX,
