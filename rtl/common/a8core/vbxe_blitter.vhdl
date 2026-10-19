@@ -546,7 +546,7 @@ begin
 					-- In mode 4 (AND with destination) or in mode 1 with collision mask active, or any other mode
 					-- we need to read the destination byte (to do either the collision detection, or to combine into the result (AND), or both)
 					-- In mode 7 we need addtional lookup of source data for the table functionality
-					if (ver_127 = '1' and blitter_mode_reg = 7) or (blitter_mode_reg = 2 and blitter_aux_reg(0) = '1') or (blitter_mode_reg = 4) or ((source_data /= x"00") and (((blitter_mode_reg = 1) and (blitter_collision_mask_reg /= x"00") and (blitter_collision_reg = x"00")) or (blitter_mode_reg > 1 and blitter_mode_reg < 7))) then
+					if (ver_127 = '1' and blitter_mode_reg = 7) or (blitter_mode_reg = 2 and blitter_aux_reg(0) = '1') or (blitter_mode_reg = 4) or ((source_data /= x"00") and (((blitter_mode_reg = 1) and (blitter_collision_mask_reg /= x"00") and (blitter_collision_reg = x"00" or ver_127 = '0')) or (blitter_mode_reg > 1 and blitter_mode_reg < 7))) then
 						blitter_vram_wren_next <= '0';
 						blitter_vram_address_next <= std_logic_vector(blitter_dest_current_reg);
 						if ver_127 = '1' and blitter_mode_reg = 7 then
