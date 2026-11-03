@@ -39,6 +39,7 @@ END pot_from_signed;
 ARCHITECTURE vhdl OF pot_from_signed IS
 	signal enable_179 : std_logic;
 	signal count_enable : std_logic;
+	signal count_div : integer range 0 to 255;
 
 	signal count_reg : std_logic_vector(9 downto 0);
 	signal count_next : std_logic_vector(9 downto 0);
@@ -55,9 +56,23 @@ enable_179_clock_div : entity work.enable_divider
 
 ---- 114K to 386k (51 to 172) 121 lines.  i.e. 121*114 cycles/256 values = ~54
 ---- TODO linear or not?
-pot_clock_div : entity work.enable_divider
-	generic map (COUNT=>count_cycles)
-	port map(clk=>clk,reset_n=>reset_n,enable_in=>enable_179,enable_out=>count_enable);
+process(clk, reset_n)
+begin
+	if (reset_n='0') then
+		count_div <= 0;
+	elsif (clk'event and clk='1') then
+		if (pot_reset = '1') then
+			count_div <= 0;
+		elsif (enable_179 = '1') then
+			if (count_div = count_cycles-1) then
+				count_div <= 0;
+			else
+				count_div <= count_div + 1;
+			end if;
+		end if;
+	end if;
+end process;
+count_enable <= '1' when enable_179 = '1' and count_div = count_cycles-1 and pot_reset = '0' else '0';
 
 	process(clk, reset_n)
 	begin
