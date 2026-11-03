@@ -116,6 +116,7 @@ localparam CONF_STR = {
 	"P2,Hardware & OS;",
 	"P2-;",
 	"P2O[9:7],CPU speed,1x,2x,4x,8x,16x;",
+	"P2O[108:107],Clock (battery),None,U1MB $D3E2,SIDE $D5E2;",
 	"P2-;",
 	"P2O[2],Machine,XL/XE,400/800;",
 	"d1P2O[110],400/800 OS ROM type,10KB,16KB;",
@@ -641,6 +642,7 @@ atari800top atari800top
 	.VBLANK(VBlank_o),
 
 	.CPU_SPEED(CPU_SPEEDS[status[9:7]]),
+	.RTC_SEL(status[108:107]),
 	.RAM_SIZE(ram_config),
 	.OS_MODE_800(mode800),
 	.OS_800_16K(os800_16k),

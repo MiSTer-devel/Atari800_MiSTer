@@ -169,6 +169,7 @@ ENTITY atari800core_simple_sdram is
 
 		HALT : in std_logic;
 		THROTTLE_COUNT_6502 : in std_logic_vector(5 downto 0); -- standard speed is cycle_length-1
+		RTC_SEL : in std_logic_vector(1 downto 0) := "00";
 		emulated_cartridge_select: in std_logic_vector(7 downto 0);
 		emulated_cartridge2_select: in std_logic_vector(7 downto 0);
 		EMU_FLASH_REQUEST : out std_logic;
@@ -554,6 +555,7 @@ PORT MAP
 	VBXE_PALETTE_COLOR => VBXE_PALETTE_COLOR,
 	ROM_IN_RAM => ROM_IN_RAM,
 	THROTTLE_COUNT_6502 => THROTTLE_COUNT_6502,
+	RTC_SEL => RTC_SEL,
 	HALT => HALT,
 	freezer_enable => freezer_enable,
 	freezer_activate => freezer_activate

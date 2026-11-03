@@ -94,6 +94,7 @@ PORT
 	PS2_KEY    : IN  STD_LOGIC_VECTOR(10 downto 0);
 
 	CPU_SPEED  : IN  STD_LOGIC_VECTOR(5 downto 0);
+	RTC_SEL    : IN STD_LOGIC_VECTOR(1 downto 0);
 	RAM_SIZE   : IN  STD_LOGIC_VECTOR(2 downto 0);
 	OS_MODE_800   : IN  STD_LOGIC;
 	OS_800_16K   : IN  STD_LOGIC;
@@ -477,6 +478,7 @@ PORT MAP
 
 	HALT => pause_atari,
 	THROTTLE_COUNT_6502 => CPU_SPEED,
+	RTC_SEL => RTC_SEL,
 	emulated_cartridge_select => CART1_SELECT_IN,
 	emulated_cartridge2_select => CART2_SELECT_IN,
 	EMU_FLASH_REQUEST => EMU_FLASH_REQUEST,

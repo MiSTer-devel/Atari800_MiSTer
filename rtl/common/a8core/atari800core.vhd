@@ -184,6 +184,7 @@ ENTITY atari800core IS
 		GTIA_XCOLOR : in STD_LOGIC;
 		ROM_IN_RAM : in std_logic;
 		THROTTLE_COUNT_6502 : in STD_LOGIC_VECTOR(5 DOWNTO 0);
+		RTC_SEL : in std_logic_vector(1 downto 0) := "00";
 		HALT : in std_logic;
 		freezer_enable: in std_logic;
 		freezer_activate: in std_logic;
@@ -645,6 +646,7 @@ PORT MAP(CLK => CLK,
 		 CACHE_ANTIC_DATA => CACHE_ANTIC_DO,
 		 PBI_DATA => PBI_ROM_DO,
 		 CPU_ADDR => CPU_ADDR,
+		 RTC_SEL => RTC_SEL,
 		 CPU_WRITE_DATA => CPU_DO,
 		 GTIA_DATA => GTIA_DO,
 		 CACHE_GTIA_DATA => CACHE_GTIA_DO,

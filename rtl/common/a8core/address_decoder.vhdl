@@ -25,6 +25,7 @@ PORT
 	-- bus masters - either CPU or antic
 	-- antic has priority and is slected when ANTIC_FETCH high
 	CPU_ADDR : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+	RTC_SEL : IN STD_LOGIC_VECTOR(1 downto 0) := "00";
 	CPU_FETCH : in std_logic;
 	CPU_WRITE_N : IN STD_LOGIC;
 	CPU_WRITE_DATA : in std_logic_vector(7 downto 0);	
@@ -276,6 +277,7 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal emu_cart_int_d_out: std_logic_vector(7 downto 0);
 	signal emu_cart_passthru : std_logic;
 	signal emu_cart_rtc_mode : std_logic_vector(1 downto 0);
+	signal rtc_where : std_logic_vector(1 downto 0);
 
 	signal emu_cart1_s4_n: std_logic;
 	signal emu_cart1_s5_n: std_logic;
@@ -353,6 +355,10 @@ ARCHITECTURE vhdl OF address_decoder IS
 	signal bank1next : std_logic_vector(1 downto 0);
 
 BEGIN
+	rtc_where <= RTC_SEL when RTC_SEL /= "00" else
+	             emu_cart_rtc_mode when emu_cart_enable = '1' else
+	             "00";
+
 	-- register
 	process(clk,reset_n)
 	begin
@@ -1227,7 +1233,7 @@ end generate;
 
 				-- PIA
 				when X"D3" =>
-					if (emu_cart_enable = '1') and (emu_cart_rtc_mode = "01") and (addr_next(7 downto 0) = x"E2") then -- Ultimate RT clock emulation
+					if (rtc_where = "01") and (addr_next(7 downto 0) = x"E2") then -- Ultimate RT clock emulation
 						ULTIME_WR_ENABLE <= write_enable_next;
 						MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
 					else
@@ -1258,38 +1264,36 @@ end generate;
 					request_complete <= '1';
 					MEMORY_DATA_INT(7 downto 0) <= last_bus_reg;
 
-					if (emu_cart_enable = '1') then
-						if (emu_cart_rtc_mode = "10") and (addr_next(7 downto 0) = x"E2") then -- SIDE(2) / SuperCart RTC
-							ULTIME_WR_ENABLE <= write_enable_next;
-							MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
+					if (rtc_where = "10") and (addr_next(7 downto 0) = x"E2") then -- SIDE(2) / SuperCart RTC
+						ULTIME_WR_ENABLE <= write_enable_next;
+						MEMORY_DATA_INT(7 downto 0) <= ULTIME_DATA;
+					elsif (emu_cart_enable = '1') then
+						emu_cart_cctl_n <= '0';
+						if write_enable_next = '1' then
+							-- TODO: write to both emulated and real cart
+							request_complete <= '1';
 						else
-							emu_cart_cctl_n <= '0';
-							if write_enable_next = '1' then
-								-- TODO: write to both emulated and real cart
-								request_complete <= '1';
-							else
-								-- read only from emulated
-								if emu_cart_cctl_dout_enable /= "000" then
-									if emu_cart_cctl_dout_enable(2 downto 1) = "00" then
-										MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
-										request_complete <= '1';
-									else
-										SDRAM_ADDR <= SDRAM_CART_ADDR;
-										if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
-											-- read from B5xx
-											SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
-										end if;
-										if emu_cart_cctl_dout_enable(2) = '1' then -- AST 32 special case
-											SDRAM_ADDR(7 downto 0) <= ADDR_next(7 downto 0);
-										end if;
-										MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
-										request_complete <= sdram_request_COMPLETE;
-										sdram_chip_select <= start_request;
-									end if;
-								else
-									MEMORY_DATA_INT(7 downto 0) <= x"ff";
+							-- read only from emulated
+							if emu_cart_cctl_dout_enable /= "000" then
+								if emu_cart_cctl_dout_enable(2 downto 1) = "00" then
+									MEMORY_DATA_INT(7 downto 0) <= emu_cart_cctl_dout;
 									request_complete <= '1';
+								else
+									SDRAM_ADDR <= SDRAM_CART_ADDR;
+									if emu_cart_cctl_dout_enable(1) = '1' then -- DCART special case
+										-- read from B5xx
+										SDRAM_ADDR(12 downto 0) <= "10101"&ADDR_next(7 downto 0);
+									end if;
+									if emu_cart_cctl_dout_enable(2) = '1' then -- AST 32 special case
+										SDRAM_ADDR(7 downto 0) <= ADDR_next(7 downto 0);
+									end if;
+									MEMORY_DATA_INT(7 downto 0) <= SDRAM_DATA(7 downto 0);
+									request_complete <= sdram_request_COMPLETE;
+									sdram_chip_select <= start_request;
 								end if;
+							else
+								MEMORY_DATA_INT(7 downto 0) <= x"ff";
+								request_complete <= '1';
 							end if;
 						end if;
 					end if;
