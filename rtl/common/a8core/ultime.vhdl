@@ -29,6 +29,7 @@ signal spi_en_next: std_logic;
 
 signal spi_clk_old : std_logic;
 signal spi_en_old : std_logic;
+signal spi_clk_rest : std_logic;
 
 signal spi_out: std_logic;
 signal spi_addr: std_logic_vector(6 downto 0);
@@ -92,12 +93,15 @@ begin
 		spi_clk_old <= spi_clk_reg;
 		if (spi_en_reg = '1') then
 			if spi_en_old = '0' then
+				spi_clk_rest <= spi_clk_reg;
 				spi_addr_count <= "111";
 				data_count <= "111";
 				spi_addr_ready <= '0';
 				spi_out <= '1';
 				spi_write <= '0';
-			elsif (spi_clk_old = '0') and (spi_clk_reg = '1') then
+			elsif (spi_clk_old /= spi_clk_reg) and
+			      ((((spi_addr_ready = '0') or (spi_write = '1')) and (spi_clk_reg = spi_clk_rest)) or
+			       ((spi_addr_ready = '1') and (spi_write = '0') and (spi_clk_reg /= spi_clk_rest))) then
 				if spi_addr_ready = '0' then
 					if spi_addr_count = "111" then
 						spi_write <= spi_in_reg;
