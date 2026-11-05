@@ -57,7 +57,7 @@ enable_179_clock_div : entity work.enable_divider
 ---- TODO linear or not?
 pot_clock_div : entity work.enable_divider
 	generic map (COUNT=>count_cycles)
-	port map(clk=>clk,reset_n=>reset_n,enable_in=>enable_179,enable_out=>count_enable);
+	port map(clk=>clk,reset_n=>reset_n and not(pot_reset),enable_in=>enable_179,enable_out=>count_enable);
 
 	process(clk, reset_n)
 	begin
