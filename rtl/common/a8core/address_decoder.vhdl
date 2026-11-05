@@ -962,7 +962,7 @@ gen_normal_memory : if low_memory=0 generate
 	SDRAM_FREEZER_RAM_ADDR <= "00100100" & freezer_access_address;
 	-- 64k freezer rom		"0 0100 1010 YYYY YYYY YYYY YYYY"
 	SDRAM_FREEZER_ROM_ADDR <= "001001010" & freezer_access_address(15 downto 0);
-	-- CARTS         -              "0 10YY YYYY YYY0 0000 0000 0000" (BOT) start at 16MB SDRAM, currently take up to 4MB
+	-- CARTS         -              "0 10YY YYYY YYY0 0000 0000 0000" (BOT) start at 8MB SDRAM, currently take up to 4MB
 	SDRAM_CART_ADDR	<= "010" & emu_cart_address(21 downto 0);
 	-- BASIC/OS ROM  -              "0 0111 XXXX XX00 0000 0000 0000" (BOT) (BASIC IN SLOT 0!), 2nd to last 512K below 8MB
 	SDRAM_BASIC_ROM_ADDR <= "00111"&"000000" &"00000000000000";
