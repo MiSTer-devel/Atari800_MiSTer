@@ -242,6 +242,8 @@ signal xdl_ov_pal_reg : std_logic_vector(1 downto 0);
 signal xdl_ov_pal_next : std_logic_vector(1 downto 0);
 signal xdl_pf_pal_reg : std_logic_vector(1 downto 0);
 signal xdl_pf_pal_next : std_logic_vector(1 downto 0);
+signal xdl_pf_pal_set_reg : std_logic;
+signal xdl_pf_pal_set_next : std_logic;
 signal xdl_gp_reg : std_logic_vector(7 downto 0);
 signal xdl_gp_next : std_logic_vector(7 downto 0);
 
@@ -380,7 +382,7 @@ begin
 
 process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_prior,gtia_prior_raw,
 	enable,xdl_active_reg,xdl_map_live_reg,xdl_map_wd_reg,xdl_map_sindex_reg,xdl_map_buffer_data_out,
-	xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,xdl_pixel_sindex_reg,
+	xdl_ov_pal_reg,gtia_palette_reg,xdl_pf_pal_reg,xdl_pf_pal_set_reg,xdl_gp_reg,xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,xdl_pixel_sindex_reg,
 	p0_reg,p1_reg,p2_reg,p3_reg,xdl_map_buffer_index_reg,coldetect_reg,colclear,gtia_hpos,xdl_map_active_reg,
 	xdl_mapscr_h_reg,xdl_ov_active_reg,xdl_ovscr_h_reg,video_clock_antic_highres,xdl_ov_live_reg,
 	colmask_reg,no_trans_reg,trans15_reg,video_clock_vbxe,video_clock_antic_lowres,xcolor_reg,xcolor2_reg,ver_127)
@@ -397,7 +399,10 @@ begin
 	map_pf0 <= gtia_pf0;
 	map_pf1 <= gtia_pf1;
 	map_pf2 <= gtia_pf2;
-	xdl_pf_palette <= xdl_pf_pal_reg;
+	xdl_pf_palette <= gtia_palette_reg;
+	if xdl_pf_pal_set_reg = '1' then
+		xdl_pf_palette <= xdl_pf_pal_reg;
+	end if;
 	xdl_ov_palette <= xdl_ov_pal_reg;
 	xdl_ov_pixel <= (others => '0');
 	xdl_ov_pixel_active <= '0';
@@ -917,6 +922,7 @@ begin
 			xdl_ov_size_reg <= "00";
 			xdl_ov_pal_reg <= "00";
 			xdl_pf_pal_reg <= "00";
+			xdl_pf_pal_set_reg <= '0';
 			xdl_gp_reg <= (others => '1');
 
 			xdl_map_vcount_reg <= "00000";
@@ -1005,6 +1011,7 @@ begin
 			xdl_ov_size_reg <= xdl_ov_size_next;
 			xdl_ov_pal_reg <= xdl_ov_pal_next;
 			xdl_pf_pal_reg <= xdl_pf_pal_next;
+			xdl_pf_pal_set_reg <= xdl_pf_pal_set_next;
 			xdl_gp_reg <= xdl_gp_next;
 
 			xdl_map_vcount_reg <= xdl_map_vcount_next;
@@ -1212,7 +1219,7 @@ process(enable_179,soft_reset,
 	blitter_status,blitter_pending_reg, xdl_ovscr_h_reg, xdl_ovscr_v_reg,
 	xdl_map_active_reg, xdl_ov_active_reg, xdl_ov_text_reg, xdl_fetch_reg, xdl_pending_reg, xdl_read_state_reg, xdl_cmd_reg, xdl_active_reg,
 	xdl_rptl_reg, xdl_ovaddr_reg, xdl_ovaddr_step_reg, xdl_chbase_reg, xdl_mapaddr_reg, xdl_mapaddr_step_reg,
-	xdl_mapscr_h_reg, xdl_mapscr_v_reg, xdl_map_wd_reg, xdl_map_ht_reg, xdl_ov_size_reg, xdl_ov_pal_reg, xdl_pf_pal_reg, xdl_gp_reg, xdl_map_vcount_reg,
+	xdl_mapscr_h_reg, xdl_mapscr_v_reg, xdl_map_wd_reg, xdl_map_ht_reg, xdl_ov_size_reg, xdl_ov_pal_reg, xdl_pf_pal_reg, xdl_pf_pal_set_reg, xdl_gp_reg, xdl_map_vcount_reg,
 	xdl_map_read_reg, xdl_map_fetch_reg, xdl_map_fetch_init_reg, xdl_map_read_count_reg, xdl_map_buffer_data_in_reg, xdl_vdelay_reg,
 	xdl_ov_vcount_reg, xdl_ov_fetch_reg, xdl_ov_fetch_init_reg, xdl_ov_hi_reg, xdl_ov_lo_reg, xdl_pixels_reg,
 	xdl_ptrans_reg, xdl_pixel_buffer_windex_reg, xdl_char_attr_reg, xdl_char_code_reg, no_trans_reg, xdl_vcount_reg, xdl_ov_tlive_reg, vsync, pal,
@@ -1261,6 +1268,7 @@ begin
 	xdl_ov_size_next <= xdl_ov_size_reg;
 	xdl_ov_pal_next <= xdl_ov_pal_reg;
 	xdl_pf_pal_next <= xdl_pf_pal_reg;
+	xdl_pf_pal_set_next <= xdl_pf_pal_set_reg;
 	xdl_gp_next <= xdl_gp_reg;
 
 	xdl_map_vcount_next <= xdl_map_vcount_reg;
@@ -1330,13 +1338,30 @@ begin
 					xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= '0';
 					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= '0';
 					if xdl_ov_hi_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= "0000" & vram_data_in(7 downto 4);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+1) <= "0000" & vram_data_in(3 downto 0);
-						if vram_data_in(7 downto 4) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= not(no_trans_reg);
-						end if;
-						if vram_data_in(3 downto 0) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= not(no_trans_reg);
+						if ver_127 = '1' and xdl_ov_lo_reg = '1' then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= '0';
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= '0';
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+1) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= "0000" & vram_data_in(3 downto 0);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= "0000" & vram_data_in(3 downto 0);
+							if vram_data_in(7 downto 4) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= not(no_trans_reg);
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= not(no_trans_reg);
+							end if;
+							if vram_data_in(3 downto 0) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
+							end if;
+						else
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+1) <= "0000" & vram_data_in(3 downto 0);
+							if vram_data_in(7 downto 4) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg) <= not(no_trans_reg);
+							end if;
+							if vram_data_in(3 downto 0) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+1) <= not(no_trans_reg);
+							end if;
 						end if;
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg) <= vram_data_in;
@@ -1376,16 +1401,20 @@ begin
 					xdl_char_attr_next <= vram_data_in;
 				else
 					-- pixels 2,3
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= '0';
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= '0';
+					if xdl_ov_hi_reg = '0' or ver_127 = '0' or xdl_ov_lo_reg = '0' then
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= '0';
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= '0';
+					end if;
 					if xdl_ov_hi_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= "0000" & vram_data_in(7 downto 4);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= "0000" & vram_data_in(3 downto 0);
-						if vram_data_in(7 downto 4) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
-						end if;
-						if vram_data_in(3 downto 0) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
+						if ver_127 = '0' or xdl_ov_lo_reg = '0' then
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= "0000" & vram_data_in(3 downto 0);
+							if vram_data_in(7 downto 4) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
+							end if;
+							if vram_data_in(3 downto 0) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
+							end if;
 						end if;
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= vram_data_in;
@@ -1395,7 +1424,7 @@ begin
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
 						end if;
 					end if;
-					if xdl_ov_lo_reg = '1' then
+					if xdl_ov_lo_reg = '1' and (xdl_ov_hi_reg = '0' or ver_127 = '0') then
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg);
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+1);
 						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg);
@@ -1454,13 +1483,30 @@ begin
 					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= '0';
 					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= '0';
 					if xdl_ov_hi_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= "0000" & vram_data_in(7 downto 4);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+5) <= "0000" & vram_data_in(3 downto 0);
-						if vram_data_in(7 downto 4) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= not(no_trans_reg);
-						end if;
-						if vram_data_in(3 downto 0) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= not(no_trans_reg);
+						if ver_127 = '1' and xdl_ov_lo_reg = '1' then
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= '0';
+							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= '0';
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+5) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= "0000" & vram_data_in(3 downto 0);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= "0000" & vram_data_in(3 downto 0);
+							if vram_data_in(7 downto 4) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= not(no_trans_reg);
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= not(no_trans_reg);
+							end if;
+							if vram_data_in(3 downto 0) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
+							end if;
+						else
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+5) <= "0000" & vram_data_in(3 downto 0);
+							if vram_data_in(7 downto 4) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+4) <= not(no_trans_reg);
+							end if;
+							if vram_data_in(3 downto 0) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+5) <= not(no_trans_reg);
+							end if;
 						end if;
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+4) <= vram_data_in;
@@ -1494,16 +1540,20 @@ begin
 			if xdl_ov_tlive_reg = '1' then
 				if xdl_ov_text_reg = '0' then
 					-- pixels 6,7
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= '0';
-					xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= '0';
+					if xdl_ov_hi_reg = '0' or ver_127 = '0' or xdl_ov_lo_reg = '0' then
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= '0';
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= '0';
+					end if;
 					if xdl_ov_hi_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= "0000" & vram_data_in(7 downto 4);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= "0000" & vram_data_in(3 downto 0);
-						if vram_data_in(7 downto 4) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
-						end if;
-						if vram_data_in(3 downto 0) = x"0" then
-							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
+						if ver_127 = '0' or xdl_ov_lo_reg = '0' then
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= "0000" & vram_data_in(7 downto 4);
+							xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= "0000" & vram_data_in(3 downto 0);
+							if vram_data_in(7 downto 4) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
+							end if;
+							if vram_data_in(3 downto 0) = x"0" then
+								xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
+							end if;
 						end if;
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= vram_data_in;
@@ -1513,7 +1563,7 @@ begin
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
 						end if;
 					end if;
-					if xdl_ov_lo_reg = '1' then
+					if xdl_ov_lo_reg = '1' and (xdl_ov_hi_reg = '0' or ver_127 = '0') then
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+4);
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+5);
 						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+4);
@@ -1621,7 +1671,7 @@ begin
 				xdl_map_ht_next <= "00111";
 				xdl_ov_size_next <= "01";
 				xdl_ov_pal_next <= "01";
-				xdl_pf_pal_next <= gtia_palette_reg;
+				xdl_pf_pal_set_next <= '0';
 				xdl_gp_next <= (others => '1');
 				xdl_cmd_next <= (others => '0');
 				xdl_map_active_next <= '0';
@@ -1661,6 +1711,7 @@ begin
 				xdl_ov_size_next <= vram_data_in(1 downto 0);
 				xdl_ov_pal_next <= vram_data_in(5 downto 4);
 				xdl_pf_pal_next <= vram_data_in(7 downto 6);
+				xdl_pf_pal_set_next <= '1';
 			when 23 =>
 				xdl_gp_next <= vram_data_in;
 			when 24 =>
