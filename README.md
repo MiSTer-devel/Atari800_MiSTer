@@ -7,6 +7,7 @@
 ### System ROMs (Atari800)
 *Note:* With the introduction of the VBXE implementation the core no longer has built-in ROM data and ROM files have to be supplied by the user as detailed here.
 This also means that the OS built-in HSIO functionality presence depends on which particular OS ROMs you use/install (the HSIO used to be part of the built-in OS ROM), if you use a plain stock OS ROM, the HSIO can be used through the PBI BIOS (see below).
+As of November 2026, the OS ROM files shipped with the core (including the one integrated in the 5200 core) are the current versions of Atari OS and Basic developed by Avery Lee for the Altirra emulator, see the altirra folder for more information and the license information and also https://www.virtualdub.org/altirra.html. Note that some titles might not be compatible with Altirra OS in which case you may need to install genuine Atari ROM files (see next).
 
 You should supply XL/XE OS ROM as games/ATARI800/boot0.rom, or load a corresponding file through OSD (this file should be 16K in size). **Note:** this ROM file also applies to the 400/800 machine type when the 16K option is selected for the 400/800 ROM type (the original 400/800 needs a special board for that, the 16K option enables an equivalent of such a board).
 Supply XL/XE Basic ROM as games/ATARI800/boot1.rom, or load it through OSD (this file should be 8K in size).
